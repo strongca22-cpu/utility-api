@@ -508,22 +508,55 @@
 - [x] Route ordering fix: `/rates/best-estimate` registered before `/rates/{pwsid}`
 - [x] Tested: Sacramento resolves $50.31/mo, San Diego $56.19/mo (eAR 2022 anchor)
 
+## Completed (Sprint 8 — Cross-Year Analysis + State Expansion Research — Session 7 cont.)
+
+### Cross-Year eAR Rate Change Analysis
+- [x] 180 utilities with bill_12ccf in both 2021 and 2022
+- [x] 173 clean, 7 outliers (>50% change, likely reporting corrections)
+- [x] **Median bill change: +1.0%/yr**, mean +3.5%/yr
+- [x] **Fixed charge: +1.9%/yr** median (2020→2022, 170 utilities)
+- [x] 45% flat (±2%), 47% increasing, 8% decreasing
+- [x] Script: `python scripts/analyze_ear_rate_changes.py [--csv]`
+
+### State Expansion Research
+- [x] Researched TX, AZ, OR, UNC EFC, AWWA sources
+
+**Findings by source:**
+
+| Source | Coverage | Format | Access | Priority |
+|--------|----------|--------|--------|----------|
+| **OR League of Cities 2023** | 71 cities, 40 with bills | Socrata CSV (free-text bills, needs parsing) | Free, Socrata API | Medium — small coverage, messy format |
+| **UNC EFC NC Dashboard** | NC statewide, 2024 data | Interactive dashboard, download button | Free | High — most recent, good coverage |
+| **UNC EFC IA Dashboard** | IA statewide, 2023 survey | Interactive dashboard | Free | High — IA is a target state |
+| **UNC EFC WV/FL** | WV (2022 PSC data), FL (2020 Raftelis) | Interactive dashboards | Free | Medium — older data |
+| **AWWA Rate Survey** | 450 utilities, all 50 states | Subscription platform (Raftelis) | Paid subscription | Low — paywall |
+| **TX TWDB** | Water use data, not rate data | Various | Free | Low — no rate data found |
+| **AZ ADWR** | Water supply/demand, not rates | ArcGIS, CSV | Free | Low — no rate data found |
+
+**Recommendation for Sprint 9:**
+1. UNC EFC NC dashboard (most mature, 2024 data, free download)
+2. UNC EFC IA dashboard (IA is DC-relevant, 2023 data)
+3. OR League of Cities CSV (small but free, needs bill amount parsing)
+
 ## Remaining Work
 
-### Cross-Year Rate Change Analysis (tabled)
-- [ ] eAR tier inflation fixed — prerequisite cleared
-- [ ] Compare eAR 2020 vs 2021 vs 2022 fixed charges and bill amounts
-- [ ] Compute annual rate change for utilities with clean data
+### UNC EFC Dashboard Ingest (NC + IA)
+- [ ] Access NC dashboard download, assess format and coverage
+- [ ] Map to water_rates schema if viable
+- [ ] Repeat for IA dashboard
+
+### OR League of Cities Rate Survey
+- [ ] Parse free-text bill amounts from 2023 survey CSV
+- [ ] Match city names to PWSIDs (fuzzy match against SDWIS)
+- [ ] Ingest as source='or_loc_2023'
 
 ### Infrastructure
 - [ ] Parser prompt refinement: water-only extraction, multi-year columns, seasonal structures
 - [ ] Claude Batch API integration (replace single calls once prompt is stable)
 
-### Expansion
-- [ ] TX, AZ, OR state-level rate data sources (equivalent to CA eAR)
-- [ ] UNC EFC dashboards as verification (NC, IA, WV, FL)
-- [ ] AWWA rate survey data (if accessible)
-- [ ] VA remaining 9 utilities: manual PDF curation
+### VA Remaining
+- [ ] 9 VA utilities need manual PDF curation
+- [ ] CivicPlus crawler found some URLs but content not parseable
 
 ## Current API Surface
 
@@ -540,5 +573,5 @@
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 8 — Cross-year eAR rate change analysis (2020-2022, clean data ready). Then state expansion: research TX/AZ/OR bulk rate data sources equivalent to CA eAR. VA remaining 9 utilities if time permits. Start from docs/next_steps.md.
+UAPI Sprint 9 — State expansion: ingest UNC EFC NC dashboard rate data (2024, free download). Then IA dashboard. OR League of Cities 2023 CSV if time permits. Start from docs/next_steps.md.
 ```
