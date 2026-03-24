@@ -256,12 +256,28 @@
 | Front Royal | 15,070 | No PDF links on billing page |
 | Radford | 17,403 | All DocumentCenter links 404 |
 
-## Sprint 3 — Remaining Work
+## Completed (Sprint 3 v2 CA — Session 5, cont.)
 
-- [ ] Manual PDF curation for 9 tabled VA utilities
-- [ ] Fix Colonial Heights tier limits + Manassas Park water-only re-parse
-- [ ] Parser prompt refinement: water-only extraction, multi-year column handling
-- [ ] Run full pipeline on CA MDWD utilities (194 targets)
+- [x] Curated URLs for top 21 CA utilities by population (~10.7M pop)
+- [x] CA pipeline round 1: 3/21 parsed — EBMUD (high), San Diego (high), LADWP (partial)
+- [x] SearXNG 0-result DuckDuckGo fallback added to rate_discovery.py
+- [x] CA batch discovery script with rate-limit detection
+- [x] **Key finding**: CA has same PDF requirement as VA. HTML rate pages are mostly navigation/CivicPlus/Granicus — need PDF links.
+- [x] **LADWP is complex**: seasonal + budget-based rates with temperature zone allotments. Parsed partially but needs specialized handling.
+
+## Sprint 3 — Remaining Work (tabled for manual curation session)
+
+### VA Manual PDF Curation (9 tabled + 2 re-parse)
+- [ ] Portsmouth, Lynchburg, Winchester, Salem, Staunton, Waynesboro, Front Royal, Radford, Western VA Water Authority
+- [ ] Fix Colonial Heights tier limits (unit conversion) + Manassas Park water-only re-parse
+
+### CA PDF Curation (18 remaining from top 21 + 173 untouched)
+- [ ] Playwright PDF-link crawling on 18 failed CA utilities (same technique as VA round 3)
+- [ ] Batch discovery for remaining 173 CA utilities (needs SearXNG cooldown or chunked runs)
+- [ ] LADWP specialized handling (seasonal/budget-based rate structure)
+
+### Infrastructure
+- [ ] Parser prompt refinement: water-only extraction, multi-year columns, seasonal structures
 - [ ] Claude Batch API integration (replace single calls once prompt is stable)
 - [ ] Hughes et al. 2025 outreach — request raw rate data for validation corpus
 
@@ -298,11 +314,11 @@
 | `utility.county_boundaries` | 3,235 | Census TIGER |
 | `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
 | `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
-| `utility.water_rates` | 26 | 22 high/medium + 4 failed (LLM-parsed) |
-| `utility.pipeline_runs` | 12 | Audit trail |
+| `utility.water_rates` | 25 | VA: 22 high/med + 4 failed; CA: 2 high + 1 partial (LLM-parsed) |
+| `utility.pipeline_runs` | 14 | Audit trail |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 3 v3 — Fix Colonial Heights/Manassas Park parse issues. Manual PDF curation for 9 tabled VA utilities. Then scale to CA (194 utilities). SearXNG at localhost:8888. Start from docs/next_steps.md.
+UAPI Sprint 3 v3 — Manual PDF curation session. Use Playwright to crawl VA (9) + CA (18) tabled utility pages, extract PDF links, re-run pipeline. Fix Colonial Heights/Manassas Park parses. SearXNG at localhost:8888. Start from docs/next_steps.md.
 ```
