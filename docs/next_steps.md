@@ -469,10 +469,12 @@
 - [x] Result: eAR tier inflation flags → 0, conflict category → 0, mean CV 18.1% → 16.4%
 - [x] Script: `python scripts/fix_ear_tier_inflation.py [--dry-run]`
 
-### Combined Water+Sewer Flags
-- [x] 7 scraped records flagged as suspected combined water+sewer (confidence → low)
-- [x] Flagged: Vallejo (3.7x), Redwood City (2.2x), San Diego (2.1x), EBMUD (2.0x), Garden Grove (1.7x), Tracy (1.6x), Livermore (1.5x)
-- [ ] Actual re-parse with water-only prompt deferred (requires API key + pipeline run)
+### Combined Water+Sewer Investigation (Sprint 7)
+- [x] 7 scraped records re-parsed with explicit water-only prompt
+- [x] **Result: NOT combined water+sewer.** 6/7 identical bills, 1 minor change (EBMUD -3.5%)
+- [x] High CA water prices (2024-2026 vintage) explain divergence from eAR/OWRS (2017-2022)
+- [x] All 7 restored to high confidence. EBMUD bill corrected to $105.75.
+- [x] Re-parse cost: $0.04 (7 Sonnet calls)
 
 ### Best-Estimate Source Priority
 - [x] Built `utility.rate_best_estimate` table — one row per PWSID
@@ -498,22 +500,20 @@
 | `utility.rate_best_estimate` | 443 | Best-estimate selection per PWSID |
 | `utility.pipeline_runs` | 26 | Audit trail |
 
-## Remaining Work
-
-### Re-parse Combined Water+Sewer Scrapes (deferred)
-- [ ] 7 utilities need re-parse with "water-only, not combined" prompt
-- [ ] Requires ANTHROPIC_API_KEY and pipeline run (~$0.05)
-- [ ] After re-parse: re-run best estimate builder
-
-### Cross-Year Rate Change Analysis (tabled)
-- [ ] eAR tier inflation now fixed — prerequisite cleared
-- [ ] Compare eAR 2020 vs 2021 vs 2022 fixed charges and bill amounts
-- [ ] Compute annual rate change for utilities with clean data
-- [ ] User note: tabled until current-state accuracy is satisfactory
+## Completed (Sprint 7 — API + Re-parse + Verification — Session 7 cont.)
 
 ### API Endpoints
-- [ ] `GET /rates/best-estimate?state=CA` — serve from rate_best_estimate table
-- [ ] `GET /resolve` update — include best_estimate_bill in response
+- [x] `GET /rates/best-estimate?state=CA&min_confidence=high` — serves from rate_best_estimate table
+- [x] `GET /resolve` updated — returns best_estimate_bill_10ccf, rate_source, rate_confidence, rate_n_sources, rate_effective_date
+- [x] Route ordering fix: `/rates/best-estimate` registered before `/rates/{pwsid}`
+- [x] Tested: Sacramento resolves $50.31/mo, San Diego $56.19/mo (eAR 2022 anchor)
+
+## Remaining Work
+
+### Cross-Year Rate Change Analysis (tabled)
+- [ ] eAR tier inflation fixed — prerequisite cleared
+- [ ] Compare eAR 2020 vs 2021 vs 2022 fixed charges and bill amounts
+- [ ] Compute annual rate change for utilities with clean data
 
 ### Infrastructure
 - [ ] Parser prompt refinement: water-only extraction, multi-year columns, seasonal structures
@@ -525,8 +525,20 @@
 - [ ] AWWA rate survey data (if accessible)
 - [ ] VA remaining 9 utilities: manual PDF curation
 
+## Current API Surface
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /resolve?lat=X&lng=Y` | Water utility + SDWIS + MDWD + Aqueduct + **best-estimate rate** for a point |
+| `GET /permits?lat=X&lng=Y&radius_km=10` | All permits within radius |
+| `GET /facility/{id}/permits` | Linked + nearby permits for an SS facility |
+| `GET /rates/{pwsid}` | Full rate detail: tiers, bills, provenance for one utility |
+| `GET /rates?state=VA` | List all parsed rates for a state |
+| `GET /rates/best-estimate?state=CA` | **Best-estimate rates** with source priority + confidence |
+| `GET /health` | Data vintage for all pipeline steps |
+
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 7 — API integration: serve best-estimate rates from /resolve and /rates/best-estimate endpoints. Re-parse 7 combined water+sewer scrapes with water-only prompt. Then cross-year eAR rate change analysis (clean data ready). Start from docs/next_steps.md.
+UAPI Sprint 8 — Cross-year eAR rate change analysis (2020-2022, clean data ready). Then state expansion: research TX/AZ/OR bulk rate data sources equivalent to CA eAR. VA remaining 9 utilities if time permits. Start from docs/next_steps.md.
 ```
