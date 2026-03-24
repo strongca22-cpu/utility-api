@@ -3,8 +3,8 @@
 # Strategy: Top 21 utilities by population, PDF-first approach
 # PDFs parse at near-100% success; HTML pages mostly fail
 
-# Los Angeles DWP — Schedule A Residential page (4M pop) [complex: seasonal/budget-based]
-CA1910067: "https://www.ladwp.com/account/customer-service/water-rates/schedule-residential"
+# Los Angeles DWP — Water Rates Ordinance PDF (53 pages, full rate structure) (4M pop)
+CA1910067: "https://www.ladwp.com/sites/default/files/documents/Water_Rates_Ordinance_4_15_16.pdf"
 
 # San Diego — Water Billing Rates (1.4M pop)
 CA3710020: "https://www.sandiego.gov/public-utilities/customer-support/water-billing-rates"
@@ -27,8 +27,8 @@ CA0110005: "https://www.ebmud.com/download_file/force/34400/702?Rate_Document_fo
 # Bakersfield — CPUC Cal Water fact sheet PDF (380K pop)
 CA1510013: "https://www.cpuc.ca.gov/-/media/cpuc-website/divisions/news-and-outreach/documents/pao/pphs/2022/cal-water-2021-grc-fact-sheet---bakersfield.pdf"
 
-# Anaheim — Water Rate Public Hearing documentation PDF (352K pop)
-CA3010005: "https://www.anaheim.net/DocumentCenter/View/69725/Water-Rate-Public-Hearing-Documentation"
+# Anaheim — General Water Service Rate Schedule PDF (352K pop)
+CA3010005: "https://www.anaheim.net/DocumentCenter/View/2076"
 
 # Riverside Public Utilities — Schedule WA-5 PDF (326K pop)
 CA3310003: "https://riversideca.gov/utilities/sites/riversideca.gov.utilities/files/pdf/rates-water/Water%20Schedule%20WA-5.pdf"
