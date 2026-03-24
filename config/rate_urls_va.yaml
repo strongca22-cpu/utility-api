@@ -62,8 +62,8 @@ VA3710100: "https://www.norfolk.gov/654/Water-Sewer-Rates"
 # Portsmouth — CivicPlus billing page (fixed scraper now renders; has CCF rate info)
 VA3740600: "https://utilities.portsmouthva.gov/152/Billing-Information"
 
-# Salem
-VA2775300: "https://www.salemva.gov/469/Water-Rates"
+# Salem — FAQ page with explicit water/sewer rate values (CivicPlus crawler +13 score)
+VA2775300: "https://www.salemva.gov/faq.aspx?qid=303"
 
 # Vienna — Fairfax Water Rate Schedule PDF (April 2025)
 VA6059800: "https://www.fairfaxwater.org/sites/default/files/customer_service/Fairfax%20Water%20Rate%20Schedule%20Adopted%204-1-2025.pdf"
@@ -76,8 +76,8 @@ VA3550051: "https://www.cityofchesapeake.net/954/Water-Sewer-Rates"
 # Colonial Heights
 VA3570150: "https://www.colonialheightsva.gov/387/Tax-Utility-Rates"
 
-# Front Royal
-VA2187406: "https://www.frontroyalva.com/448/Understanding-Residential-Utility-Bills"
+# Front Royal — Fee Schedule adopted May 2025 (CivicPlus crawler discovery)
+VA2187406: "https://www.frontroyalva.com/766/fee-schedule-adopted-may-27-2025"
 
 # Leesburg — Loudoun Water Rates, Rules and Regulations PDF (Oct 2025)
 VA6107300: "https://www.loudounwater.org/sites/default/files/Board%20-%20Rates%20Rules%20Regs%20-%20Document%20-%20October%209%202025%20-%20Carnes%20%281%29.pdf"
@@ -118,8 +118,8 @@ VA1750100: "https://www.radfordva.gov/documentcenter/view/5940"
 # VA2775300: "https://www.salemva.gov/faq.aspx?qid=303"  # Override: FAQ has rate values
 # Previous URL (Water Rates page) may have CivicPlus rendering issues
 
-# Waynesboro — Fee Schedule Residential (DocumentCenter PDF, previously not found)
-VA2820775: "https://www.waynesboro.va.us/documentcenter/view/6805"
+# Waynesboro — still tabled: DC view/6805 is building permits, not water rates
+# VA2820775: needs manual URL curation
 
 # Front Royal — Combined Fee Schedule (adopted May 2025)
 # VA2187406: "https://www.frontroyalva.com/766/fee-schedule-adopted-may-27-2025"

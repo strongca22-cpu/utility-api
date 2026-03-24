@@ -1,0 +1,5 @@
+# Auto-discovered rate URLs via SearXNG
+# State: CA
+# Discovered: 0 | Last run: 2026-03-24T09:22:42.420586
+# Run: python scripts/standalone_discover.py --state CA
+
