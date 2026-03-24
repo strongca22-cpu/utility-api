@@ -1,0 +1,36 @@
+# Data source URLs and configuration for utility enrichment pipeline
+# Sprint 1: VA + CA pilot
+
+states:
+  - VA
+  - CA
+
+sources:
+  epa_cws:
+    description: "EPA Community Water System Service Area Boundaries"
+    url: "https://epa.maps.arcgis.com/home/item.html?id=80c6912ef14f46e480f5afd807767b4b"
+    feature_service: "https://services.arcgis.com/cJ9YHowT8TU7DUyn/arcgis/rest/services/CWSBoundaries/FeatureServer/0"
+    format: geojson
+    license: "Public domain (17 USC §105)"
+    notes: "~44K CWS polygons nationally. 99% population coverage."
+
+  sdwis_echo:
+    description: "SDWIS data via EPA ECHO bulk download"
+    url: "https://echo.epa.gov/files/echodownloads/SDWA_latest_downloads.zip"
+    format: csv_zip
+    license: "Public domain"
+    notes: "Contains SDWA_PUB_WATER_SYSTEMS.csv, SDWA_VIOLATIONS.csv, etc."
+
+  mdwd:
+    description: "Municipal Drinking Water Database (Harvard Dataverse)"
+    doi: "10.7910/DVN/DFB6NG"
+    url: "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DFB6NG"
+    format: "csv/stata"
+    license: "CC BY 4.0"
+    notes: "~2,219 municipal utilities. Finances, demographics, 2022 rate snapshot."
+
+  aqueduct:
+    description: "WRI Aqueduct 4.0 water risk data"
+    local_gdb: "${AQUEDUCT_GDB_PATH}"
+    license: "CC BY 4.0"
+    notes: "Already downloaded in strong-strategic project. ~23K watershed polygons."

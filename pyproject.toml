@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "utility-api"
+version = "0.1.0"
+description = "Water utility intelligence API — enrichment layer + standalone product"
+requires-python = ">=3.10"
+dependencies = [
+    "sqlalchemy>=2.0",
+    "geoalchemy2>=0.14",
+    "psycopg[binary]>=3.1",
+    "alembic>=1.13",
+    "geopandas>=0.14",
+    "shapely>=2.0",
+    "pyproj>=3.6",
+    "fiona>=1.9",
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.23",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "requests>=2.31",
+    "typer>=0.9",
+    "loguru>=0.7",
+    "pandas>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1",
+    "httpx>=0.25",
+]
+
+[project.scripts]
+ua-ingest = "utility_api.cli.ingest:app"
+ua-api = "utility_api.cli.serve:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 99
+target-version = "py310"
