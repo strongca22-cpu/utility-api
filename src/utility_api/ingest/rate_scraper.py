@@ -104,15 +104,22 @@ def _clean_html_text(soup: BeautifulSoup) -> str:
     for comment in soup.find_all(string=lambda t: isinstance(t, Comment)):
         comment.extract()
 
-    # Try to find main content area first
-    main_content = (
-        soup.find("main")
-        or soup.find("article")
-        or soup.find(id=re.compile(r"content|main", re.I))
-        or soup.find(class_=re.compile(r"content|main|body", re.I))
-        or soup.body
-        or soup
-    )
+    # Try to find main content area — prefer the largest matching element
+    # (avoids picking tiny skip-nav or accessibility wrappers)
+    main_content = soup.find("main") or soup.find("article")
+    if main_content is None:
+        # Search by id/class patterns, pick the one with the most text
+        candidates = []
+        for el in soup.find_all(id=re.compile(r"content|main", re.I)):
+            candidates.append(el)
+        for el in soup.find_all(class_=re.compile(r"content|main|body", re.I)):
+            if el not in candidates:
+                candidates.append(el)
+        if candidates:
+            # Pick the candidate with the longest text content
+            main_content = max(candidates, key=lambda el: len(el.get_text(strip=True)))
+        else:
+            main_content = soup.body or soup
 
     # Get text with some structure preservation
     text = main_content.get_text(separator="\n", strip=True)

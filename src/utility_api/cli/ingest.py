@@ -91,6 +91,7 @@ def rates(
     search_delay: float = typer.Option(2.0, "--search-delay", help="Seconds between web searches"),
     scrape_delay: float = typer.Option(1.5, "--scrape-delay", help="Seconds between page scrapes"),
     url_file: str = typer.Option(None, "--url-file", "-f", help="YAML file with curated pwsid→url mappings"),
+    max_cost: float = typer.Option(None, "--max-cost", help="Hard cap on API cost in USD"),
 ):
     """Discover, scrape, and parse water rates via Claude API.
 
@@ -110,6 +111,7 @@ def rates(
         scrape_delay=scrape_delay,
         dry_run=dry_run,
         url_file=url_file,
+        max_cost_usd=max_cost,
     )
 
 

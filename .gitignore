@@ -5,20 +5,40 @@ __pycache__/
 .venv/
 dist/
 build/
+*.egg
 
 # Data (large files, downloaded on demand)
-data/raw/
-data/interim/
+data/
+*.csv
+*.parquet
+*.gpkg
+*.gdb
+*.shp
+*.geojson
 
-# Environment
+# Environment & secrets
 .env
+.env.*
+*.key
+credentials*.json
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # Logs
-logs/*.log
+logs/
 
 # OS
 .DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Strong-Strategic isolation — never merge these
+# This repo shares a PostGIS DB but is a separate codebase
+strong-strategic/
+strong_strategic/

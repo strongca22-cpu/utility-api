@@ -300,6 +300,7 @@ def run_rate_ingest(
     dry_run: bool = False,
     skip_existing: bool = True,
     url_file: str | None = None,
+    max_cost_usd: float | None = None,
 ) -> dict:
     """Run the full rate ingest pipeline.
 
@@ -326,6 +327,9 @@ def run_rate_ingest(
     url_file : str | None
         Path to YAML file with curated pwsid → url mappings.
         If provided, uses curated URL instead of web search for matching PWSIDs.
+    max_cost_usd : float | None
+        Hard cap on estimated API cost in USD. Pipeline stops when exceeded.
+        Uses Sonnet pricing: $3/M input + $15/M output tokens.
 
     Returns
     -------
@@ -356,7 +360,14 @@ def run_rate_ingest(
         "scraped": 0,
         "parsed_ok": 0,
         "failed": 0,
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "estimated_cost_usd": 0.0,
     }
+
+    # Sonnet pricing: $3/M input, $15/M output
+    COST_PER_INPUT_TOKEN = 3.0 / 1_000_000
+    COST_PER_OUTPUT_TOKEN = 15.0 / 1_000_000
 
     for i, util in enumerate(utilities):
         pwsid = util["pwsid"]
@@ -430,6 +441,32 @@ def run_rate_ingest(
         # Step 4: Parse with Claude API
         parse = parse_rate_text(scrape.text, utility_name=name, state_code=state)
 
+        # Track API cost
+        stats["total_input_tokens"] += parse.input_tokens
+        stats["total_output_tokens"] += parse.output_tokens
+        call_cost = (parse.input_tokens * COST_PER_INPUT_TOKEN
+                     + parse.output_tokens * COST_PER_OUTPUT_TOKEN)
+        stats["estimated_cost_usd"] += call_cost
+        logger.info(f"  API cost: ${call_cost:.4f} (cumulative: ${stats['estimated_cost_usd']:.4f})")
+
+        if max_cost_usd and stats["estimated_cost_usd"] >= max_cost_usd:
+            logger.warning(
+                f"  ⚠ Cost cap reached: ${stats['estimated_cost_usd']:.2f} >= ${max_cost_usd:.2f}. "
+                f"Stopping pipeline."
+            )
+            # Still store this last result before stopping
+            bill_5, bill_10 = calculate_bills_from_parse(parse)
+            _store_rate_record(
+                pwsid, name, state, county,
+                source_url=rate_url, raw_text_hash=scrape.text_hash,
+                parse_result=parse, bill_5ccf=bill_5, bill_10ccf=bill_10,
+            )
+            if parse.parse_confidence in ("high", "medium"):
+                stats["parsed_ok"] += 1
+            else:
+                stats["failed"] += 1
+            break
+
         # Step 5: Calculate bills
         bill_5, bill_10 = calculate_bills_from_parse(parse)
 
@@ -463,6 +500,8 @@ def run_rate_ingest(
     logger.info(f"  Pages scraped: {stats['scraped']}")
     logger.info(f"  Parsed OK: {stats['parsed_ok']}")
     logger.info(f"  Failed: {stats['failed']}")
+    logger.info(f"  API tokens: {stats['total_input_tokens']}in + {stats['total_output_tokens']}out")
+    logger.info(f"  Estimated cost: ${stats['estimated_cost_usd']:.4f}")
 
     if not dry_run:
         schema = settings.utility_schema
