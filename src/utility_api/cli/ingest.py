@@ -90,11 +90,15 @@ def rates(
     dry_run: bool = typer.Option(False, "--dry-run", help="Discover + scrape only, no API calls"),
     search_delay: float = typer.Option(2.0, "--search-delay", help="Seconds between web searches"),
     scrape_delay: float = typer.Option(1.5, "--scrape-delay", help="Seconds between page scrapes"),
+    url_file: str = typer.Option(None, "--url-file", "-f", help="YAML file with curated pwsid→url mappings"),
 ):
     """Discover, scrape, and parse water rates via Claude API.
 
     Pipeline: URL discovery → web scrape → Claude API parse → bill calculation → DB store.
     Requires ANTHROPIC_API_KEY in environment or .env file.
+
+    Use --url-file to provide curated URLs (skips web search for those PWSIDs).
+    Example: ua-ingest rates --url-file config/rate_urls_va.yaml
     """
     from utility_api.ingest.rates import run_rate_ingest
 
@@ -105,6 +109,7 @@ def rates(
         search_delay=search_delay,
         scrape_delay=scrape_delay,
         dry_run=dry_run,
+        url_file=url_file,
     )
 
 

@@ -1,0 +1,54 @@
+# Manually curated rate page URLs for VA MDWD utilities
+# Format: pwsid: url
+# Sources: manual web search, utility website review
+# Created: 2026-03-23
+#
+# URL types:
+#   - HTML pages with rate tables (best case)
+#   - PDF rate schedules (extracted via pymupdf)
+#   - Utility billing/rates landing pages
+#
+# Notes:
+#   - Many VA municipal sites use CivicPlus (JS-rendered, unreliable for scraping)
+#   - PDF rate schedules are often the most reliable source
+#   - Some utilities are served by regional authorities (e.g., Fairfax Water)
+
+# Alexandria — served by Virginia-American Water Company
+VA6510010: "https://www.amwater.com/vaaw/Resources/PDF/VA%20Water%20Tariff.pdf"
+
+# Blacksburg — Giles-Bland-Pulaski-Wythe (GBPW) utility
+VA1121052: "https://www.gbpw.com/sites/default/files/2024-03/BBResidentialRates_0.pdf"
+
+# Fairfax Water (not in MDWD but good test case — serves large portion of NoVA)
+# VA_FAIRFAX: "https://www.fairfaxwater.org/rates"
+
+# Additional VA utilities — URLs to be populated via discovery or manual search
+# VA6013010: ""  # Arlington County
+# VA2540500: ""  # Charlottesville
+# VA1121090: ""  # Christiansburg
+# VA3550051: ""  # Chesapeake
+# VA3570150: ""  # Colonial Heights
+# VA5590100: ""  # Danville
+# VA6630050: ""  # Fredericksburg
+# VA2187406: ""  # Front Royal
+# VA2660345: ""  # Harrisonburg
+# VA6107300: ""  # Leesburg
+# VA5680200: ""  # Lynchburg
+# VA6685100: ""  # Manassas
+# VA6687100: ""  # Manassas Park
+# VA5690400: ""  # Martinsville
+# VA3700500: ""  # Newport News
+# VA3710100: ""  # Norfolk
+# VA3730750: ""  # Petersburg
+# VA3740600: ""  # Portsmouth
+# VA1750100: ""  # Radford
+# VA4760100: ""  # Richmond
+# VA2775300: ""  # Salem
+# VA2790600: ""  # Staunton
+# VA3800805: ""  # Suffolk
+# VA6059800: ""  # Vienna
+# VA3810900: ""  # Virginia Beach
+# VA2820775: ""  # Waynesboro
+# VA2770900: ""  # Western Virginia Water Authority (Roanoke)
+# VA3830850: ""  # Williamsburg
+# VA2840500: ""  # Winchester

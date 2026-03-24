@@ -55,6 +55,31 @@ from utility_api.ingest.rate_discovery import discover_rate_url
 from utility_api.ingest.rate_parser import parse_rate_text
 from utility_api.ingest.rate_scraper import scrape_rate_page
 
+# Common fractional meter sizes → decimal inches
+_METER_SIZE_MAP = {
+    "5/8": 0.625,
+    "3/4": 0.75,
+    "5/8 x 3/4": 0.625,
+    "1": 1.0,
+    "1 1/2": 1.5,
+    "2": 2.0,
+}
+
+
+def _coerce_meter_size(value) -> float | None:
+    """Coerce meter size to float, handling fractional strings like '5/8'."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip().strip('"').strip("'")
+    if s in _METER_SIZE_MAP:
+        return _METER_SIZE_MAP[s]
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return None
+
 
 def _get_target_utilities(
     pwsids: list[str] | None = None,
@@ -210,7 +235,7 @@ def _store_rate_record(
             "struct_type": parse_result.rate_structure_type,
             "billing_freq": parse_result.billing_frequency,
             "fixed_charge": parse_result.fixed_charge_monthly,
-            "meter_size": parse_result.meter_size_inches,
+            "meter_size": _coerce_meter_size(parse_result.meter_size_inches),
             "t1_limit": parse_result.tier_1_limit_ccf,
             "t1_rate": parse_result.tier_1_rate,
             "t2_limit": parse_result.tier_2_limit_ccf,
@@ -232,6 +257,40 @@ def _store_rate_record(
         conn.commit()
 
 
+def _load_curated_urls(url_file: str | None = None) -> dict[str, str]:
+    """Load curated rate page URLs from a YAML file.
+
+    Parameters
+    ----------
+    url_file : str | None
+        Path to YAML file mapping pwsid → url.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of pwsid → url.
+    """
+    if url_file is None:
+        return {}
+
+    from pathlib import Path
+
+    import yaml
+
+    path = Path(url_file)
+    if not path.exists():
+        logger.warning(f"URL file not found: {url_file}")
+        return {}
+
+    with open(path) as f:
+        data = yaml.safe_load(f) or {}
+
+    # Filter to entries with actual URLs (not empty/commented)
+    urls = {k: v for k, v in data.items() if v and isinstance(v, str) and v.strip()}
+    logger.info(f"Loaded {len(urls)} curated URLs from {url_file}")
+    return urls
+
+
 def run_rate_ingest(
     pwsids: list[str] | None = None,
     state_filter: list[str] | None = None,
@@ -240,12 +299,13 @@ def run_rate_ingest(
     scrape_delay: float = 1.5,
     dry_run: bool = False,
     skip_existing: bool = True,
+    url_file: str | None = None,
 ) -> dict:
     """Run the full rate ingest pipeline.
 
     Steps:
     1. Get target utilities from DB
-    2. For each utility: discover URL → scrape → parse → calculate → store
+    2. For each utility: use curated URL or discover URL → scrape → parse → calculate → store
 
     Parameters
     ----------
@@ -263,6 +323,9 @@ def run_rate_ingest(
         If True, print results but don't write to DB.
     skip_existing : bool
         If True, skip utilities with existing high/medium parses.
+    url_file : str | None
+        Path to YAML file with curated pwsid → url mappings.
+        If provided, uses curated URL instead of web search for matching PWSIDs.
 
     Returns
     -------
@@ -272,7 +335,14 @@ def run_rate_ingest(
     started = datetime.now(timezone.utc)
     logger.info("=== Water Rate Ingest Starting ===")
 
+    # Load curated URLs if provided
+    curated_urls = _load_curated_urls(url_file)
+
     # Step 1: Get targets
+    if curated_urls and not pwsids:
+        # If url_file provided without specific pwsids, target those in the file
+        pwsids = list(curated_urls.keys())
+
     utilities = _get_target_utilities(pwsids, state_filter, limit, skip_existing)
     logger.info(f"Target utilities: {len(utilities)}")
 
@@ -296,9 +366,15 @@ def run_rate_ingest(
 
         logger.info(f"\n[{i + 1}/{len(utilities)}] {name} ({pwsid}, {state})")
 
-        # Step 2: Discover URL
-        discovery = discover_rate_url(pwsid, name, state, county)
-        if not discovery.best_url:
+        # Step 2: Discover URL (use curated if available)
+        if pwsid in curated_urls:
+            rate_url = curated_urls[pwsid]
+            logger.info(f"  Using curated URL: {rate_url}")
+        else:
+            discovery = discover_rate_url(pwsid, name, state, county)
+            rate_url = discovery.best_url
+
+        if not rate_url:
             logger.warning(f"  No URL found for {name}")
             stats["failed"] += 1
             if not dry_run:
@@ -310,7 +386,7 @@ def run_rate_ingest(
                     raw_text_hash="",
                     parse_result=ParseResult(
                         parse_confidence="failed",
-                        parse_notes=f"URL discovery failed: {discovery.error}",
+                        parse_notes="URL discovery failed: no rate page found",
                         parse_model="",
                     ),
                     bill_5ccf=None,
@@ -323,7 +399,7 @@ def run_rate_ingest(
         time.sleep(search_delay)
 
         # Step 3: Scrape
-        scrape = scrape_rate_page(discovery.best_url)
+        scrape = scrape_rate_page(rate_url)
         if scrape.error and not scrape.is_pdf:
             logger.warning(f"  Scrape failed: {scrape.error}")
             stats["failed"] += 1
@@ -331,7 +407,7 @@ def run_rate_ingest(
                 from utility_api.ingest.rate_parser import ParseResult
                 _store_rate_record(
                     pwsid, name, state, county,
-                    source_url=discovery.best_url,
+                    source_url=rate_url,
                     raw_text_hash="",
                     parse_result=ParseResult(
                         parse_confidence="failed",
@@ -344,31 +420,11 @@ def run_rate_ingest(
             time.sleep(scrape_delay)
             continue
 
-        if scrape.is_pdf:
-            logger.info(f"  PDF detected — skipping (future enhancement)")
-            stats["failed"] += 1
-            if not dry_run:
-                from utility_api.ingest.rate_parser import ParseResult
-                _store_rate_record(
-                    pwsid, name, state, county,
-                    source_url=discovery.best_url,
-                    raw_text_hash="",
-                    parse_result=ParseResult(
-                        parse_confidence="failed",
-                        parse_notes="PDF rate schedule — needs PDF extraction",
-                        parse_model="",
-                    ),
-                    bill_5ccf=None,
-                    bill_10ccf=None,
-                )
-            time.sleep(scrape_delay)
-            continue
-
         stats["scraped"] += 1
         time.sleep(scrape_delay)
 
         if dry_run:
-            logger.info(f"  [DRY RUN] Would parse {len(scrape.text)} chars from {discovery.best_url}")
+            logger.info(f"  [DRY RUN] Would parse {len(scrape.text)} chars from {rate_url}")
             continue
 
         # Step 4: Parse with Claude API
@@ -380,7 +436,7 @@ def run_rate_ingest(
         # Step 6: Store
         _store_rate_record(
             pwsid, name, state, county,
-            source_url=discovery.best_url,
+            source_url=rate_url,
             raw_text_hash=scrape.text_hash,
             parse_result=parse,
             bill_5ccf=bill_5,
