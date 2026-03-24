@@ -108,3 +108,26 @@ VA3810900: "https://virginiabeach.gov/connect/blog/new-fees-rates-effective-july
 
 # Williamsburg — James City Service Authority (JCSA)
 VA3830850: "https://www.jamescitycountyva.gov/DocumentCenter/View/2015/Rates--Charges-PDF"
+
+# ── Round 4: CivicPlus crawler discoveries (Sprint 4, 2026-03-24) ───────
+
+# Radford — Utility Rates FY2026 (DocumentCenter PDF, previously all 404)
+VA1750100: "https://www.radfordva.gov/documentcenter/view/5940"
+
+# Salem — FAQ page with explicit water/sewer rate tables
+# VA2775300: "https://www.salemva.gov/faq.aspx?qid=303"  # Override: FAQ has rate values
+# Previous URL (Water Rates page) may have CivicPlus rendering issues
+
+# Waynesboro — Fee Schedule Residential (DocumentCenter PDF, previously not found)
+VA2820775: "https://www.waynesboro.va.us/documentcenter/view/6805"
+
+# Front Royal — Combined Fee Schedule (adopted May 2025)
+# VA2187406: "https://www.frontroyalva.com/766/fee-schedule-adopted-may-27-2025"
+# Previous URL was a billing explanation page
+
+# ── Still tabled (need SearXNG or manual) ────────────────────────────────
+#   VA2770900: Western Virginia Water Authority — wvwa.com is not CivicPlus, no rate PDFs found
+#   VA2790600: Staunton — ci.staunton.va.us returns 0 search results (403 or not CivicPlus)
+#   VA3740600: Portsmouth — HRSD rate schedule is sewer-only; city water rates still missing
+#   VA5680200: Lynchburg — Rate study PDFs found but only FY10-FY17 vintage; need current
+#   VA2840500: Winchester — Only landing pages found, no rate PDFs
