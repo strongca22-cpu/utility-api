@@ -320,5 +320,5 @@
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 3 v3 — Manual PDF curation session. Use Playwright to crawl VA (9) + CA (18) tabled utility pages, extract PDF links, re-run pipeline. Fix Colonial Heights/Manassas Park parses. SearXNG at localhost:8888. Start from docs/next_steps.md.
+UAPI Sprint 4 — Ingest SWRCB eAR bulk rate data for CA (HydroShare processed 2020-2022). Map to water_rates schema, reconcile with 16 scraped CA rates. Then CivicPlus DocumentCenter crawler for VA/CA gaps. Start from docs/rate_data_strategy.md and docs/next_steps.md.
 ```
