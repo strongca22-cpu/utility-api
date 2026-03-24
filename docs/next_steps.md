@@ -337,6 +337,14 @@
   - 188 have pre-computed bill amounts (6/9/12/24 HCF)
   - 187 have explicit tier structure
   - All have rate structure type and billing frequency
+- [x] **Dynamic column mapping** — eAR column indices vary by year (2020: 1314 cols, 2021: 2315, 2022: 2978). Replaced hardcoded indices with name-based header lookup.
+- [x] **eAR 2020 + 2021 ingested**: 194 + 193 = 387 additional records. 2020 has tier data but no bill columns.
+- [x] **CivicPlus DocumentCenter crawler** — search-based approach:
+  - Playwright renders CivicPlus site search (JS-rendered)
+  - Runs 4 search queries per site, extracts all links, deduplicates
+  - Relevance scoring classifier for link titles (strong/moderate/negative signals)
+  - Tested on 3 sites: Fredericksburg (+23 rate ordinance), Martinsville (+8.5 rate schedule), Colonial Heights (+1.0 utility rates page)
+  - CLI: `ua-ingest civicplus-crawl --domain fredericksburgva.gov`
 
 ### Sprint 4 — eAR Reconciliation (14 overlapping utilities)
 
@@ -365,20 +373,21 @@
 | `utility.county_boundaries` | 3,235 | Census TIGER |
 | `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
 | `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
-| `utility.water_rates` | 290 | scraped_llm: 96 (VA 22 + CA 16 + failed) + swrcb_ear_2022: 194 |
-| `utility.pipeline_runs` | 16 | Audit trail |
+| `utility.water_rates` | 677 | scraped_llm: 96 + swrcb_ear_2020: 194 + swrcb_ear_2021: 193 + swrcb_ear_2022: 194 |
+| `utility.pipeline_runs` | 19 | Audit trail |
 
 ## Sprint 4 — Remaining Work
 
 ### eAR Additional Years
-- [ ] Download and ingest 2020 + 2021 eAR files (same pipeline, `ua-ingest ear --year 2020 --year 2021`)
+- [x] Download and ingest 2020 + 2021 eAR files — 387 records inserted
 - [ ] Cross-year rate change analysis for utilities with all 3 years
 
 ### CivicPlus DocumentCenter Crawler
-- [ ] Build platform-specific crawler for `/DocumentCenter` index pages
-- [ ] Scan filenames for rate-related PDFs (water rate, fee schedule, tariff)
-- [ ] Needs utility classifier to filter irrelevant hits (not every PDF is a rate schedule)
-- [ ] Target: ~14% of utilities (9 in surveyed sample of 65)
+- [x] Search-based crawler with relevance scoring classifier
+- [x] Tested on 3 sites — finds correct rate documents
+- [ ] Run crawler on all known CivicPlus utilities lacking rate URLs
+- [ ] Feed discovered URLs into the existing rate parsing pipeline
+- [ ] Extend to non-CivicPlus sites (general site search + classify approach)
 
 ### OWRS Ingest (Layer 1, medium ROI)
 - [ ] Download CA Data Collaborative Open Water Rate Specification from OpenEI
@@ -397,5 +406,5 @@
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 4 cont. — CivicPlus DocumentCenter crawler for VA/CA rate gaps. Build platform-specific crawler that indexes /DocumentCenter pages, classifies PDFs by filename, and extracts rate schedules. Then ingest eAR 2020+2021. Start from docs/next_steps.md and docs/rate_data_strategy.md.
+UAPI Sprint 4 cont. v1 — Run CivicPlus crawler on VA/CA utilities lacking rate URLs. Identify CivicPlus sites from existing URL configs + web discovery. Feed best candidate URLs into rate parsing pipeline. Then OWRS ingest (OpenEI CA rate specs). Start from docs/next_steps.md.
 ```
