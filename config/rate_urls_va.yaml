@@ -12,12 +12,18 @@
 #   - PDF rate schedules are often the most reliable source
 #   - Some utilities are served by regional authorities (e.g., Fairfax Water, Loudoun Water, JCSA)
 #
-# Tabled (5 utilities — CivicPlus 403/404, need manual curation later):
+# Tabled (7 utilities — need manual browser curation):
 #   VA2840500: Winchester — winchesterva.gov 403s, Frederick Water may serve city
 #   VA1750100: Radford — all radfordva.gov DocumentCenter links 404
 #   VA2790600: Staunton — ci.staunton.va.us 403
 #   VA2820775: Waynesboro — no rate page found, only billing portal
 #   VA2770900: Western Virginia Water Authority — WVWA PDFs on chooseroanokecounty.com all 404
+#   VA3740600: Portsmouth — only HRSD wastewater PDF in DocumentCenter, no city water rates
+#   VA2187406: Front Royal — no PDF links on billing page, no rate docs found
+#
+# Special case:
+#   VA2775300: Salem — CivicPlus page has rate structure but volumetric $/1000gal values
+#              don't render in scraped text (table cell extraction issue)
 
 # ── Already parsed (high/medium confidence) ───────────────────────────────
 
@@ -38,8 +44,8 @@ VA2540500: "https://www.charlottesville.gov/ArchiveCenter/ViewFile/Item/160"
 # Christiansburg
 VA1121090: "https://www.christiansburg.org/79/Utility-Rates"
 
-# Danville — Danville Utilities
-VA5590100: "https://home.danvilleutilities.com/218/Residential-Water-Wastewater-Rates"
+# Danville — Water & Wastewater Rate Schedules & Riders PDF (16 pages)
+VA5590100: "https://home.danvilleutilities.com/DocumentCenter/View/153"
 
 # Fredericksburg — FY2026 billing calculation chart
 VA6630050: "https://www.fredericksburgva.gov/DocumentCenter/View/30135/FY2026-City-of-Fredericksburg-VA---Utility-Billing-Calculation-Chart"
@@ -47,8 +53,8 @@ VA6630050: "https://www.fredericksburgva.gov/DocumentCenter/View/30135/FY2026-Ci
 # Harrisonburg — 2025-2026 water rates PDF
 VA2660345: "https://www.harrisonburgva.gov/sites/default/files/water/Customer%20Accounts/2025-2026%20RATES%20WATER.pdf"
 
-# Lynchburg
-VA5680200: "https://www.lynchburgva.gov/555/Rates-Fees"
+# Lynchburg — City code ordinance Ch.34 (water/sewer rates) via Municode
+VA5680200: "https://library.municode.com/va/lynchburg/codes/code_of_ordinances?nodeId=CH34SE"
 
 # Norfolk
 VA3710100: "https://www.norfolk.gov/654/Water-Sewer-Rates"
@@ -59,8 +65,8 @@ VA3740600: "https://utilities.portsmouthva.gov/152/Billing-Information"
 # Salem
 VA2775300: "https://www.salemva.gov/469/Water-Rates"
 
-# Vienna — served by Fairfax Water (HTML rates page with rate info, worked in Sprint 3 v1)
-VA6059800: "https://www.fairfaxwater.org/rates"
+# Vienna — Fairfax Water Rate Schedule PDF (April 2025)
+VA6059800: "https://www.fairfaxwater.org/sites/default/files/customer_service/Fairfax%20Water%20Rate%20Schedule%20Adopted%204-1-2025.pdf"
 
 # ── Round 2: Re-searched with niche keywords ──────────────────────────────
 
@@ -73,23 +79,23 @@ VA3570150: "https://www.colonialheightsva.gov/387/Tax-Utility-Rates"
 # Front Royal
 VA2187406: "https://www.frontroyalva.com/448/Understanding-Residential-Utility-Bills"
 
-# Leesburg — served by Loudoun Water (rates/billing page has "Residential Water and Wastewater Rates 2026")
-VA6107300: "https://www.loudounwater.org/residential-customers/rates-billing"
+# Leesburg — Loudoun Water Rates, Rules and Regulations PDF (Oct 2025)
+VA6107300: "https://www.loudounwater.org/sites/default/files/Board%20-%20Rates%20Rules%20Regs%20-%20Document%20-%20October%209%202025%20-%20Carnes%20%281%29.pdf"
 
-# Manassas — utility rates page (Revize CMS, not CivicPlus — static HTML)
-VA6685100: "https://www.manassasva.gov/electric_water___sewer/utility_rates_2.php"
+# Manassas — Residential Water Service rate schedule PDF (FY26)
+VA6685100: "https://www.manassasva.gov/Utilities/utility%20rates/Residential%20Water%20Service%20RWS_FY26.pdf?t=202507021055350"
 
 # Manassas Park — Water Billing Reference Guide PDF
 VA6687100: "https://www.manassasparkva.gov/Water%20Billing%20Reference%20Guide%202025%20-%202026.pdf?t=202507171434120"
 
-# Martinsville
-VA5690400: "https://www.martinsville-va.gov/357/Rates-Taxes"
+# Martinsville — Schedule of Water and Sewer Rates PDF (July 2024)
+VA5690400: "https://www.martinsville-va.gov/DocumentCenter/View/362"
 
 # Newport News — Newport News Waterworks
 VA3700500: "https://www.nnva.gov/325/Rates-Fees"
 
-# Petersburg
-VA3730750: "http://www.petersburg-va.org/881/Utility-Billing-and-Analysis"
+# Petersburg — Current Water/Sewer Rates and Fees (Jan 2026)
+VA3730750: "http://www.petersburg-va.org/DocumentCenter/View/6421/Rates-Effective-July-1-2019"
 
 # Richmond — Richmond DPU utility rates
 VA4760100: "https://www.rva.gov/public-utilities/utility-rates"
