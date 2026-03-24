@@ -149,8 +149,70 @@ def _extract_domain(url: str) -> str:
         return ""
 
 
-def _search_duckduckgo(query: str, max_results: int = 10) -> list[RatePageCandidate]:
-    """Search DuckDuckGo HTML for rate page candidates.
+SEARXNG_URL = "http://localhost:8888/search"
+
+
+def _search_searxng(query: str, max_results: int = 10) -> list[RatePageCandidate]:
+    """Search via local SearXNG instance (meta-search across multiple engines).
+
+    Parameters
+    ----------
+    query : str
+        Search query string.
+    max_results : int
+        Maximum number of results to return.
+
+    Returns
+    -------
+    list[RatePageCandidate]
+        Parsed and scored search results.
+    """
+    params = {
+        "q": query,
+        "format": "json",
+        "categories": "general",
+        "language": "en",
+    }
+
+    try:
+        with httpx.Client(timeout=15) as client:
+            response = client.get(SEARXNG_URL, params=params)
+            response.raise_for_status()
+    except httpx.HTTPError as e:
+        logger.warning(f"SearXNG search failed for '{query}': {e}")
+        # Fall back to DuckDuckGo direct if SearXNG is down
+        return _search_duckduckgo_fallback(query, max_results)
+
+    data = response.json()
+    candidates = []
+
+    for result in data.get("results", []):
+        href = result.get("url", "")
+        title = result.get("title", "")
+        snippet = result.get("content", "")
+
+        if not href:
+            continue
+
+        candidate = RatePageCandidate(
+            url=href,
+            title=title,
+            snippet=snippet,
+            domain=_extract_domain(href),
+        )
+        _score_candidate(candidate)
+        candidates.append(candidate)
+
+        if len(candidates) >= max_results:
+            break
+
+    # Sort by score descending
+    candidates.sort(key=lambda c: c.score, reverse=True)
+    return candidates
+
+
+def _search_duckduckgo_fallback(query: str, max_results: int = 10) -> list[RatePageCandidate]:
+    """Fallback: search DuckDuckGo HTML directly if SearXNG is unavailable.
 
     Parameters
     ----------
@@ -172,7 +234,7 @@ def _search_duckduckgo(query: str, max_results: int = 10) -> list[RatePageCandid
             response = client.post(url, data=params)
             response.raise_for_status()
     except httpx.HTTPError as e:
-        logger.warning(f"DuckDuckGo search failed for '{query}': {e}")
+        logger.warning(f"DuckDuckGo fallback also failed for '{query}': {e}")
         return []
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -186,7 +248,6 @@ def _search_duckduckgo(query: str, max_results: int = 10) -> list[RatePageCandid
             continue
 
         href = title_el.get("href", "")
-        # DuckDuckGo wraps URLs in a redirect — extract the actual URL
         if "uddg=" in href:
             from urllib.parse import parse_qs, urlparse
             parsed = urlparse(href)
@@ -208,7 +269,6 @@ def _search_duckduckgo(query: str, max_results: int = 10) -> list[RatePageCandid
         if len(candidates) >= max_results:
             break
 
-    # Sort by score descending
     candidates.sort(key=lambda c: c.score, reverse=True)
     return candidates
 
@@ -258,7 +318,7 @@ def discover_rate_url(
         search_query=query,
     )
 
-    candidates = _search_duckduckgo(query)
+    candidates = _search_searxng(query)
     result.candidates = candidates
 
     if candidates and candidates[0].score > 0:
