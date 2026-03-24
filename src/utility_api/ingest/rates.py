@@ -190,10 +190,11 @@ def _store_rate_record(
     now = datetime.now(timezone.utc)
 
     with engine.connect() as conn:
-        # Delete existing record for this PWSID + effective date (upsert pattern)
+        # Delete existing scraped record for this PWSID + effective date (upsert pattern)
         conn.execute(text(f"""
             DELETE FROM {schema}.water_rates
             WHERE pwsid = :pwsid
+            AND source = 'scraped_llm'
             AND (rate_effective_date = :eff_date OR rate_effective_date IS NULL)
         """), {
             "pwsid": pwsid,
@@ -210,7 +211,7 @@ def _store_rate_record(
                 tier_3_limit_ccf, tier_3_rate,
                 tier_4_limit_ccf, tier_4_rate,
                 bill_5ccf, bill_10ccf,
-                source_url, raw_text_hash,
+                source, source_url, raw_text_hash,
                 parse_confidence, parse_model, parse_notes,
                 scraped_at, parsed_at
             ) VALUES (
@@ -222,7 +223,7 @@ def _store_rate_record(
                 :t3_limit, :t3_rate,
                 :t4_limit, :t4_rate,
                 :bill_5, :bill_10,
-                :url, :text_hash,
+                'scraped_llm', :url, :text_hash,
                 :confidence, :model, :notes,
                 :scraped_at, :parsed_at
             )

@@ -7,12 +7,17 @@ Purpose:
     Each record represents a single rate schedule vintage for one utility,
     including the full tier structure and computed bill amounts.
 
-    Rate data is populated by the LLM rate parsing pipeline (Sprint 3):
-    web scrape → Claude API extraction → tier calculation → DB insert.
+    Multiple records per utility are allowed when from different sources
+    (e.g., scraped_llm vs swrcb_ear). Conflict resolution is deferred.
+
+    Sources:
+    - scraped_llm: LLM rate parsing pipeline (Sprint 3)
+    - swrcb_ear_YYYY: CA SWRCB Electronic Annual Report bulk data (Sprint 4)
+    - owrs: Open Water Rate Specification (future)
 
 Author: AI-Generated
 Created: 2026-03-23
-Modified: 2026-03-23
+Modified: 2026-03-24
 
 Dependencies:
     - sqlalchemy
@@ -51,7 +56,7 @@ class WaterRate(Base):
 
     __tablename__ = "water_rates"
     __table_args__ = (
-        UniqueConstraint("pwsid", "rate_effective_date", name="uq_water_rate_pwsid_date"),
+        UniqueConstraint("pwsid", "rate_effective_date", "source", name="uq_water_rate_pwsid_date_source"),
         {"schema": SCHEMA},
     )
 
@@ -119,7 +124,25 @@ class WaterRate(Base):
         Float, comment="Calculated monthly bill at 10 CCF (7,480 gal)"
     )
 
+    # Official eAR bill snapshots (state-reported, not calculated)
+    bill_6ccf: Mapped[float | None] = mapped_column(
+        Float, comment="Monthly bill at 6 CCF — eAR WR6HCFDWCharges"
+    )
+    bill_9ccf: Mapped[float | None] = mapped_column(
+        Float, comment="Monthly bill at 9 CCF — eAR WR9HCFDWCharges"
+    )
+    bill_12ccf: Mapped[float | None] = mapped_column(
+        Float, comment="Monthly bill at 12 CCF — eAR WR12HCFDWCharges"
+    )
+    bill_24ccf: Mapped[float | None] = mapped_column(
+        Float, comment="Monthly bill at 24 CCF — eAR WR24HCFDWCharges"
+    )
+
     # Provenance
+    source: Mapped[str | None] = mapped_column(
+        String(50), default="scraped_llm",
+        comment="Data source: scraped_llm | swrcb_ear_2020 | swrcb_ear_2021 | swrcb_ear_2022 | owrs",
+    )
     source_url: Mapped[str | None] = mapped_column(Text, comment="URL of scraped rate page")
     raw_text_hash: Mapped[str | None] = mapped_column(
         String(64), comment="SHA-256 of scraped text (change detection)"

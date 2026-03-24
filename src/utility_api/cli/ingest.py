@@ -83,6 +83,27 @@ def ca_ewrims():
 
 
 @app.command()
+def ear(
+    year: list[int] = typer.Option(None, "--year", "-y", help="Year(s) to ingest: 2020, 2021, 2022"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+):
+    """Ingest CA SWRCB eAR bulk rate data from HydroShare Excel files.
+
+    Loads state-reported water rate structures and bill amounts for CA
+    utilities that match our existing database. Source: HydroShare processed
+    eAR data (2020-2022).
+
+    Example: ua-ingest ear --year 2022 --dry-run
+    """
+    from utility_api.ingest.ear_ingest import run_ear_ingest
+
+    run_ear_ingest(
+        years=year or None,
+        dry_run=dry_run,
+    )
+
+
+@app.command()
 def rates(
     state: list[str] = typer.Option(None, "--state", "-s", help="Filter to state(s): VA, CA"),
     pwsid: list[str] = typer.Option(None, "--pwsid", "-p", help="Specific PWSID(s) to process"),
