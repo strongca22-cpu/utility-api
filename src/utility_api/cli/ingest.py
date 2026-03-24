@@ -138,6 +138,26 @@ def civicplus_crawl(
 
 
 @app.command()
+def owrs(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+    all_utilities: bool = typer.Option(False, "--all-utilities", help="Include utilities not in CWS list"),
+):
+    """Ingest CA OWRS rate data from the California Data Collaborative.
+
+    Loads pre-computed rate structures and bill amounts for ~386 CA utilities
+    from the OWRS-Analysis summary table. Source: OpenEI / GitHub.
+
+    Example: ua-ingest owrs --dry-run
+    """
+    from utility_api.ingest.owrs_ingest import run_owrs_ingest
+
+    run_owrs_ingest(
+        dry_run=dry_run,
+        all_utilities=all_utilities,
+    )
+
+
+@app.command()
 def rates(
     state: list[str] = typer.Option(None, "--state", "-s", help="Filter to state(s): VA, CA"),
     pwsid: list[str] = typer.Option(None, "--pwsid", "-p", help="Specific PWSID(s) to process"),
