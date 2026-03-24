@@ -104,6 +104,7 @@ class PermitRecord(BaseModel):
     face_value_units: str | None = Field(None, description="Units for face_value_amount")
     max_diversion_rate: float | None = Field(None, description="Max direct diversion rate")
     max_diversion_units: str | None = Field(None, description="Units for max_diversion_rate")
+    max_diversion_rate_gpd: float | None = Field(None, description="Max diversion rate normalized to gallons per day")
     lat: float | None = None
     lng: float | None = None
     distance_km: float = Field(description="Distance from query point in km")

@@ -53,6 +53,7 @@ class Permit(Base):
     face_value_units: Mapped[str | None] = mapped_column(Text)
     max_diversion_rate: Mapped[float | None] = mapped_column(Float)
     max_diversion_units: Mapped[str | None] = mapped_column(Text)
+    max_diversion_rate_gpd: Mapped[float | None] = mapped_column(Float)
     geom = mapped_column(Geometry("POINT", srid=4326), nullable=True)
     raw_attrs = mapped_column(JSONB, nullable=True)
     loaded_at = mapped_column(DateTime(timezone=True), server_default=func.now())

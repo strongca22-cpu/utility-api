@@ -52,6 +52,7 @@ SELECT
     face_value_units,
     max_diversion_rate,
     max_diversion_units,
+    max_diversion_rate_gpd,
     ST_Y(geom) AS lat,
     ST_X(geom) AS lng,
     ST_Distance(
@@ -138,6 +139,7 @@ def permits(
             face_value_units=row["face_value_units"],
             max_diversion_rate=row["max_diversion_rate"],
             max_diversion_units=row["max_diversion_units"],
+            max_diversion_rate_gpd=row["max_diversion_rate_gpd"],
             lat=row["lat"],
             lng=row["lng"],
             distance_km=round(row["distance_km"], 3),
