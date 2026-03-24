@@ -128,12 +128,36 @@
 - **DuckDuckGo HTML** for URL discovery (no API key required). Query: `{utility_name} {county} {state} water rates`.
 - **Sonnet** for extraction (fast, cheap, good at structured output). Model is configurable per call.
 
+## Completed (Sprint 3 v1 — Session 4, cont.)
+
+- [x] Playwright auto-fallback for JS-rendered pages (CivicPlus) and 403-blocked sites
+- [x] PDF rate schedule extraction via pymupdf — handles multi-page tariff documents
+- [x] SearXNG self-hosted meta-search (Docker: `~/searxng/`) replaces DuckDuckGo for URL discovery
+  - Aggregates Google, DuckDuckGo, Bing, Brave — no single-engine rate limiting
+  - JSON API at `http://localhost:8888/search?q=...&format=json`
+  - Falls back to DuckDuckGo direct if SearXNG container is down
+- [x] Curated URL file support: `--url-file config/rate_urls_va.yaml`
+- [x] Claude API parsing verified end-to-end — penny-level accuracy on bill calculations
+- [x] Fixed: unit conversion ($/1000gal → $/CCF), meter size coercion, PDF pipeline flow
+
+### Sprint 3 v1 Verified Results (in DB)
+
+| Utility | Structure | Fixed | Bill@5CCF | Bill@10CCF | Confidence |
+|---------|-----------|-------|-----------|------------|------------|
+| Blacksburg (VA) | tiered | $28.00 | $31.34 | $48.19 | high |
+| Alexandria / VA-American Water | uniform | $15.00 | $28.03 | $41.06 | high |
+| Arlington County | tiered | $6.03 | $23.59 | $44.64 | medium |
+
+### Sprint 3 v1 Findings
+
+- **SearXNG solved discovery**: 5/5 URLs found (vs 0/5 with rate-limited DuckDuckGo)
+- **PDF extraction is the reliable path**: most utility rate data lives in PDFs, not HTML pages
+- **CivicPlus remains problematic**: headless Playwright gets served wrong page content by CivicPlus CMS routing. Not solvable via scraping alone — need curated URLs or PDF links for CivicPlus utilities.
+- **Claude Sonnet extraction quality is high**: correctly identifies rate structures, converts units, handles multi-district tariffs (VA-American Water 53-page PDF → correct Alexandria district rates)
+
 ## Sprint 3 — Remaining Work
 
-- [ ] Add ANTHROPIC_API_KEY to .env and test Claude parsing on Fairfax Water text
-- [ ] Add Playwright for JS-rendered sites (CivicPlus, Granicus) — this is the majority of utilities
-- [ ] Add PDF rate schedule extraction (many rate schedules are PDF, not HTML)
-- [ ] Run full pipeline on VA MDWD utilities (31 targets)
+- [ ] Run full pipeline on all 31 VA MDWD utilities (curated URLs for CivicPlus gaps)
 - [ ] Run full pipeline on CA MDWD utilities (194 targets)
 - [ ] Manual spot-check: validate ~20 parsed rates against source URLs
 - [ ] Claude Batch API integration (replace single calls once prompt is stable)
@@ -171,11 +195,11 @@
 | `utility.county_boundaries` | 3,235 | Census TIGER |
 | `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
 | `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
-| `utility.water_rates` | 0 | Pending — API key needed |
+| `utility.water_rates` | 3 | LLM-parsed (Blacksburg, Alexandria, Arlington) |
 | `utility.pipeline_runs` | 8 | Audit trail |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 3 v1 — Playwright integration for JS-rendered municipal sites + Claude API end-to-end test. API key is in .env. Start from docs/next_steps.md.
+UAPI Sprint 3 v2 — Scale rate parsing to all 31 VA utilities. Curate URLs for CivicPlus gaps. SearXNG running at localhost:8888. Start from docs/next_steps.md.
 ```
