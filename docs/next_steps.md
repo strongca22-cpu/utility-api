@@ -373,21 +373,37 @@
 | `utility.county_boundaries` | 3,235 | Census TIGER |
 | `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
 | `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
-| `utility.water_rates` | 677 | scraped_llm: 96 + swrcb_ear_2020: 194 + swrcb_ear_2021: 193 + swrcb_ear_2022: 194 |
-| `utility.pipeline_runs` | 19 | Audit trail |
+| `utility.water_rates` | ~684 | scraped_llm: ~103 (41 high/med) + swrcb_ear_2020: 194 + swrcb_ear_2021: 193 + swrcb_ear_2022: 194 |
+| `utility.pipeline_runs` | 21 | Audit trail |
+
+## Sprint 4 — CivicPlus + CA Discovery Results (Session 6 cont.)
+
+### CivicPlus Crawler — VA Results (9 utilities)
+- [x] Crawled all 9 VA utilities missing scraped rates
+- **Radford**: Found FY2026 Utility Rates PDF but DocumentCenter serves Excel (not parseable)
+- **Salem**: FAQ page with rate values found (+13 score) but static scraper misses JS content
+- **Waynesboro**: Document was building permits, not water rates (false positive)
+- **Front Royal**: Fee schedule page found but CivicPlus rendering blocks scraping
+- **Lynchburg**: Rate study PDFs found but only FY10-FY17 vintage
+- **Portsmouth, Winchester, Staunton, WVWA**: No actionable results
+
+### CA SearXNG Discovery — Top 10 by population
+- [x] **Huntington Beach** (201K): flat rate $22.46 fixed, $34.48@5CCF [high] — .php page parsed
+- [x] **Modesto** (219K): uniform $26.48 fixed, $37.03@5CCF [high] — rate study PDF parsed
+- Santa Rosa: fee schedule PDF was development fees, not water rates
+- Fresno, Long Beach, Santa Ana, Riverside, Glendale, Ontario, Oxnard: landing pages without rate numbers
+
+### Key Findings
+1. **CivicPlus crawler works on CivicPlus sites** but most CA cities aren't CivicPlus
+2. **SearXNG finds overview pages**, not rate tables — the persistent Layer 3 problem
+3. **PDF-first discovery** (searching for `filetype:pdf site:{domain} water rate schedule`) is still the highest-ROI approach for individual utilities
+4. **eAR bulk data already covers all 194 CA utilities** — scraped rates add cross-validation and current pricing but are diminishing returns
+5. **VA tabled utilities** need manual browser curation (Layer 4) — CivicPlus rendering and Excel format issues aren't solvable via automated scraping
 
 ## Sprint 4 — Remaining Work
 
-### eAR Additional Years
-- [x] Download and ingest 2020 + 2021 eAR files — 387 records inserted
-- [ ] Cross-year rate change analysis for utilities with all 3 years
-
-### CivicPlus DocumentCenter Crawler
-- [x] Search-based crawler with relevance scoring classifier
-- [x] Tested on 3 sites — finds correct rate documents
-- [ ] Run crawler on all known CivicPlus utilities lacking rate URLs
-- [ ] Feed discovered URLs into the existing rate parsing pipeline
-- [ ] Extend to non-CivicPlus sites (general site search + classify approach)
+### eAR Analysis
+- [ ] Cross-year rate change analysis for utilities with all 3 years (2020-2022)
 
 ### OWRS Ingest (Layer 1, medium ROI)
 - [ ] Download CA Data Collaborative Open Water Rate Specification from OpenEI
@@ -406,5 +422,5 @@
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 4 cont. v1 — Run CivicPlus crawler on VA/CA utilities lacking rate URLs. Identify CivicPlus sites from existing URL configs + web discovery. Feed best candidate URLs into rate parsing pipeline. Then OWRS ingest (OpenEI CA rate specs). Start from docs/next_steps.md.
+UAPI Sprint 5 — OWRS ingest (OpenEI CA rate specs, machine-readable YAML). Cross-year eAR rate change analysis (2020-2022). Then reconciliation framework: flag scraped combined water+sewer charges, eAR data quality issues (Manteca $1/mo), and vintage mismatches. Start from docs/next_steps.md.
 ```
