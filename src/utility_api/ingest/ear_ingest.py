@@ -67,41 +67,65 @@ from utility_api.config import settings
 from utility_api.db import engine
 
 
-# --- Column index mapping for eAR Excel ---
-# These are 0-based indices into the ear_annual_matrix sheet.
-# Verified against 2022 file; 2020/2021 use the same formatted output.
+# --- Column name mapping ---
+# Maps our internal keys to eAR Excel header names.
+# Column positions vary between years (2020: 1314 cols, 2021: 2315, 2022: 2978)
+# so we look up by header name at load time, not by hardcoded index.
 
-COL = {
-    "pwsid": 87,             # PwsID (CA-prefixed)
-    "pws_name": 88,          # PWSName
-    "population": 310,       # PopulationTotal
-    "billing_freq": 772,     # WRBillingFreq (M, BM, Q, etc.)
-    "rate_structure": 778,   # WRRateStructureRes
-    "uom": 783,              # WRUOM (should be 'Hundred Cubic Feet')
-    "has_rate": 767,         # WRHasRate (Yes/No)
-    "sf_num_tiers": 805,     # WRSFNumTiers
-    # Single-family tier structure (up to 4 tiers used)
-    "sf_base_1": 809,        # WRSFCostPerUOM1 — fixed/base charge per billing period
-    "sf_limit_1": 810,       # WRSFMetricUsage1 — tier 1 upper limit (HCF/billing period)
-    "sf_rate_1": 811,        # WRSFUsageCost1 — $/HCF for tier 1
-    "sf_base_2": 814,        # WRSFCostPerUOM2
-    "sf_limit_2": 815,       # WRSFMetricUsage2
-    "sf_rate_2": 816,        # WRSFUsageCost2
-    "sf_base_3": 819,        # WRSFCostPerUOM3
-    "sf_limit_3": 820,       # WRSFMetricUsage3
-    "sf_rate_3": 821,        # WRSFUsageCost3
-    "sf_base_4": 824,        # WRSFCostPerUOM4
-    "sf_limit_4": 825,       # WRSFMetricUsage4
-    "sf_rate_4": 826,        # WRSFUsageCost4
+COL_NAMES = {
+    "pwsid": "PwsID",
+    "pws_name": "PWSName",
+    "population": "PopulationTotal",
+    "billing_freq": "WRBillingFreq",
+    "rate_structure": "WRRateStructureRes",
+    "uom": "WRUOM",
+    "has_rate": "WRHasRate",
+    "sf_num_tiers": "WRSFNumTiers",
+    # Single-family tier structure (up to 4 tiers)
+    "sf_base_1": "WRSFCostPerUOM1",       # Fixed/base charge per billing period
+    "sf_limit_1": "WRSFMetricUsage1",     # Tier 1 upper limit (HCF/billing period)
+    "sf_rate_1": "WRSFUsageCost1",        # $/HCF for tier 1
+    "sf_base_2": "WRSFCostPerUOM2",
+    "sf_limit_2": "WRSFMetricUsage2",
+    "sf_rate_2": "WRSFUsageCost2",
+    "sf_base_3": "WRSFCostPerUOM3",
+    "sf_limit_3": "WRSFMetricUsage3",
+    "sf_rate_3": "WRSFUsageCost3",
+    "sf_base_4": "WRSFCostPerUOM4",
+    "sf_limit_4": "WRSFMetricUsage4",
+    "sf_rate_4": "WRSFUsageCost4",
     # Provenance
-    "rate_updated": 878,     # WRRateUpdatedDate
-    "rate_link": 880,        # WRWaterRateLink
-    # Pre-computed monthly-equivalent bills
-    "bill_6hcf": 1440,       # WR6HCFDWCharges
-    "bill_9hcf": 1441,       # WR9HCFDWCharges
-    "bill_12hcf": 1442,      # WR12HCFDWCharges
-    "bill_24hcf": 1443,      # WR24HCFDWCharges
+    "rate_updated": "WRRateUpdatedDate",
+    "rate_link": "WRWaterRateLink",
+    # Pre-computed monthly-equivalent bills (not present in 2020)
+    "bill_6hcf": "WR6HCFDWCharges",
+    "bill_9hcf": "WR9HCFDWCharges",
+    "bill_12hcf": "WR12HCFDWCharges",
+    "bill_24hcf": "WR24HCFDWCharges",
 }
+
+
+def _build_col_index(headers: list) -> dict[str, int | None]:
+    """Build column index mapping from Excel header row.
+
+    Looks up each COL_NAMES entry by header name and returns its 0-based index.
+    Returns None for columns not found in this year's file.
+    """
+    header_map = {}
+    for i, h in enumerate(headers):
+        if h is not None:
+            header_map[h] = i
+
+    col = {}
+    for key, header_name in COL_NAMES.items():
+        col[key] = header_map.get(header_name)
+
+    # Log any missing columns
+    missing = [k for k, v in col.items() if v is None]
+    if missing:
+        logger.warning(f"  Missing columns in this year's file: {missing}")
+
+    return col
 
 # eAR rate structure -> our normalized type
 STRUCTURE_MAP = {
@@ -186,7 +210,20 @@ def _get_existing_pwsids() -> set[str]:
     return {r[0] for r in rows}
 
 
-def _parse_ear_row(row: tuple, year: int) -> dict | None:
+def _get_cell(row: tuple, col: dict, key: str):
+    """Safely get a cell value using the dynamic column index.
+
+    Returns None if the column doesn't exist in this year's file.
+    """
+    idx = col.get(key)
+    if idx is None:
+        return None
+    if idx >= len(row):
+        return None
+    return row[idx]
+
+
+def _parse_ear_row(row: tuple, year: int, col: dict) -> dict | None:
     """Parse a single eAR row into a water_rates-compatible dict.
 
     Parameters
@@ -195,57 +232,59 @@ def _parse_ear_row(row: tuple, year: int) -> dict | None:
         Raw row values from the Excel sheet.
     year : int
         Report year (2020, 2021, or 2022).
+    col : dict
+        Column index mapping (from _build_col_index).
 
     Returns
     -------
     dict | None
         Mapped record ready for DB insert, or None if row should be skipped.
     """
-    pwsid = row[COL["pwsid"]]
-    has_rate = row[COL["has_rate"]]
+    pwsid = _get_cell(row, col, "pwsid")
+    has_rate = _get_cell(row, col, "has_rate")
 
     # Skip rows without rate data
     if not pwsid or has_rate != "Yes":
         return None
 
     # Rate structure
-    raw_structure = row[COL["rate_structure"]]
+    raw_structure = _get_cell(row, col, "rate_structure")
     structure_type = STRUCTURE_MAP.get(raw_structure, "other") if raw_structure else None
 
     # Billing frequency
-    raw_freq = row[COL["billing_freq"]]
+    raw_freq = _get_cell(row, col, "billing_freq")
     billing_freq = BILLING_FREQ_MAP.get(raw_freq)
     divisor = BILLING_DIVISOR.get(raw_freq, 1)
 
     # Fixed charge — CostPerUOM1 is per-billing-period, normalize to monthly
-    raw_base = _safe_float(row[COL["sf_base_1"]])
+    raw_base = _safe_float(_get_cell(row, col, "sf_base_1"))
     fixed_charge_monthly = round(raw_base / divisor, 2) if raw_base is not None else None
 
     # Tier limits and rates (HCF per billing period → HCF per month)
     # Tier limits are per-billing-period; normalize to monthly for consistency
     def tier_limit(col_key: str) -> float | None:
-        val = _safe_float(row[COL[col_key]])
+        val = _safe_float(_get_cell(row, col, col_key))
         if val is not None:
             return round(val / divisor, 2)
         return None
 
     def tier_rate(col_key: str) -> float | None:
-        return _safe_float(row[COL[col_key]])
+        return _safe_float(_get_cell(row, col, col_key))
 
     # Effective date: use WRRateUpdatedDate if available, else Jan 1 of report year
-    eff_date = _extract_date(row[COL["rate_updated"]])
+    eff_date = _extract_date(_get_cell(row, col, "rate_updated"))
     if eff_date is None:
         eff_date = date(year, 1, 1)
 
-    # Bill snapshots (already monthly-equivalent in eAR)
-    bill_6 = _safe_float(row[COL["bill_6hcf"]])
-    bill_9 = _safe_float(row[COL["bill_9hcf"]])
-    bill_12 = _safe_float(row[COL["bill_12hcf"]])
-    bill_24 = _safe_float(row[COL["bill_24hcf"]])
+    # Bill snapshots (already monthly-equivalent in eAR; not present in 2020)
+    bill_6 = _safe_float(_get_cell(row, col, "bill_6hcf"))
+    bill_9 = _safe_float(_get_cell(row, col, "bill_9hcf"))
+    bill_12 = _safe_float(_get_cell(row, col, "bill_12hcf"))
+    bill_24 = _safe_float(_get_cell(row, col, "bill_24hcf"))
 
     # Determine confidence based on data completeness
     has_bills = any(v is not None for v in [bill_6, bill_9, bill_12, bill_24])
-    has_tiers = _safe_float(row[COL["sf_rate_1"]]) is not None
+    has_tiers = _safe_float(_get_cell(row, col, "sf_rate_1")) is not None
     if has_bills and has_tiers:
         confidence = "high"
     elif has_bills:
@@ -259,16 +298,16 @@ def _parse_ear_row(row: tuple, year: int) -> dict | None:
     notes_parts = []
     if raw_structure and raw_structure not in STRUCTURE_MAP:
         notes_parts.append(f"Unmapped rate structure: {raw_structure}")
-    num_tiers = _safe_int(row[COL["sf_num_tiers"]])
+    num_tiers = _safe_int(_get_cell(row, col, "sf_num_tiers"))
     if num_tiers and num_tiers > 4:
         notes_parts.append(f"eAR reports {num_tiers} tiers; only first 4 captured")
-    uom = row[COL["uom"]]
+    uom = _get_cell(row, col, "uom")
     if uom and "Hundred Cubic Feet" not in str(uom):
         notes_parts.append(f"Non-standard UOM: {uom}")
 
     return {
         "pwsid": pwsid,
-        "utility_name": row[COL["pws_name"]],
+        "utility_name": _get_cell(row, col, "pws_name"),
         "state_code": "CA",
         "county": None,  # eAR doesn't include county in a clean column
         "rate_effective_date": eff_date,
@@ -292,7 +331,7 @@ def _parse_ear_row(row: tuple, year: int) -> dict | None:
         "bill_12ccf": bill_12,
         "bill_24ccf": bill_24,
         "source": f"swrcb_ear_{year}",
-        "source_url": row[COL["rate_link"]] if row[COL["rate_link"]] else None,
+        "source_url": _get_cell(row, col, "rate_link") or None,
         "raw_text_hash": None,
         "parse_confidence": confidence,
         "parse_model": None,
@@ -335,6 +374,27 @@ def _load_ear_year(year: int, target_pwsids: set[str], dry_run: bool = False) ->
     wb = openpyxl.load_workbook(str(filepath), read_only=True, data_only=True)
     ws = wb["ear_annual_matrix"]
 
+    # Build column index from header row
+    headers = None
+    for row in ws.iter_rows(max_row=1, values_only=True):
+        headers = list(row)
+        break
+
+    if headers is None:
+        logger.error(f"  No header row found in {filepath.name}")
+        wb.close()
+        return {"error": "No header row"}
+
+    col = _build_col_index(headers)
+
+    # Verify essential columns exist
+    if col.get("pwsid") is None:
+        logger.error(f"  PwsID column not found in {filepath.name}")
+        wb.close()
+        return {"error": "PwsID column missing"}
+
+    logger.info(f"  Column mapping built: {len(headers)} columns, PwsID at index {col['pwsid']}")
+
     stats = {
         "year": year,
         "total_rows": 0,
@@ -348,13 +408,13 @@ def _load_ear_year(year: int, target_pwsids: set[str], dry_run: bool = False) ->
     records = []
     for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
         stats["total_rows"] += 1
-        pwsid = row[COL["pwsid"]]
+        pwsid = _get_cell(row, col, "pwsid")
 
         if pwsid not in target_pwsids:
             continue
         stats["matched"] += 1
 
-        record = _parse_ear_row(row, year)
+        record = _parse_ear_row(row, year, col)
         if record is None:
             stats["skipped_no_rate"] += 1
             continue

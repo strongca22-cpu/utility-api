@@ -103,6 +103,40 @@ def ear(
     )
 
 
+@app.command("civicplus-crawl")
+def civicplus_crawl(
+    domain: list[str] = typer.Option(None, "--domain", "-d", help="CivicPlus domain(s) to crawl"),
+    min_score: float = typer.Option(2.0, "--min-score", help="Minimum relevance score for candidates"),
+):
+    """Search CivicPlus DocumentCenter sites for water rate PDFs.
+
+    Uses Playwright to render CivicPlus site search and scores results
+    for water rate relevance. Outputs ranked candidate URLs.
+
+    Example: ua-ingest civicplus-crawl --domain fredericksburgva.gov
+    """
+    import asyncio
+
+    from utility_api.ingest.civicplus_crawler import crawl_civicplus_search
+
+    if not domain:
+        typer.echo("Provide at least one --domain")
+        raise typer.Exit(1)
+
+    async def run():
+        for d in domain:
+            base_url = f"https://www.{d}" if not d.startswith("http") else d
+            typer.echo(f"\n=== {d} ===")
+            result = await crawl_civicplus_search(base_url, min_score=min_score)
+            typer.echo(f"Results: {result.total_results}, Candidates: {len(result.candidates)}")
+            for c in result.candidates[:10]:
+                dc = " [DC]" if c.is_document_center else ""
+                typer.echo(f"  [{c.relevance_score:+.1f}]{dc} {c.title}")
+                typer.echo(f"         {c.url}")
+
+    asyncio.run(run())
+
+
 @app.command()
 def rates(
     state: list[str] = typer.Option(None, "--state", "-s", help="Filter to state(s): VA, CA"),
