@@ -157,6 +157,24 @@ def owrs(
     )
 
 
+@app.command("efc-nc")
+def efc_nc(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+):
+    """Ingest NC water rates from UNC EFC dashboard (2025 CSV).
+
+    Loads pre-computed bill curves for ~400 NC utilities, reverse-engineers
+    tier structures, and normalizes to monthly equivalents.
+
+    Source: https://dashboards.efc.sog.unc.edu/nc
+
+    Example: ua-ingest efc-nc --dry-run
+    """
+    from utility_api.ingest.efc_nc_ingest import run_efc_nc_ingest
+
+    run_efc_nc_ingest(dry_run=dry_run)
+
+
 @app.command()
 def rates(
     state: list[str] = typer.Option(None, "--state", "-s", help="Filter to state(s): VA, CA"),
