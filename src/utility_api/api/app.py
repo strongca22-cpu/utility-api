@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from utility_api.api.dependencies import get_db
 from utility_api.api.routers.permits import router as permits_router
+from utility_api.api.routers.rates import router as rates_router
 from utility_api.api.routers.resolve import router as resolve_router
 from utility_api.config import settings
 
@@ -40,6 +41,7 @@ app = FastAPI(
 
 app.include_router(resolve_router)
 app.include_router(permits_router)
+app.include_router(rates_router)
 
 
 VINTAGE_QUERY = text("""

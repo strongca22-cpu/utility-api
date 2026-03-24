@@ -224,15 +224,45 @@
 - Waynesboro (21K) — no rate page found
 - Western VA Water Authority (100K) — WVWA PDFs on chooseroanokecounty.com all 404
 
+## Completed (Sprint 3 v2 round 3 — Session 5, cont.)
+
+- [x] Playwright PDF link crawling: extracted DocumentCenter/direct PDF URLs from 9 failed utility pages
+- [x] Round 3 pipeline: 6/7 more successes → **22/26 VA utilities parsed (90% pop coverage)**
+- [x] `/rates/{pwsid}` endpoint: single-utility detail + `/rates?state=VA` list endpoint
+- [x] Spot-check outliers:
+  - **Colonial Heights**: tier limits likely wrong (6,683 CCF = 5M gal per tier). Parser may have misapplied $/1,000 cubic feet conversion to limits.
+  - **Manassas Park**: parse extracted combined water+sewer rates (not water-only). Inflated by ~50%.
+  - **Suffolk**: $11.40/CCF is high but parsing logic looks correct.
+  - **Norfolk**: Correct — simple flat rate $6.51/CCF.
+- [x] Total API cost: $0.36 across 3 rounds ($4 cap never approached)
+
+### Spot-Check Action Items
+
+- [ ] Colonial Heights: re-parse or manually correct tier limits (likely should be ~7, 33, 167 CCF not 6683/33415/167075)
+- [ ] Manassas Park: re-parse targeting water-only rates (exclude sewer component)
+- [ ] Add parser prompt guidance: "Extract WATER rates only, not combined water+sewer"
+
+### Tabled VA Utilities (9 — need manual browser PDF curation)
+
+| Utility | Pop | Issue |
+|---------|-----|-------|
+| Western VA Water Auth | 99,897 | WVWA PDFs on chooseroanokecounty.com all 404 |
+| Portsmouth | 96,201 | No city water rate PDF in DocumentCenter |
+| Lynchburg | 79,812 | Municode ordinance page wrong section (sewer regs) |
+| Winchester | 27,284 | winchesterva.gov 403 (CivicPlus) |
+| Salem | 25,432 | CivicPlus table volumetric values don't render |
+| Staunton | 24,416 | ci.staunton.va.us 403 |
+| Waynesboro | 21,491 | No rate page found |
+| Front Royal | 15,070 | No PDF links on billing page |
+| Radford | 17,403 | All DocumentCenter links 404 |
+
 ## Sprint 3 — Remaining Work
 
-- [ ] Manual PDF curation for 10 failed utilities (open each site in browser, copy PDF link)
-- [ ] Manual PDF curation for 5 tabled utilities (check for non-CivicPlus rate PDFs)
-- [ ] Spot-check: verify Suffolk, Colonial Heights, Manassas Park, Norfolk against source URLs
-- [ ] Salem parser prompt tune (multi-year column format in $/1,000 gal)
+- [ ] Manual PDF curation for 9 tabled VA utilities
+- [ ] Fix Colonial Heights tier limits + Manassas Park water-only re-parse
+- [ ] Parser prompt refinement: water-only extraction, multi-year column handling
 - [ ] Run full pipeline on CA MDWD utilities (194 targets)
 - [ ] Claude Batch API integration (replace single calls once prompt is stable)
-- [ ] Build `/rates/{pwsid}` endpoint to serve parsed rate data
 - [ ] Hughes et al. 2025 outreach — request raw rate data for validation corpus
 
 ## Future Enhancements (Parking Lot)
@@ -253,6 +283,8 @@
 | `GET /resolve?lat=X&lng=Y` | Water utility + SDWIS + MDWD + Aqueduct + rate flag for a point |
 | `GET /permits?lat=X&lng=Y&radius_km=10` | All permits within radius (filters: `category_group`, `source`) |
 | `GET /facility/{id}/permits` | Linked + nearby permits for an SS facility |
+| `GET /rates/{pwsid}` | Full rate detail: tiers, bills, provenance for one utility |
+| `GET /rates?state=VA` | List all parsed rates for a state (summary view) |
 | `GET /health` | Data vintage for all pipeline steps |
 
 ## Database State (as of Session 5)
@@ -266,11 +298,11 @@
 | `utility.county_boundaries` | 3,235 | Census TIGER |
 | `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
 | `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
-| `utility.water_rates` | 26 | 16 high/medium + 10 failed (LLM-parsed) |
-| `utility.pipeline_runs` | 10 | Audit trail |
+| `utility.water_rates` | 26 | 22 high/medium + 4 failed (LLM-parsed) |
+| `utility.pipeline_runs` | 12 | Audit trail |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 3 v3 — Manual PDF curation for 15 remaining VA utilities + spot-check high-value parses. SearXNG at localhost:8888. Start from docs/next_steps.md.
+UAPI Sprint 3 v3 — Fix Colonial Heights/Manassas Park parse issues. Manual PDF curation for 9 tabled VA utilities. Then scale to CA (194 utilities). SearXNG at localhost:8888. Start from docs/next_steps.md.
 ```
