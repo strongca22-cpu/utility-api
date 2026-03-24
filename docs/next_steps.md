@@ -76,6 +76,9 @@
 - [x] `max_diversion_rate_gpd` column (migration 006): normalized 24,156 CA records to gallons/day
   - CFS × 646,317 | GPM × 1,440 | GPD × 1 | AFY × 893 | AF × 325,851
   - NULL units assumed CFS (most common)
+- [x] `/facility/{id}/permits` endpoint: returns linked permits (from xref) + nearby permits (spatial radius)
+  - Tested: Microsoft Boydton → 4 linked DC permits + 64 nearby within 15km
+- [x] `scripts/populate_permit_xref.py`: rerunnable xref population script (replaces temp file)
 
 ### Data Center Candidates (11 unproven locations)
 
@@ -111,8 +114,30 @@
 - [ ] Cross-reference matched DC permits → enrich SS facility records with permit IDs
 - [ ] Face value unit normalization (AFY → GPD) for cross-comparison with diversion rates
 
+## Current API Surface
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /resolve?lat=X&lng=Y` | Water utility + SDWIS + MDWD + Aqueduct for a point |
+| `GET /permits?lat=X&lng=Y&radius_km=10` | All permits within radius (filters: `category_group`, `source`) |
+| `GET /facility/{id}/permits` | Linked + nearby permits for an SS facility |
+| `GET /health` | Data vintage for all 7 pipeline steps |
+
+## Database State (as of Session 3)
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `utility.cws_boundaries` | 44,643 | EPA CWS |
+| `utility.aqueduct_polygons` | 68,506 | WRI Aqueduct 4.0 |
+| `utility.sdwis_systems` | 3,711 | EPA ECHO (VA + CA) |
+| `utility.mdwd_financials` | 225 | Harvard Dataverse (VA + CA) |
+| `utility.county_boundaries` | 3,235 | Census TIGER |
+| `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
+| `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
+| `utility.pipeline_runs` | 8 | Audit trail |
+
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 2 v2 — Validate DC candidates + expand permit scraping to additional states. Start from docs/next_steps.md.
+UAPI Sprint 3 v0 — LLM rate parsing: utility website scraping + Claude Batch API for water rate extraction. Populate avg_monthly_bill columns. Start from docs/next_steps.md.
 ```

@@ -1,7 +1,7 @@
 # Session Summary — Sprint 2: State Regulatory Permit Layers
 
 **Date**: 2026-03-23
-**Session**: 3 (Sprint 2 v0)
+**Session**: 3 (Sprint 2 v0 → v1)
 
 ## What Was Done
 
@@ -66,10 +66,53 @@ industrial, energy, municipal, mining, commercial, institutional, environmental,
 - `src/utility_api/api/schemas.py` — added PermitRecord, PermitsResponse
 - `src/utility_api/cli/ingest.py` — added va-deq, ca-ewrims commands; updated `all` to 7 steps
 
+## Sprint 2 Enrichment (v1, same session)
+
+### County Enrichment
+- CA: 43,438 permits filled via spatial join to TIGER counties
+- VA VPDES: 10,736 permits filled (entire layer had no county data)
+
+### Permit-Facility Cross-Reference
+- `permit_facility_xref` table (migration 005)
+- 30 DC permits matched to SS facilities (23 high, 5 medium, 2 low confidence)
+- 11 flagged as `data_center_candidate` — new facility locations not in SS DB
+- Script: `scripts/populate_permit_xref.py` (idempotent, rerunnable)
+
+### Unit Normalization
+- `max_diversion_rate_gpd` column (migration 006)
+- 24,156 CA records normalized from 7 unit types to gallons/day
+- Conversion factors: CFS×646,317 | GPM×1,440 | GPD×1 | AFY×893 | AF×325,851
+
+### Facility Permits Endpoint
+- `GET /facility/{facility_id}/permits` — returns linked permits + nearby permits
+- Two response sets: linked (from xref with match metadata) and nearby (spatial radius)
+- Example: Microsoft Boydton → 4 linked DC permits + 64 nearby within 15km
+
+### Additional Files Created
+- `migrations/versions/005_add_permit_facility_xref.py`
+- `migrations/versions/006_add_normalized_rate_column.py`
+- `src/utility_api/models/permit_facility_xref.py`
+- `scripts/populate_permit_xref.py`
+
+### Strategic Insight
+Water, wastewater, and energy permits are public record across all states. Scraping these three sources should fill out the DC database beyond OSM/imagery detection — permits are filed before construction, making them a leading indicator for facility discovery. The 11 unmatched candidates prove this concept.
+
 ## Verified Working
 
 - VA DEQ ingest: 16,519 permits loaded
 - CA eWRIMS ingest: 45,011 permits loaded
-- `/permits` endpoint tested with Ashburn VA (data center alley) and Sacramento CA
-- `/health` endpoint shows data vintage for all 7 pipeline steps
-- 41 data center VWP permits visible, concentrated in Loudoun County (19/41)
+- `/permits` endpoint tested with Ashburn VA and Sacramento CA
+- `/facility/{id}/permits` tested with Microsoft Boydton and Loudoun facilities
+- `/health` endpoint shows data vintage for all 8 pipeline steps
+- 41 data center VWP permits visible, 30 matched to SS facilities, 11 candidates flagged
+- County coverage: 98%+ across all permits
+- GPD normalization: 24,156 CA records converted
+
+## Commits
+
+```
+918532c  Sprint 2: VA DEQ + CA SWRCB permit layers and /permits endpoint
+64e277d  Sprint 2 enrichment: county join, DC cross-reference, rate normalization
+e50c05a  Update next_steps with Sprint 2 enrichment results and DC candidates
+c1af209  Add /facility/{id}/permits endpoint + xref population script
+```
