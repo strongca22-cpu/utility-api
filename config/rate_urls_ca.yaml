@@ -1,64 +1,172 @@
-# CA Rate URLs — curated via WebSearch (Sprint 3 v2, Session 5)
+# CA Rate URL Candidates — auto-discovered via SearXNG
 # Generated: 2026-03-24
-# Strategy: Top 21 utilities by population, PDF-first approach
-# PDFs parse at near-100% success; HTML pages mostly fail
+# Discovered: 56 | Failed: 29
 
-# Los Angeles DWP — Water Rates Ordinance PDF (53 pages, full rate structure) (4M pop)
-CA1910067: "https://www.ladwp.com/sites/default/files/documents/Water_Rates_Ordinance_4_15_16.pdf"
+# CITY OF HAYWARD (Alameda, pop=158,289) [HTML]
+CA0110006: "https://www.hayward-ca.gov/recycled-water-rates"
 
-# San Diego — Water Billing Rates (1.4M pop)
-CA3710020: "https://www.sandiego.gov/public-utilities/customer-support/water-billing-rates"
+# CITY OF PLEASANTON (Alameda, pop=79,510) [HTML]
+CA0110008: "https://www.cityofpleasantonca.gov/our-government/pleasanton-water/water-rates/"
 
-# San Jose Water — 2025 Rates page (1M pop)
-CA4310020: "https://www.sjwater.com/2025Rates"
+# CITY OF LIVERMORE (Alameda, pop=88,126) [HTML]
+CA0110011: "https://www.acwd.org/115/Water-Rates"
 
-# Fresno — Master Fee Schedule Public Utilities PDF (520K pop)
-CA1010007: "https://www.fresno.gov/wp-content/uploads/2024/07/MFS-Public-Utilities_580_584_CPI-ED-2024.07.01-2.pdf"
+# CITY OF ANTIOCH (Contra Costa, pop=110,542) [HTML]
+CA0710001: "https://www.ccwater.com/558/Water-Rates"
 
-# Sacramento — Water Rates PDF (Exhibit A) (491K pop)
-CA3410020: "https://www.cityofsacramento.gov/content/dam/portal/dou/utilities/rates/Water-Rates.pdf"
+# CITY OF CLOVIS (Fresno, pop=104,180) [HTML]
+CA1010003: "https://kmph.com/news/local/city-of-clovis-proposes-three-year-water-rate-hike-for-financial-stability"
 
-# Long Beach Utilities — Water Rates page (475K pop)
-CA1910055: "https://www.lbutilities.org/customer-service/rates-fees/water-rates"
+# CITY OF FRESNO (Fresno, pop=520,052) [HTML]
+CA1010007: "https://www.fcwaterworks18.org/residential-water-and-wastewater-service-rates"
 
-# Oakland/EBMUD — FY2026 Rate Schedule PDF (422K pop)
-CA0110005: "https://www.ebmud.com/download_file/force/34400/702?Rate_Document_for_FY_2026_Web.pdf="
+# COMPTON-CITY, WATER DEPT. (Los Angeles, pop=98,462) [HTML]
+CA1910026: "https://california.libertyutilities.com/compton/residential/rates-and-tariffs/water-rates.html"
 
-# Bakersfield — CPUC Cal Water fact sheet PDF (380K pop)
-CA1510013: "https://www.cpuc.ca.gov/-/media/cpuc-website/divisions/news-and-outreach/documents/pao/pphs/2022/cal-water-2021-grc-fact-sheet---bakersfield.pdf"
+# DOWNEY - CITY, WATER DEPT. (Los Angeles, pop=114,219) [PDF]
+CA1910034: "https://ear.waterboards.ca.gov/Home/ViewCCR?PwsID=CA1910034&Year=2021&isCert=false"
 
-# Anaheim — General Water Service Rate Schedule PDF (352K pop)
-CA3010005: "https://www.anaheim.net/DocumentCenter/View/2076"
+# EL MONTE-CITY, WATER DEPT. (Los Angeles, pop=116,732) [PDF]
+CA1910038: "https://docs.cpuc.ca.gov/PublishedDocs/Published/G000/M227/K750/227750643.pdf"
 
-# Riverside Public Utilities — Schedule WA-5 PDF (326K pop)
-CA3310003: "https://riversideca.gov/utilities/sites/riversideca.gov.utilities/files/pdf/rates-water/Water%20Schedule%20WA-5.pdf"
+# HAWTHORNE-CITY WATER DEPT. (Los Angeles, pop=88,451) [HTML]
+CA1910047: "https://innovation.luskin.ucla.edu/wp-content/uploads/2025/10/2015_WaterAtlas_BillingLevels.xlsx"
 
-# Stockton — Water Rate Adjustment Notice PDF (306K pop)
-CA3910012: "https://cms3.revize.com/revize/stockton/Documents/Services/Water,%20Sewer%20&%20Stormwater/Water/Water%20Rates%20&%20Fee%20Estimator/COS_MUD_FY2024_25WaterRateNotice.pdf"
+# SANTA MONICA-CITY, WATER DIVISION (Los Angeles, pop=93,220) [HTML]
+CA1910146: "https://www.santamonica.gov/waterrates"
 
-# San Bernardino MWD — Water and Sewer Rates PDF (216K pop)
-CA3610039: "https://www.sbmwd.org/DocumentCenter/View/401/21-Water-and-Sewer-Service-Rates-and-Charges-PDF"
+# SOUTH GATE-CITY, WATER DEPT. (Los Angeles, pop=96,401) [HTML]
+CA1910152: "https://www.cpuc.ca.gov/about-cpuc/divisions/water-division/water-rates-and-general-rate-case-proceedings-section/general-rate-case-proceedings---class-a"
 
-# Modesto — Water Rates page (CivicPlus) (211K pop)
-CA5010010: "https://www.modestogov.com/1009/Water-Rates"
+# BURBANK-CITY, WATER DEPT. (Los Angeles, pop=105,319) [HTML]
+CA1910179: "https://www.burbankca.gov/newsroom/-/newsdetail/20124/burbank-water-and-power-announces-approved-rate-changes-to-achieve-sustainable-future-and-maintain-reliability"
 
-# Huntington Beach (202K pop)
-CA3010053: "https://www.huntingtonbeachca.gov/government/departments/public-works/utilities/water-division/water-rates.cfm"
+# NORWALK - CITY, WATER DEPT. (Los Angeles, pop=107,140) [HTML]
+CA1910191: "https://california.libertyutilities.com/compton/residential/rates-and-tariffs/water-rates.html"
 
-# Glendale Water and Power — Water Rates page (201K pop)
-CA1910043: "https://www.glendaleca.gov/government/departments/glendale-water-and-power/rates/water-rates-1323"
+# NAPA, CITY OF (Napa, pop=80,434) [HTML]
+CA2810003: "https://www.cityofnapa.org/605/Water-Rates"
 
-# Oceanside (176K pop)
-CA3710014: "https://www.ci.oceanside.ca.us/government/water-sewer/customer-service/water-rates"
+# CITY OF FULLERTON (Orange, pop=140,847) [PDF]
+CA3010010: "https://www.mwdoc.com/wp-content/uploads/2024/08/2157-Water-Rates-with-Exhibits.pdf"
 
-# Santa Rosa — Water Rate Table PDF (July 2025) (175K pop)
-CA4910009: "https://www.srcity.org/DocumentCenter/View/2152/Water-Rate-Table-as-of-July-1-2025-PDF?bidId="
+# CITY OF NEWPORT BEACH (Orange, pop=87,127) [HTML]
+CA3010023: "https://www.newportbeachca.gov/government/departments/utilities/water-services/water-rates/potable-water"
 
-# Corona (164K pop)
-CA3310037: "https://www.coronaca.gov/government/departments-divisions/department-of-water-and-power/utility-rates"
+# CITY OF ORANGE (Orange, pop=140,992) [HTML]
+CA3010027: "https://www.mwdoc.com/your-water/water-rates-and-charges/"
 
-# Pasadena Water and Power (142K pop)
-CA1910124: "https://www.cityofpasadena.net/water-and-power/water-rates/"
+# CITY OF SAN CLEMENTE (Orange, pop=65,526) [PDF]
+CA3010036: "https://www.mwdoc.com/wp-content/uploads/2024/08/2157-Water-Rates-with-Exhibits.pdf"
 
-# Roseville (130K pop)
-CA3110008: "https://www.roseville.ca.us/government/departments/environmental_utilities/water_utility/water_rates"
+# CITY OF SANTA ANA (Orange, pop=335,400) [HTML]
+CA3010038: "https://www.santa-ana.org/water-rate-study/"
+
+# CITY OF TUSTIN (Orange, pop=80,583) [HTML]
+CA3010046: "https://www.tustinca.org/242/Water-Rates"
+
+# CITY OF HUNTINGTON BEACH (Orange, pop=201,899) [HTML]
+CA3010053: "https://huntingtonbeachca.gov/departments/public_works/water_and_sewer/2023-24_water_and_wastewater_rates_studies.php"
+
+# CITY OF GARDEN GROVE (Orange, pop=175,393) [PDF]
+CA3010062: "https://ggcity.org/sites/default/files/gg-water-rate-ordinance.pdf"
+
+# CITY OF ROSEVILLE (Placer, pop=130,269) [HTML]
+CA3110008: "https://www.pcwa.net/services/water-rates"
+
+# HEMET, CITY OF (Riverside, pop=83,861) [PDF]
+CA3310016: "https://riversideca.gov/finance/acfr/pdf/2023%20ACFR/2023%20RPU.pdf"
+
+# INDIO WATER AUTHORITY (Riverside, pop=87,533) [PDF]
+CA3310020: "https://indio.civicweb.net/document/181983/Resolution%20of%20Intent%20to%20Adjust%20Water%20Rates%20for%20.pdf?handle=54998CE8B58A492984E89E4B4664D314"
+
+# RIVERSIDE, CITY OF (Riverside, pop=322,424) [HTML]
+CA3310031: "https://riversideca.gov/utilities/residents/rates/water-rules-rates"
+
+# CORONA, CITY OF (Riverside, pop=164,226) [HTML]
+CA3310037: "https://www.coronaca.gov/departments/utilities/customer-care/services/water-rates-residential"
+
+# FOLSOM, CITY OF - MAIN (Sacramento, pop=76,375) [HTML]
+CA3410014: "https://www.sjwd.org/water-rates-faqs"
+
+# CHINO, CITY OF (San Bernardino, pop=85,595) [HTML]
+CA3610012: "https://indicators.sbcounty.gov/environment/water-consumption/"
+
+# HESPERIA WD (San Bernardino, pop=93,295) [HTML]
+CA3610024: "https://www.hesperiaca.gov/137/Water"
+
+# ONTARIO MUNICIPAL UTILITIES COMPANY (San Bernardino, pop=171,214) [HTML]
+CA3610034: "https://www.sbmwd.org/378/Rates-2022"
+
+# CHINO HILLS, CITY OF (San Bernardino, pop=78,309) [HTML]
+CA3610036: "https://www.chinohills.org/1373/How-Water-Rates-Are-Set"
+
+# REDLANDS CITY MUD-WATER DIV (San Bernardino, pop=71,035) [PDF]
+CA3610037: "https://www.epa.gov/sites/default/files/2015-09/documents/12004-exhibit-c-malcolm-pirnie-perchlorate-treatment-costs-2008.pdf"
+
+# UPLAND, CITY OF (San Bernardino, pop=76,443) [PDF]
+CA3610050: "https://www.ieua.org/wp-content/uploads/2020/07/2022-IEUA-Recycled-and-Recharge-Rate-Study-Report-Final.pdf"
+
+# CARLSBAD MWD (San Diego, pop=113,453) [PDF]
+CA3710005: "https://www.sandiego.gov/sites/default/files/legacy/water/pdf/rates/151001rateproppres.pdf"
+
+# ESCONDIDO, CITY OF (San Diego, pop=151,451) [HTML]
+CA3710006: "https://www.sandiego.gov/public-utilities/customer-support/water-billing-rates"
+
+# OCEANSIDE, CITY OF (San Diego, pop=175,691) [HTML]
+CA3710014: "https://www.10news.com/news/local-news/city-of-oceanside-to-consider-raising-water-rates"
+
+# LODI, CITY OF (San Joaquin, pop=64,596) [HTML]
+CA3910004: "https://www.lodi.gov/868/Fee-Schedule"
+
+# MANTECA, CITY OF (San Joaquin, pop=75,448) [HTML]
+CA3910005: "https://www.mantecabulletin.com/news/local-news/water-rates-going-up-but-not-due-to-raw-water-cost/"
+
+# TRACY, CITY OF (San Joaquin, pop=87,075) [HTML]
+CA3910011: "https://www.mantecabulletin.com/news/local-news/water-rates-going-up-but-not-due-to-raw-water-cost/"
+
+# CITY OF REDWOOD CITY (San Mateo, pop=85,288) [HTML]
+CA4110022: "https://www.smdailyjournal.com/news/local/redwood-city-increases-water-rates/article_4a07dd00-177a-478a-bad0-48d292c3e9ef.html"
+
+# CITY OF SANTA BARBARA WATER DEPARTMENT (Santa Barbara, pop=91,842) [HTML]
+CA4210010: "https://santabarbaraca.gov/government/departments/public-works/water-resources/rates-forms-newsletters/water-rate-calculator"
+
+# CITY OF SANTA MARIA UTILITIES DEPARTMENT (Santa Barbara, pop=105,093) [HTML]
+CA4210011: "https://santabarbaraca.gov/government/departments/public-works/water-resources/rates-forms-newsletters/water-rate-calculator"
+
+# CITY OF MILPITAS (Santa Clara, pop=77,604) [HTML]
+CA4310005: "https://www.milpitas.gov/788/Water-Sewer-Information"
+
+# CITY OF REDDING (Shasta, pop=91,582) [HTML]
+CA4510005: "https://www.cityofshastalake.gov/1266/2024-Water-Rates"
+
+# CITY OF FAIRFIELD (Solano, pop=112,970) [HTML]
+CA4810003: "https://www.dailyrepublic.com/news/new-year-new-water-rates-for-fairfield-homes-businesses/article_efab1bf8-4f02-434c-8ef2-ee679ec4e147.html"
+
+# CITY OF VALLEJO (Solano, pop=121,253) [PDF]
+CA4810007: "https://cdnsm5-hosted.civiclive.com/UserFiles/Servers/Server_13423/File/Water_Department/Water%20Rates/Lakes%20Rates%2010-24-19.pdf"
+
+# SANTA ROSA, CITY OF (Sonoma, pop=174,972) [HTML]
+CA4910009: "https://www.sonomacity.org/water-rates/"
+
+# MODESTO, CITY OF (Stanislaus, pop=211,266) [HTML]
+CA5010010: "https://www.modestogov.com/1056/Water-Rates"
+
+# TURLOCK, CITY OF (Stanislaus, pop=72,292) [HTML]
+CA5010019: "https://csusignal.com/7466/news/turlock-city-council-votes-yes-on-higher-water-rates/"
+
+# CITY OF YUBA CITY (Sutter, pop=66,941) [HTML]
+CA5110002: "https://www.ycpd.org/departments/public_works/utility_rate_information.php"
+
+# OXNARD WATER DEPT (Ventura, pop=207,254) [HTML]
+CA5610007: "https://www.cityofventura.ca.gov/1441/Rates"
+
+# VENTURA WATER DEPARTMENT (Ventura, pop=109,708) [HTML]
+CA5610017: "https://www.cityofventura.ca.gov/2725/Current-Water-and-Wastewater-Rates"
+
+# CAMARILLO WATER DEPT (Ventura, pop=67,608) [HTML]
+CA5610019: "https://www.cityofventura.ca.gov/1441/Rates"
+
+# CITY OF THOUSAND OAKS WATER DEPARTMENT (Ventura, pop=129,339) [HTML]
+CA5610020: "https://www.cityofventura.ca.gov/1441/Rates"
+
