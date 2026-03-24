@@ -51,8 +51,15 @@ class ResolveResponse(BaseModel):
     # MDWD financials (nullable — only ~2,200 systems nationally)
     mdwd_available: bool = Field(False, description="Whether MDWD financial data exists")
     mdwd_year: int | None = Field(None, description="Year of MDWD data")
-    # Rate data now served from utility.water_rates table via /rates endpoint
+    # Rate data
     has_rate_data: bool = Field(False, description="Whether parsed rate data exists for this utility")
+    rate_source: str | None = Field(None, description="Source of best estimate: swrcb_ear_2022, owrs, scraped_llm")
+    best_estimate_bill_10ccf: float | None = Field(None, description="Best-estimate monthly bill at 10 CCF ($/month)")
+    best_estimate_fixed_charge: float | None = Field(None, description="Best-estimate monthly fixed/service charge ($/month)")
+    best_estimate_rate_structure: str | None = Field(None, description="Rate structure: uniform, increasing_block, etc.")
+    rate_effective_date: date | None = Field(None, description="Effective date of the selected rate schedule")
+    rate_confidence: str | None = Field(None, description="Confidence in best estimate: high, medium, low")
+    rate_n_sources: int | None = Field(None, description="Number of independent data sources for this utility")
     median_household_income: float | None = Field(None, description="Median household income for service area")
     pct_below_poverty: float | None = Field(None, description="Percent of population below poverty line")
     water_utility_revenue: float | None = Field(None, description="Water utility revenue (CPI-adjusted, from Census of Governments)")

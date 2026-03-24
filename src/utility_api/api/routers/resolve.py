@@ -92,6 +92,18 @@ rate_match AS (
     FROM utility.water_rates r
     WHERE r.pwsid = (SELECT pwsid FROM cws_match)
     LIMIT 1
+),
+best_estimate_match AS (
+    SELECT
+        be.selected_source AS rate_source,
+        be.bill_estimate_10ccf AS best_estimate_bill_10ccf,
+        be.fixed_charge_monthly AS best_estimate_fixed_charge,
+        be.rate_structure_type AS best_estimate_rate_structure,
+        be.rate_effective_date AS rate_effective_date,
+        be.confidence AS rate_confidence,
+        be.n_sources AS rate_n_sources
+    FROM utility.rate_best_estimate be
+    WHERE be.pwsid = (SELECT pwsid FROM cws_match)
 )
 SELECT
     -- CWS
@@ -106,6 +118,10 @@ SELECT
     m.water_utility_debt, m.mdwd_population,
     -- Rate data
     COALESCE(r.has_rate_data, FALSE) AS has_rate_data,
+    -- Best estimate rate
+    be.rate_source, be.best_estimate_bill_10ccf, be.best_estimate_fixed_charge,
+    be.best_estimate_rate_structure, be.rate_effective_date,
+    be.rate_confidence, be.rate_n_sources,
     -- Aqueduct
     a.aqueduct_id, a.water_stress_score, a.water_stress_label,
     a.water_depletion_score, a.drought_risk_score,
@@ -116,6 +132,7 @@ FROM
     LEFT JOIN sdwis_match s ON TRUE
     LEFT JOIN mdwd_match m ON TRUE
     LEFT JOIN rate_match r ON TRUE
+    LEFT JOIN best_estimate_match be ON TRUE
     LEFT JOIN aqueduct_match a ON TRUE
 """)
 
@@ -172,6 +189,14 @@ def resolve(
         water_utility_expenditure=result["water_utility_expenditure"],
         water_utility_debt=result["water_utility_debt"],
         mdwd_population=result["mdwd_population"],
+        # Best estimate rate
+        rate_source=result["rate_source"],
+        best_estimate_bill_10ccf=result["best_estimate_bill_10ccf"],
+        best_estimate_fixed_charge=result["best_estimate_fixed_charge"],
+        best_estimate_rate_structure=result["best_estimate_rate_structure"],
+        rate_effective_date=result["rate_effective_date"],
+        rate_confidence=result["rate_confidence"],
+        rate_n_sources=result["rate_n_sources"],
         # Aqueduct
         aqueduct_id=result["aqueduct_id"],
         water_stress_score=result["water_stress_score"],

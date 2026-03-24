@@ -32,6 +32,87 @@ router = APIRouter(tags=["rates"])
 SCHEMA = settings.utility_schema
 
 
+@router.get("/rates/best-estimate")
+def list_best_estimates(
+    state: str | None = Query(None, description="Filter by state code (e.g., CA)"),
+    min_confidence: str = Query(None, description="Minimum confidence: high, medium, low"),
+    min_bill: float | None = Query(None, description="Minimum bill @10CCF"),
+    max_bill: float | None = Query(None, description="Maximum bill @10CCF"),
+    db: Session = Depends(get_db),
+):
+    """List best-estimate rates for all utilities.
+
+    Returns one row per PWSID with the selected best-estimate source,
+    bill amount, and confidence. Use for comparison and ranking.
+
+    Source priority: eAR 2022 (government anchor) > scraped (if agrees) > OWRS > scraped (diverges).
+    """
+    clauses = []
+    params = {}
+
+    if state:
+        clauses.append("be.state_code = :state")
+        params["state"] = state.upper()
+    if min_confidence:
+        conf_map = {"high": ["high"], "medium": ["high", "medium"], "low": ["high", "medium", "low"]}
+        conf_list = conf_map.get(min_confidence.lower(), ["high", "medium", "low"])
+        placeholders = ", ".join(f"'{c}'" for c in conf_list)
+        clauses.append(f"be.confidence IN ({placeholders})")
+    if min_bill is not None:
+        clauses.append("be.bill_estimate_10ccf >= :min_bill")
+        params["min_bill"] = min_bill
+    if max_bill is not None:
+        clauses.append("be.bill_estimate_10ccf <= :max_bill")
+        params["max_bill"] = max_bill
+
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+
+    rows = db.execute(text(f"""
+        SELECT
+            be.pwsid, be.utility_name, be.state_code,
+            be.selected_source, be.bill_estimate_10ccf,
+            be.bill_5ccf, be.bill_10ccf, be.bill_6ccf, be.bill_12ccf,
+            be.fixed_charge_monthly, be.rate_structure_type,
+            be.rate_effective_date, be.n_sources,
+            be.anchor_source, be.anchor_bill,
+            be.confidence, be.selection_notes,
+            m.population
+        FROM {SCHEMA}.rate_best_estimate be
+        LEFT JOIN {SCHEMA}.mdwd_financials m ON m.pwsid = be.pwsid
+        {where}
+        ORDER BY m.population DESC NULLS LAST, be.bill_estimate_10ccf DESC NULLS LAST
+    """), params).mappings().all()
+
+    results = []
+    for row in rows:
+        results.append({
+            "pwsid": row["pwsid"],
+            "utility_name": row["utility_name"],
+            "state_code": row["state_code"],
+            "selected_source": row["selected_source"],
+            "bill_estimate_10ccf": row["bill_estimate_10ccf"],
+            "bill_5ccf": row["bill_5ccf"],
+            "bill_10ccf": row["bill_10ccf"],
+            "bill_6ccf": row["bill_6ccf"],
+            "bill_12ccf": row["bill_12ccf"],
+            "fixed_charge_monthly": row["fixed_charge_monthly"],
+            "rate_structure": row["rate_structure_type"],
+            "rate_effective_date": str(row["rate_effective_date"]) if row["rate_effective_date"] else None,
+            "n_sources": row["n_sources"],
+            "anchor_source": row["anchor_source"],
+            "anchor_bill": row["anchor_bill"],
+            "confidence": row["confidence"],
+            "selection_notes": row["selection_notes"],
+            "population_served": row["population"],
+        })
+
+    return {
+        "total_results": len(results),
+        "filters": {"state": state, "min_confidence": min_confidence, "min_bill": min_bill, "max_bill": max_bill},
+        "rates": results,
+    }
+
+
 @router.get("/rates/{pwsid}")
 def get_rate(pwsid: str, db: Session = Depends(get_db)):
     """Get parsed water rate data for a specific utility.
