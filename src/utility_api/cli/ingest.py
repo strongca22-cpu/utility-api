@@ -66,19 +66,39 @@ def tiger_county():
     run_tiger_county_ingest()
 
 
+@app.command("va-deq")
+def va_deq():
+    """Download and load VA DEQ permits (VWP + VPDES) from EDMA MapServer."""
+    from utility_api.ingest.va_deq import run_va_deq_ingest
+
+    run_va_deq_ingest()
+
+
+@app.command("ca-ewrims")
+def ca_ewrims():
+    """Download and load CA SWRCB eWRIMS water rights (targeted load)."""
+    from utility_api.ingest.ca_ewrims import run_ca_ewrims_ingest
+
+    run_ca_ewrims_ingest()
+
+
 @app.command()
 def all():
     """Run all ingest steps in dependency order."""
-    typer.echo("=== Step 1/5: CWS Boundaries ===")
+    typer.echo("=== Step 1/7: CWS Boundaries ===")
     cws()
-    typer.echo("=== Step 2/5: Aqueduct Polygons ===")
+    typer.echo("=== Step 2/7: Aqueduct Polygons ===")
     aqueduct()
-    typer.echo("=== Step 3/5: SDWIS Systems (+ county enrichment) ===")
+    typer.echo("=== Step 3/7: SDWIS Systems (+ county enrichment) ===")
     sdwis()
-    typer.echo("=== Step 4/5: MDWD Financials ===")
+    typer.echo("=== Step 4/7: MDWD Financials ===")
     mdwd()
-    typer.echo("=== Step 5/5: TIGER County Boundaries (+ spatial join) ===")
+    typer.echo("=== Step 5/7: TIGER County Boundaries (+ spatial join) ===")
     tiger_county()
+    typer.echo("=== Step 6/7: VA DEQ Permits ===")
+    va_deq()
+    typer.echo("=== Step 7/7: CA eWRIMS Water Rights ===")
+    ca_ewrims()
     typer.echo("=== All ingest steps complete ===")
 
 

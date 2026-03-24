@@ -84,3 +84,54 @@ class ResolveResponse(BaseModel):
         "water_stress_score": 2.3,
         "water_stress_label": "Medium-High",
     }}}
+
+
+class PermitRecord(BaseModel):
+    """Single permit in the /permits response."""
+
+    source: str = Field(description="Data source: va_deq_vwp, va_deq_vpdes, ca_swrcb_ewrims")
+    permit_number: str = Field(description="State-assigned permit/application ID")
+    facility_name: str | None = Field(None, description="Facility or owner name")
+    source_category: str | None = Field(None, description="Category as delivered by data provider")
+    category_group: str | None = Field(None, description="Normalized bucket: industrial, energy, municipal, etc.")
+    use_codes: list[str] | None = Field(None, description="List of use codes (CA multi-use rights)")
+    status: str | None = Field(None, description="Permit status")
+    state_code: str | None = None
+    county: str | None = None
+    issued_date: date | None = None
+    expiration_date: date | None = None
+    face_value_amount: float | None = Field(None, description="Permitted volume")
+    face_value_units: str | None = Field(None, description="Units for face_value_amount")
+    max_diversion_rate: float | None = Field(None, description="Max direct diversion rate")
+    max_diversion_units: str | None = Field(None, description="Units for max_diversion_rate")
+    lat: float | None = None
+    lng: float | None = None
+    distance_km: float = Field(description="Distance from query point in km")
+
+
+class PermitsResponse(BaseModel):
+    """Response from the /permits endpoint."""
+
+    query_lat: float
+    query_lng: float
+    radius_km: float
+    total_results: int = Field(description="Number of permits found within radius")
+    permits: list[PermitRecord]
+
+    model_config = {"json_schema_extra": {"example": {
+        "query_lat": 38.8951,
+        "query_lng": -77.0364,
+        "radius_km": 10.0,
+        "total_results": 3,
+        "permits": [{
+            "source": "va_deq_vwp",
+            "permit_number": "21-0533",
+            "facility_name": "Microsoft Corporation - Timber Data Center",
+            "source_category": "Data Center",
+            "category_group": "industrial",
+            "status": "active",
+            "state_code": "VA",
+            "county": "Mecklenburg County",
+            "distance_km": 2.3,
+        }],
+    }}}

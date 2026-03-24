@@ -1,0 +1,108 @@
+# Category Group Mapping — Permits
+#
+# Maps source-native categories (source_category) to normalized
+# category_group buckets for cross-state filtering.
+#
+# Two-tier design:
+#   source_category  = exactly what the data provider delivers
+#   category_group   = our normalized bucket for cross-state queries
+#
+# Created: 2026-03-23
+
+category_groups:
+  industrial:
+    description: "Manufacturing, processing, industrial facilities (incl. data centers)"
+  energy:
+    description: "Power generation, fossil fuel, renewables"
+  municipal:
+    description: "Public water supply, wastewater treatment"
+  mining:
+    description: "Extraction operations"
+  commercial:
+    description: "Non-industrial commercial operations"
+  institutional:
+    description: "Government, education, military"
+  environmental:
+    description: "Wetlands, stream impacts, fish & wildlife, water quality"
+  agricultural:
+    description: "Irrigation, livestock, frost protection"
+  water_withdrawal:
+    description: "Generic water withdrawal — not yet classified as industrial/municipal/etc."
+  infrastructure:
+    description: "Transportation, pipelines, stormwater, fire protection, dust control"
+  other:
+    description: "Recreational, aesthetic, catch-all"
+
+# --- VA DEQ VWP Individual Permits (Layer 192) ---
+va_deq_vwp_activity_type:
+  Data Center: industrial
+  Industrial: industrial
+  Ind-Wtr/Wstwtr Treat Fac: industrial
+  Ind-Renewable Energy Gen Fac: energy
+  Ind-Fossilfuel Energy Gen Fac: energy
+  Water Withdrawal: water_withdrawal
+  Municipal: municipal
+  Waste Management Facility: municipal
+  Mining: mining
+  Commercial: commercial
+  Institutional: institutional
+  Dredging-only: environmental
+  Agricultural: agricultural
+  Gas Pipeline: infrastructure
+  Linear Transportation - VDOT: infrastructure
+  Linear Transportation - Other: infrastructure
+  Recreational: other
+  Other: other
+  No Permit Required: other
+  # Excluded from ingest:
+  # Residential: exclude
+
+# --- VA DEQ VWP General Permits (Layer 193) ---
+# Same activity codes as IP but subset; uses VWT_ACTIV_CODE field
+va_deq_vwp_gp_activity_code:
+  Industrial: industrial
+  Commercial: commercial
+  Municipal: municipal
+  Mining: mining
+  Agricultural: agricultural
+  Other: other
+  # Excluded from ingest:
+  # Linear Transportation - VDOT: exclude
+  # Linear Transportation - Other: exclude
+
+# --- VA DEQ VPDES Outfalls (Layer 119) ---
+va_deq_vpdes_type:
+  VPDES_IP: industrial
+  SWI_GP: infrastructure
+  SWG_GP: infrastructure
+  CWF_GP: agricultural
+  CWD_GP: municipal
+  PWTP_GP: municipal
+  SF_GP: infrastructure
+  CRT_GP: infrastructure
+  PETR_GP: energy
+  MIN_GP: mining
+
+# --- CA SWRCB eWRIMS USE_CODE ---
+ca_ewrims_use_code:
+  Industrial: industrial
+  Power: energy
+  Incidental Power: energy
+  Heat Control: energy
+  Municipal: municipal
+  Mining: mining
+  Milling: mining
+  Fire Protection: infrastructure
+  Dust Control: infrastructure
+  Water Quality: environmental
+  Fish and Wildlife Preservation and Enhancement: environmental
+  Aquaculture: environmental
+  Irrigation: agricultural
+  Frost Protection: agricultural
+  Stockwatering: agricultural
+  Recreational: other
+  Aesthetic: other
+  Snow Making: other
+  Other: other
+  # Excluded from targeted load:
+  # Domestic: exclude
