@@ -155,11 +155,82 @@
 - **CivicPlus remains problematic**: headless Playwright gets served wrong page content by CivicPlus CMS routing. Not solvable via scraping alone — need curated URLs or PDF links for CivicPlus utilities.
 - **Claude Sonnet extraction quality is high**: correctly identifies rate structures, converts units, handles multi-district tariffs (VA-American Water 53-page PDF → correct Alexandria district rates)
 
+## Completed (Sprint 3 v2 — Session 5)
+
+- [x] **CivicPlus scraper bug fix**: `_clean_html_text()` matched `id="skipToContentLinks"` (20 chars) instead of actual page content. Fixed to select the largest matching element by text length. Unblocked 11 CivicPlus sites.
+- [x] Batch URL discovery: SearXNG search + HTTP HEAD verification for all 28 uncurated VA utilities
+- [x] Curated `config/rate_urls_va.yaml` with 26 verified URLs (PDF + HTML mix)
+- [x] API cost tracking: `--max-cost` CLI flag, Sonnet pricing ($3/M in + $15/M out), pipeline stops at cap
+- [x] Batch discovery script: `scripts/batch_discover_va_urls.py`
+- [x] Hardened `.gitignore` for standalone repo isolation from strong-strategic
+- [x] GitHub remote added: `git@github.com:strongca22-cpu/utility-api.git`
+
+### Sprint 3 v2 Results (16/26 VA utilities parsed — 81% population coverage)
+
+| Utility | Pop | Structure | Fixed/mo | Bill@5CCF | Bill@10CCF |
+|---------|-----|-----------|----------|-----------|------------|
+| Virginia Beach | 452,745 | uniform | $6.00 | $29.30 | $52.60 |
+| Norfolk | 246,393 | flat | N/A | $32.55 | $65.10 |
+| Chesapeake | 235,429 | tiered | $11.36 | $33.86 | $56.36 |
+| Richmond | 220,289 | tiered | $17.66 | $36.81 | $69.96 |
+| Newport News | 182,385 | tiered | N/A | $17.49 | $35.94 |
+| Alexandria | 153,511 | uniform | $15.00 | $28.03 | $41.06 |
+| Suffolk | 88,161 | uniform | $16.50 | $73.50 | $130.50 |
+| Harrisonburg | 52,538 | tiered | $13.32 | $29.92 | $46.52 |
+| Charlottesville | 46,597 | uniform | $10.00 | $38.26 | $66.52 |
+| Blacksburg | 44,215 | tiered | $28.00 | $31.34 | $48.19 |
+| Fredericksburg | 28,118 | uniform | $21.11 | $37.21 | $53.31 |
+| Christiansburg | 21,943 | tiered | $11.00 | $51.40 | $88.80 |
+| Colonial Heights | 17,820 | tiered | $6.57 | $69.47 | $132.37 |
+| Manassas Park | 15,726 | tiered | $52.77 | $129.62 | $206.47 |
+| Williamsburg/JCSA | 15,052 | tiered | $9.02 | $25.67 | $54.92 |
+| Arlington | N/A | tiered | $6.03 | $23.59 | $44.64 |
+
+**Total API cost**: $0.26 across 2 rounds (well under $4 cap)
+
+### Sprint 3 v2 Findings
+
+- **CivicPlus scraper bug was the primary blocker**: not a CivicPlus rendering issue but a BeautifulSoup content selector bug. All CivicPlus sites render fine with Playwright once the selector is fixed.
+- **PDF remains the most reliable source**: direct PDF links parsed at near-100% success. HTML pages succeed when they contain actual rate tables, but many utility pages are landing/navigation pages with rates in linked PDFs.
+- **SearXNG rate-limits after ~60 queries**: hit empty results after sustained search sessions. Plan searches in batches.
+- **Search keyword optimization matters**: generic "city VA water rates" returns statewide reports. Need authority-specific names (e.g., "Loudoun Water", "Newport News Waterworks") and domain-specific queries.
+
+### Spot-Check Flags
+
+- **Suffolk** ($130 at 10CCF), **Colonial Heights** ($132), **Manassas Park** ($206) — unusually high. May include combined water+sewer charges. Needs manual verification against source URLs.
+- **Norfolk** shows "flat" structure with N/A fixed charge — verify against source.
+- **Charlottesville** parsed from FY2020 report (older vintage) — check for newer rates.
+
+### Still Failed (10 utilities — need manual PDF curation)
+
+| Utility | Pop | Issue |
+|---------|-----|-------|
+| Portsmouth | 96,201 | Billing info page, no actual dollar amounts — need rate schedule PDF |
+| Lynchburg | 79,812 | Playwright timeout — retry or find PDF |
+| Leesburg/Loudoun Water | 51,209 | Billing policy page — need Loudoun Water rate schedule PDF |
+| Danville | 42,082 | Page has meter charges but consumption rates "per 1,000 gallons" not parsed |
+| Manassas | 41,764 | Directory page linking to documents — need actual rate sheet PDF |
+| Petersburg | 32,477 | General utility billing page, no rate amounts |
+| Salem | 25,432 | Has rate structure but multi-year columns confused parser — prompt tune |
+| Vienna/Fairfax Water | 16,522 | Rates page links to PDF schedule but page itself lacks $/CCF — need PDF |
+| Front Royal | 15,070 | Bill explanation page, not actual rates |
+| Martinsville | 13,645 | References "Schedule of Water and Sewer Rates (PDF)" but link not followed |
+
+### Tabled (5 utilities — CivicPlus 403/404, deferred)
+
+- Winchester (27K) — winchesterva.gov returns 403
+- Radford (17K) — all DocumentCenter PDF links 404
+- Staunton (24K) — ci.staunton.va.us returns 403
+- Waynesboro (21K) — no rate page found
+- Western VA Water Authority (100K) — WVWA PDFs on chooseroanokecounty.com all 404
+
 ## Sprint 3 — Remaining Work
 
-- [ ] Run full pipeline on all 31 VA MDWD utilities (curated URLs for CivicPlus gaps)
+- [ ] Manual PDF curation for 10 failed utilities (open each site in browser, copy PDF link)
+- [ ] Manual PDF curation for 5 tabled utilities (check for non-CivicPlus rate PDFs)
+- [ ] Spot-check: verify Suffolk, Colonial Heights, Manassas Park, Norfolk against source URLs
+- [ ] Salem parser prompt tune (multi-year column format in $/1,000 gal)
 - [ ] Run full pipeline on CA MDWD utilities (194 targets)
-- [ ] Manual spot-check: validate ~20 parsed rates against source URLs
 - [ ] Claude Batch API integration (replace single calls once prompt is stable)
 - [ ] Build `/rates/{pwsid}` endpoint to serve parsed rate data
 - [ ] Hughes et al. 2025 outreach — request raw rate data for validation corpus
@@ -184,7 +255,7 @@
 | `GET /facility/{id}/permits` | Linked + nearby permits for an SS facility |
 | `GET /health` | Data vintage for all pipeline steps |
 
-## Database State (as of Session 4)
+## Database State (as of Session 5)
 
 | Table | Rows | Source |
 |-------|------|--------|
@@ -195,11 +266,11 @@
 | `utility.county_boundaries` | 3,235 | Census TIGER |
 | `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
 | `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
-| `utility.water_rates` | 3 | LLM-parsed (Blacksburg, Alexandria, Arlington) |
-| `utility.pipeline_runs` | 8 | Audit trail |
+| `utility.water_rates` | 26 | 16 high/medium + 10 failed (LLM-parsed) |
+| `utility.pipeline_runs` | 10 | Audit trail |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 3 v2 — Scale rate parsing to all 31 VA utilities. Curate URLs for CivicPlus gaps. SearXNG running at localhost:8888. Start from docs/next_steps.md.
+UAPI Sprint 3 v3 — Manual PDF curation for 15 remaining VA utilities + spot-check high-value parses. SearXNG at localhost:8888. Start from docs/next_steps.md.
 ```
