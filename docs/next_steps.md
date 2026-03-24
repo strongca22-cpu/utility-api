@@ -457,25 +457,63 @@
 | `utility.water_rates` | 1,069 | owrs: 387 + scraped_llm: 101 + ear_2020: 194 + ear_2021: 193 + ear_2022: 194 |
 | `utility.pipeline_runs` | 23 | Audit trail |
 
-## Sprint 5 — Remaining Work
-
-### Reconciliation Resolution (requires methodology discussion)
-- [ ] Decide vintage priority: most recent? or most reliable source?
-- [ ] Fix eAR tier limit inflation: divide by 1000 for known-affected utilities, or flag as untrusted?
-- [ ] Re-parse 8 suspected combined water+sewer scraped rates as water-only
-- [ ] Handle "unexplained" divergence (13 utilities) — manual review
-- [ ] Design a "best estimate" selection logic (source priority × vintage × confidence)
+## Completed (Sprint 6 — Reconciliation Fixes + Best Estimate — Session 7 cont.)
 
 ### eAR Tier Limit Fix
-- [ ] Identify all 54 affected utilities
-- [ ] Check if 2022 data is systematically corrected (Escondido suggests partial fix)
-- [ ] If 2022 is clean: prefer 2022 over 2020/2021 for tier structure
-- [ ] If not: apply ÷1000 correction to limits > 500 CCF in eAR sources
+- [x] 97 records across 61 PWSIDs had tier limits in gallons instead of CCF
+- [x] Inflation factors varied: 748x (gallons), 1000x (kgal), up to 5110x
+- [x] Fix strategy: NULL inflated tier structures (>100 CCF residential threshold)
+- [x] 90 records: pre-computed state bills preserved (reasonable despite bad tiers)
+- [x] 7 records: bills also NULLed (state's own calculation used inflated tiers)
+- [x] 3 additional inflated bill records caught in second pass
+- [x] Result: eAR tier inflation flags → 0, conflict category → 0, mean CV 18.1% → 16.4%
+- [x] Script: `python scripts/fix_ear_tier_inflation.py [--dry-run]`
+
+### Combined Water+Sewer Flags
+- [x] 7 scraped records flagged as suspected combined water+sewer (confidence → low)
+- [x] Flagged: Vallejo (3.7x), Redwood City (2.2x), San Diego (2.1x), EBMUD (2.0x), Garden Grove (1.7x), Tracy (1.6x), Livermore (1.5x)
+- [ ] Actual re-parse with water-only prompt deferred (requires API key + pipeline run)
+
+### Best-Estimate Source Priority
+- [x] Built `utility.rate_best_estimate` table — one row per PWSID
+- [x] Priority: eAR 2022 (government anchor) > eAR 2021 > scraped (if agrees <25% with anchor) > OWRS > scraped (diverges) > eAR 2020
+- [x] 443 PWSIDs: eAR 2022=179 (40%), OWRS=227 (51%), scraped=30 (7%), none=7
+- [x] Confidence: high=184 (42%), medium=252 (57%), none=7 (2%)
+- [x] 5 scraped rates upgraded (agreed with eAR anchor within 25%)
+- [x] Bill @10CCF: mean=$54, median=$48, range=$4-$462
+- [x] Script: `python scripts/build_best_estimate.py [--dry-run] [--csv]`
+
+## Database State (as of Session 7 final)
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `utility.cws_boundaries` | 44,643 | EPA CWS |
+| `utility.aqueduct_polygons` | 68,506 | WRI Aqueduct 4.0 |
+| `utility.sdwis_systems` | 3,711 | EPA ECHO (VA + CA) |
+| `utility.mdwd_financials` | 225 | Harvard Dataverse (VA + CA) |
+| `utility.county_boundaries` | 3,235 | Census TIGER |
+| `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
+| `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
+| `utility.water_rates` | 1,069 | owrs: 387 + scraped_llm: 101 + ear: 581 (97 tiers NULLed, 10 bills NULLed) |
+| `utility.rate_best_estimate` | 443 | Best-estimate selection per PWSID |
+| `utility.pipeline_runs` | 26 | Audit trail |
+
+## Remaining Work
+
+### Re-parse Combined Water+Sewer Scrapes (deferred)
+- [ ] 7 utilities need re-parse with "water-only, not combined" prompt
+- [ ] Requires ANTHROPIC_API_KEY and pipeline run (~$0.05)
+- [ ] After re-parse: re-run best estimate builder
 
 ### Cross-Year Rate Change Analysis (tabled)
-- [ ] Prerequisite: fix eAR tier inflation first
-- [ ] Then: compare eAR 2020 vs 2021 vs 2022 fixed charges and bill amounts
-- [ ] Compute annual rate change for utilities with clean data across all 3 years
+- [ ] eAR tier inflation now fixed — prerequisite cleared
+- [ ] Compare eAR 2020 vs 2021 vs 2022 fixed charges and bill amounts
+- [ ] Compute annual rate change for utilities with clean data
+- [ ] User note: tabled until current-state accuracy is satisfactory
+
+### API Endpoints
+- [ ] `GET /rates/best-estimate?state=CA` — serve from rate_best_estimate table
+- [ ] `GET /resolve` update — include best_estimate_bill in response
 
 ### Infrastructure
 - [ ] Parser prompt refinement: water-only extraction, multi-year columns, seasonal structures
@@ -485,9 +523,10 @@
 - [ ] TX, AZ, OR state-level rate data sources (equivalent to CA eAR)
 - [ ] UNC EFC dashboards as verification (NC, IA, WV, FL)
 - [ ] AWWA rate survey data (if accessible)
+- [ ] VA remaining 9 utilities: manual PDF curation
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 6 — Reconciliation methodology: fix eAR tier limit inflation (÷1000 for 54 affected utilities), re-parse 8 combined water+sewer scrapes as water-only, design "best estimate" source priority logic. Then cross-year eAR analysis (prerequisite: clean tier data). Start from docs/next_steps.md.
+UAPI Sprint 7 — API integration: serve best-estimate rates from /resolve and /rates/best-estimate endpoints. Re-parse 7 combined water+sewer scrapes with water-only prompt. Then cross-year eAR rate change analysis (clean data ready). Start from docs/next_steps.md.
 ```
