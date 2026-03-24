@@ -400,27 +400,94 @@
 4. **eAR bulk data already covers all 194 CA utilities** — scraped rates add cross-validation and current pricing but are diminishing returns
 5. **VA tabled utilities** need manual browser curation (Layer 4) — CivicPlus rendering and Excel format issues aren't solvable via automated scraping
 
-## Sprint 4 — Remaining Work
+## Completed (Sprint 5 — OWRS Ingest + Reconciliation Diagnostic — Session 7)
 
-### eAR Analysis
-- [ ] Cross-year rate change analysis for utilities with all 3 years (2020-2022)
+### OWRS Ingest
+- [x] Cloned CA Data Collaborative OWRS repo (433 CA utilities, 492 YAML files)
+- [x] Discovered pre-computed summary table in OWRS-Analysis repo with PWSID crosswalk
+- [x] Built `owrs_ingest.py`: CSV → water_rates mapping with tier parsing, unit conversion, bill recalculation
+- [x] **387 records inserted** (419 rows → 397 parsed → 392 matched CWS → 387 after dedup)
+- [x] Handles tiered (291), uniform (109), budget-based (16) rate structures
+- [x] Unit conversion for 61 kgal-reporting utilities → CCF
+- [x] Billing frequency normalization (bimonthly/quarterly → monthly)
+- [x] Bill_5ccf and bill_10ccf recalculated from tier structure at standard usage
+- [x] CLI: `ua-ingest owrs [--dry-run]`
+- [x] Cross-validation: Anaheim OWRS vs scraped = 2% diff (validates calculation logic)
 
-### OWRS Ingest (Layer 1, medium ROI)
-- [ ] Download CA Data Collaborative Open Water Rate Specification from OpenEI
-- [ ] Machine-readable YAML → water_rates mapping
-- [ ] Source tag: `owrs`
+### OWRS Data Characteristics
+- **Vintage**: 2002-2021 (median ~2017). Older than eAR (2020-2022) and scraped (2024-2026).
+- **Coverage**: 381 unique PWSIDs, 229 net new (not in any prior source)
+- **Quality**: Pre-curated by CA Data Collaborative from utility OWRS filings. Water-only.
+- **Limitation**: 3 records skipped (anomalous bill_type: formula strings, "0")
+- **Limitation**: 16 budget-based rates have non-numeric tier limits (% of allocation). Prices stored, limits NULL.
 
-### Reconciliation Framework (deferred)
-- [ ] Design conflict resolution for duplicate source records
-- [ ] Prioritize: scraped combined charges → flag for water-only re-parse
-- [ ] eAR Manteca ($1/mo) → flag as data quality issue
+### Reconciliation Diagnostic
+- [x] Built `scripts/reconcile_rates.py` — cross-source variance analysis
+- [x] 190 multi-source utilities with comparable bill amounts analyzed
+- [x] **Variance distribution**: 38% agree (<10% CV), 32% moderate (10-25%), 15% divergent (25-50%), 7% major (50-100%)
+- [x] **157/1069 records flagged** for quality issues:
+  - 88 eAR tier limit inflation (1000x factor, 54 utilities) — tier limits in gallons not CCF
+  - 76 stale vintage (pre-2015, mostly OWRS)
+  - 8 suspected combined water+sewer scrapes (Vallejo 3.7x, Redwood City 2.2x, San Diego 2.1x, EBMUD 2.0x)
+  - 2 suspiciously low bills (Manteca eAR = $1/mo confirmed)
+  - 2 suspiciously high fixed charges
+  - 7 suspiciously high bills (eAR inflation artifacts)
+- [x] CSV report: `data/interim/rate_reconciliation.csv`
+
+### Key Insights for Reconciliation Methodology
+1. **eAR tier limit inflation is systematic**: 54 utilities across all 3 eAR years have limits 1000x too high. Root cause likely in the HydroShare processing — tier limits appear to be in gallons, not HCF/CCF. The eAR 2022 data is partially corrected (Escondido: 2020/2021 have 7000 CCF, 2022 has 7 CCF).
+2. **Scraped combined charges are identifiable**: when scraped bill is >1.5x the median of eAR+OWRS, and >$40, it's likely combined water+sewer. 8 utilities flagged.
+3. **Vintage gaps explain most moderate divergence**: OWRS (2017) vs scraped (2024) is a 7-year gap. Water rates typically increase 3-5% annually → ~25-40% expected divergence.
+4. **"Unexplained" divergence** (13 utilities, CV>25% with no flagged issues) needs individual review.
+
+### Cross-Year eAR Analysis
+- **Tabled** — current-state accuracy supercedes historical trend analysis. The eAR tier inflation issue needs to be resolved before cross-year comparisons are meaningful.
+
+## Database State (as of Session 7)
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `utility.cws_boundaries` | 44,643 | EPA CWS |
+| `utility.aqueduct_polygons` | 68,506 | WRI Aqueduct 4.0 |
+| `utility.sdwis_systems` | 3,711 | EPA ECHO (VA + CA) |
+| `utility.mdwd_financials` | 225 | Harvard Dataverse (VA + CA) |
+| `utility.county_boundaries` | 3,235 | Census TIGER |
+| `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
+| `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
+| `utility.water_rates` | 1,069 | owrs: 387 + scraped_llm: 101 + ear_2020: 194 + ear_2021: 193 + ear_2022: 194 |
+| `utility.pipeline_runs` | 23 | Audit trail |
+
+## Sprint 5 — Remaining Work
+
+### Reconciliation Resolution (requires methodology discussion)
+- [ ] Decide vintage priority: most recent? or most reliable source?
+- [ ] Fix eAR tier limit inflation: divide by 1000 for known-affected utilities, or flag as untrusted?
+- [ ] Re-parse 8 suspected combined water+sewer scraped rates as water-only
+- [ ] Handle "unexplained" divergence (13 utilities) — manual review
+- [ ] Design a "best estimate" selection logic (source priority × vintage × confidence)
+
+### eAR Tier Limit Fix
+- [ ] Identify all 54 affected utilities
+- [ ] Check if 2022 data is systematically corrected (Escondido suggests partial fix)
+- [ ] If 2022 is clean: prefer 2022 over 2020/2021 for tier structure
+- [ ] If not: apply ÷1000 correction to limits > 500 CCF in eAR sources
+
+### Cross-Year Rate Change Analysis (tabled)
+- [ ] Prerequisite: fix eAR tier inflation first
+- [ ] Then: compare eAR 2020 vs 2021 vs 2022 fixed charges and bill amounts
+- [ ] Compute annual rate change for utilities with clean data across all 3 years
 
 ### Infrastructure
 - [ ] Parser prompt refinement: water-only extraction, multi-year columns, seasonal structures
 - [ ] Claude Batch API integration (replace single calls once prompt is stable)
 
+### Expansion
+- [ ] TX, AZ, OR state-level rate data sources (equivalent to CA eAR)
+- [ ] UNC EFC dashboards as verification (NC, IA, WV, FL)
+- [ ] AWWA rate survey data (if accessible)
+
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 5 — OWRS ingest (OpenEI CA rate specs, machine-readable YAML). Cross-year eAR rate change analysis (2020-2022). Then reconciliation framework: flag scraped combined water+sewer charges, eAR data quality issues (Manteca $1/mo), and vintage mismatches. Start from docs/next_steps.md.
+UAPI Sprint 6 — Reconciliation methodology: fix eAR tier limit inflation (÷1000 for 54 affected utilities), re-parse 8 combined water+sewer scrapes as water-only, design "best estimate" source priority logic. Then cross-year eAR analysis (prerequisite: clean tier data). Start from docs/next_steps.md.
 ```
