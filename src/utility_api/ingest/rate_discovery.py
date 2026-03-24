@@ -208,6 +208,12 @@ def _search_searxng(query: str, max_results: int = 10) -> list[RatePageCandidate
 
     # Sort by score descending
     candidates.sort(key=lambda c: c.score, reverse=True)
+
+    # If SearXNG returned 0 results, try DuckDuckGo fallback (rate limit likely)
+    if not candidates:
+        logger.info(f"SearXNG returned 0 results for '{query}' — trying DuckDuckGo fallback")
+        return _search_duckduckgo_fallback(query, max_results)
+
     return candidates
 
 
