@@ -60,6 +60,18 @@ Updated: model, ingest search_map, resolve query, response schema.
 - Richmond (VA): water_utility_revenue=$27.7M, no county (independent city — expected)
 - /health returns vintage timestamps for all 4 data layers
 
+### 6. Census TIGER County Boundaries (spatial join)
+**Problem:** 543 CWS boundaries still had NULL county_served after SDWIS enrichment (mostly tribal systems and independent cities).
+
+**Fix:** Downloaded Census TIGER/Line 2024 county boundaries (3,235 polygons), loaded into `utility.county_boundaries` table, then ran `ST_Intersects` spatial join on CWS centroids to fill remaining gaps.
+
+**Result:** 543 → 0 missing. 100% county coverage (44,643/44,643). County boundaries table now available as reusable infrastructure for future spatial queries.
+
+**Files added:**
+- `migrations/versions/003_add_county_boundaries_table.py`
+- `src/utility_api/models/county_boundary.py`
+- `src/utility_api/ingest/tiger_county.py`
+
 ## Key Finding: MDWD Data Cadence
 MDWD is NOT a rate/pricing dataset. It sources from:
 - **Census of Governments** (financials): 1997, 2002, 2007, 2012, 2017

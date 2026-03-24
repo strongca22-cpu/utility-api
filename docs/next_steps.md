@@ -27,9 +27,11 @@
 - **MDWD dual cadence**: Census of Governments financials publish every 5 years (2017 latest), ACS demographics are annual (2018 latest). Ingest prefers the vintage with financial data.
 - **County gaps** (543 systems without county): Mostly tribal systems and independent cities (e.g., Richmond, VA) where SDWIS geographic areas don't list a county. Could be filled via spatial join to Census TIGER in a future pass.
 
-## Remaining for Sprint 1
+## Completed (Sprint 1 Cleanup — Session 2, cont.)
 
-- [ ] Census TIGER county boundary spatial join — infrastructure for future spatial enrichment, would cover the 543 CWS systems missing county from SDWIS
+- [x] Census TIGER county boundaries loaded (3,235 polygons) into `utility.county_boundaries`
+- [x] Spatial join filled remaining 543 CWS boundaries missing county → 100% county coverage (44,643/44,643)
+- [x] `ua-ingest tiger-county` CLI command added; included in `ua-ingest all` pipeline
 
 ## Sprint 2 — State Regulatory Layers
 

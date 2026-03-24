@@ -58,17 +58,27 @@ def aqueduct():
     run_aqueduct_ingest()
 
 
+@app.command("tiger-county")
+def tiger_county():
+    """Download and load Census TIGER county boundaries + spatial join."""
+    from utility_api.ingest.tiger_county import run_tiger_county_ingest
+
+    run_tiger_county_ingest()
+
+
 @app.command()
 def all():
     """Run all ingest steps in dependency order."""
-    typer.echo("=== Step 1/4: CWS Boundaries ===")
+    typer.echo("=== Step 1/5: CWS Boundaries ===")
     cws()
-    typer.echo("=== Step 2/4: Aqueduct Polygons ===")
+    typer.echo("=== Step 2/5: Aqueduct Polygons ===")
     aqueduct()
-    typer.echo("=== Step 3/4: SDWIS Systems ===")
+    typer.echo("=== Step 3/5: SDWIS Systems (+ county enrichment) ===")
     sdwis()
-    typer.echo("=== Step 4/4: MDWD Financials ===")
+    typer.echo("=== Step 4/5: MDWD Financials ===")
     mdwd()
+    typer.echo("=== Step 5/5: TIGER County Boundaries (+ spatial join) ===")
+    tiger_county()
     typer.echo("=== All ingest steps complete ===")
 
 
