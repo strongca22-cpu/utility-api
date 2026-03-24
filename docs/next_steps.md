@@ -317,8 +317,85 @@
 | `utility.water_rates` | 25 | VA: 22 high/med + 4 failed; CA: 2 high + 1 partial (LLM-parsed) |
 | `utility.pipeline_runs` | 14 | Audit trail |
 
+## Completed (Sprint 4 — eAR Bulk Ingest — Session 6)
+
+- [x] Schema evolution (migration 008):
+  - `source` column on `water_rates`: `scraped_llm | swrcb_ear_YYYY | owrs`
+  - Unique constraint updated to `(pwsid, rate_effective_date, source)` — allows duplicate records from different sources
+  - eAR bill snapshot columns: `bill_6ccf`, `bill_9ccf`, `bill_12ccf`, `bill_24ccf`
+  - Existing scraped records backfilled with `source='scraped_llm'`
+- [x] HydroShare eAR 2022 downloaded (17 MB Excel, 7,228 CA systems)
+- [x] `ear_ingest.py` — bulk ingest from formatted eAR Excel:
+  - Maps SF residential tier structure: base charge, up to 4 tiers (limits + rates), billing frequency
+  - Bill columns are monthly-equivalent (bimonthly charges ÷ 2)
+  - Fixed charge normalized to monthly
+  - Tier limits normalized to monthly (per-billing-period ÷ divisor)
+  - Rate structure mapping: Variable Base → increasing_block, Uniform Usage → uniform, Fixed Base → flat
+  - Idempotent: clears source-tagged records before reinserting
+- [x] CLI: `ua-ingest ear --year 2022` (with `--dry-run`)
+- [x] **194/194 CA MDWD utilities ingested** from eAR 2022:
+  - 188 have pre-computed bill amounts (6/9/12/24 HCF)
+  - 187 have explicit tier structure
+  - All have rate structure type and billing frequency
+
+### Sprint 4 — eAR Reconciliation (14 overlapping utilities)
+
+14 CA utilities now have both scraped (LLM) and eAR records. Notable discrepancies:
+
+| PWSID | Name | Scraped @5CCF | eAR @6CCF | Scraped @10CCF | eAR @12CCF | Notes |
+|-------|------|---------------|-----------|----------------|------------|-------|
+| CA0110011 | Livermore | $61.38 | $43.49 | $88.28 | $66.83 | Scraped much higher — vintage or combined charges? |
+| CA4110022 | Redwood City | $92.09 | $47.91 | $137.99 | $68.74 | Scraped ~2x eAR — likely combined water+sewer |
+| CA4810007 | Vallejo | $115.08 | $41.64 | $183.03 | $55.23 | Scraped ~3x eAR — almost certainly combined charges |
+| CA3910005 | Manteca | $33.59 | $1.03 | $45.94 | $1.04 | eAR suspiciously low ($1/mo) — data quality issue |
+| CA3710005 | Carlsbad | $43.97 | $50.85 | $67.72 | $75.75 | Close — both plausible, different vintages |
+| CA3010001 | Anaheim | $15.75 | $16.88 | $16.50 | $28.80 | Scraped bill@10 < bill@6 — parser error likely |
+| CA3410020 | Sacramento | $43.01 | $44.47 | $50.31 | $53.22 | Close agreement — good cross-validation |
+
+**Key insight**: several scraped rates likely include combined water+sewer charges (Vallejo, Redwood City, Livermore). The eAR data is water-only by design (state filing). This validates having both sources for comparison. Conflict resolution is deferred.
+
+## Database State (as of Session 6)
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `utility.cws_boundaries` | 44,643 | EPA CWS |
+| `utility.aqueduct_polygons` | 68,506 | WRI Aqueduct 4.0 |
+| `utility.sdwis_systems` | 3,711 | EPA ECHO (VA + CA) |
+| `utility.mdwd_financials` | 225 | Harvard Dataverse (VA + CA) |
+| `utility.county_boundaries` | 3,235 | Census TIGER |
+| `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
+| `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
+| `utility.water_rates` | 290 | scraped_llm: 96 (VA 22 + CA 16 + failed) + swrcb_ear_2022: 194 |
+| `utility.pipeline_runs` | 16 | Audit trail |
+
+## Sprint 4 — Remaining Work
+
+### eAR Additional Years
+- [ ] Download and ingest 2020 + 2021 eAR files (same pipeline, `ua-ingest ear --year 2020 --year 2021`)
+- [ ] Cross-year rate change analysis for utilities with all 3 years
+
+### CivicPlus DocumentCenter Crawler
+- [ ] Build platform-specific crawler for `/DocumentCenter` index pages
+- [ ] Scan filenames for rate-related PDFs (water rate, fee schedule, tariff)
+- [ ] Needs utility classifier to filter irrelevant hits (not every PDF is a rate schedule)
+- [ ] Target: ~14% of utilities (9 in surveyed sample of 65)
+
+### OWRS Ingest (Layer 1, medium ROI)
+- [ ] Download CA Data Collaborative Open Water Rate Specification from OpenEI
+- [ ] Machine-readable YAML → water_rates mapping
+- [ ] Source tag: `owrs`
+
+### Reconciliation Framework (deferred)
+- [ ] Design conflict resolution for duplicate source records
+- [ ] Prioritize: scraped combined charges → flag for water-only re-parse
+- [ ] eAR Manteca ($1/mo) → flag as data quality issue
+
+### Infrastructure
+- [ ] Parser prompt refinement: water-only extraction, multi-year columns, seasonal structures
+- [ ] Claude Batch API integration (replace single calls once prompt is stable)
+
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 4 — Ingest SWRCB eAR bulk rate data for CA (HydroShare processed 2020-2022). Map to water_rates schema, reconcile with 16 scraped CA rates. Then CivicPlus DocumentCenter crawler for VA/CA gaps. Start from docs/rate_data_strategy.md and docs/next_steps.md.
+UAPI Sprint 4 cont. — CivicPlus DocumentCenter crawler for VA/CA rate gaps. Build platform-specific crawler that indexes /DocumentCenter pages, classifies PDFs by filename, and extracts rate schedules. Then ingest eAR 2020+2021. Start from docs/next_steps.md and docs/rate_data_strategy.md.
 ```
