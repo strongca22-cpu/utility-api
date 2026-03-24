@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""
+Claude API Rate Parser
+
+Purpose:
+    Send scraped utility rate page text to Claude API for structured
+    extraction of water rate schedules. Returns parsed tier structure,
+    fixed charges, and metadata in a structured format.
+
+Author: AI-Generated
+Created: 2026-03-23
+Modified: 2026-03-23
+
+Dependencies:
+    - anthropic (Anthropic Python SDK)
+
+Usage:
+    from utility_api.ingest.rate_parser import parse_rate_text
+    result = parse_rate_text(page_text, utility_name="City of Richmond")
+
+Notes:
+    - Uses Claude API (single request mode for development; Batch API later)
+    - Structured JSON output via system prompt + tool_use
+    - parse_confidence reflects extraction quality: high/medium/low/failed
+    - Handles: flat rates, uniform rates, increasing block (tiered) rates
+    - Does NOT handle: seasonal rates, budget-based rates (flagged for review)
+    - ANTHROPIC_API_KEY must be set in environment or .env
+
+Configuration:
+    - ANTHROPIC_API_KEY: Required. Set in .env or environment.
+    - Default model: claude-sonnet-4-20250514 (fast, cheap, good for extraction)
+
+Data Sources:
+    - Input: Scraped text from rate_scraper
+    - Output: Structured rate data for water_rates table
+"""
+
+import json
+import os
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+from loguru import logger
+
+
+# Rate extraction prompt — the core of the LLM pipeline
+SYSTEM_PROMPT = """You are a water utility rate analyst. Your job is to extract structured
+water rate information from utility website text.
+
+You will receive text scraped from a water utility's rate page. Extract the RESIDENTIAL
+water rate structure and return a JSON object with the following fields.
+
+Rules:
+- Extract RESIDENTIAL rates only (not commercial, industrial, or irrigation)
+- If multiple meter sizes are listed, use the smallest standard residential size (typically 5/8" or 3/4")
+- Convert all volumetric rates to $/CCF (100 cubic feet = 748 gallons)
+  - If rates are in $/1,000 gallons: multiply by 7.48 to get $/CCF
+  - If rates are in $/gallon: multiply by 74,800 to get $/CCF (but this is very unusual)
+  - If rates are in $/HCF: that IS $/CCF (HCF = hundred cubic feet = CCF)
+- If billing is bimonthly or quarterly, normalize fixed_charge_monthly to monthly (divide by 2 or 3)
+- List tiers in ascending order of consumption
+- For flat/uniform rates (single volumetric price), use tier_1 only with null limit
+- If you cannot determine the rate structure, set parse_confidence to "failed" and explain in notes
+- If the page text doesn't contain rate information, set parse_confidence to "failed"
+- Be precise with numbers — do not round or estimate"""
+
+EXTRACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "rate_effective_date": {
+            "type": ["string", "null"],
+            "description": "Date the rate schedule took effect (YYYY-MM-DD or null if unknown)",
+        },
+        "rate_structure_type": {
+            "type": "string",
+            "enum": ["flat", "uniform", "increasing_block", "decreasing_block",
+                     "budget_based", "seasonal", "unknown"],
+            "description": "Type of rate structure",
+        },
+        "billing_frequency": {
+            "type": ["string", "null"],
+            "enum": ["monthly", "bimonthly", "quarterly", None],
+        },
+        "fixed_charge_monthly": {
+            "type": ["number", "null"],
+            "description": "Base/service/availability charge normalized to $/month",
+        },
+        "meter_size_inches": {
+            "type": ["number", "null"],
+            "description": "Meter size this fixed charge applies to (e.g., 0.625 for 5/8 inch)",
+        },
+        "tier_1_limit_ccf": {
+            "type": ["number", "null"],
+            "description": "Tier 1 upper limit in CCF (null for flat/uniform rates)",
+        },
+        "tier_1_rate": {
+            "type": ["number", "null"],
+            "description": "Volumetric rate for tier 1 in $/CCF",
+        },
+        "tier_2_limit_ccf": {"type": ["number", "null"]},
+        "tier_2_rate": {"type": ["number", "null"]},
+        "tier_3_limit_ccf": {"type": ["number", "null"]},
+        "tier_3_rate": {"type": ["number", "null"]},
+        "tier_4_limit_ccf": {"type": ["number", "null"]},
+        "tier_4_rate": {"type": ["number", "null"]},
+        "parse_confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low", "failed"],
+            "description": (
+                "high: clear rate table found and parsed. "
+                "medium: rates found but some ambiguity. "
+                "low: partial data or significant assumptions. "
+                "failed: could not extract rates."
+            ),
+        },
+        "notes": {
+            "type": "string",
+            "description": "Extraction notes, assumptions, edge cases, or reasons for failure",
+        },
+    },
+    "required": [
+        "rate_structure_type", "fixed_charge_monthly",
+        "tier_1_rate", "parse_confidence", "notes",
+    ],
+}
+
+# Default model — Sonnet is fast/cheap for structured extraction
+DEFAULT_MODEL = "claude-sonnet-4-20250514"
+
+
+@dataclass
+class ParseResult:
+    """Result of parsing rate text with Claude API."""
+
+    # Extracted rate data
+    rate_effective_date: str | None = None
+    rate_structure_type: str | None = None
+    billing_frequency: str | None = None
+    fixed_charge_monthly: float | None = None
+    meter_size_inches: float | None = None
+    tier_1_limit_ccf: float | None = None
+    tier_1_rate: float | None = None
+    tier_2_limit_ccf: float | None = None
+    tier_2_rate: float | None = None
+    tier_3_limit_ccf: float | None = None
+    tier_3_rate: float | None = None
+    tier_4_limit_ccf: float | None = None
+    tier_4_rate: float | None = None
+
+    # Metadata
+    parse_confidence: str = "failed"
+    parse_notes: str = ""
+    parse_model: str = ""
+    parsed_at: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    error: str | None = None
+
+
+def _get_anthropic_client():
+    """Create an Anthropic client.
+
+    Returns
+    -------
+    anthropic.Anthropic
+        Configured client instance.
+
+    Raises
+    ------
+    RuntimeError
+        If ANTHROPIC_API_KEY is not set.
+    """
+    try:
+        import anthropic
+    except ImportError:
+        raise RuntimeError(
+            "anthropic SDK not installed. Run: pip install anthropic"
+        )
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        # Also check .env file
+        from utility_api.config import PROJECT_ROOT
+        env_path = PROJECT_ROOT / ".env"
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                if line.startswith("ANTHROPIC_API_KEY="):
+                    api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    break
+
+    if not api_key:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY not found. Set it in environment or .env file."
+        )
+
+    return anthropic.Anthropic(api_key=api_key)
+
+
+def parse_rate_text(
+    page_text: str,
+    utility_name: str = "",
+    state_code: str = "",
+    model: str | None = None,
+) -> ParseResult:
+    """Parse water rate information from scraped page text using Claude API.
+
+    Parameters
+    ----------
+    page_text : str
+        Extracted text from a utility rate page.
+    utility_name : str
+        Utility name (included in prompt for context).
+    state_code : str
+        State code (included in prompt for context).
+    model : str | None
+        Claude model ID. Defaults to Sonnet.
+
+    Returns
+    -------
+    ParseResult
+        Parsed rate structure with confidence and metadata.
+    """
+    model = model or DEFAULT_MODEL
+
+    if not page_text or len(page_text.strip()) < 50:
+        return ParseResult(
+            parse_confidence="failed",
+            parse_notes="Input text too short or empty",
+            parse_model=model,
+        )
+
+    # Build the user message
+    context_parts = []
+    if utility_name:
+        context_parts.append(f"Utility: {utility_name}")
+    if state_code:
+        context_parts.append(f"State: {state_code}")
+    context_line = " | ".join(context_parts)
+
+    user_message = f"""Extract the residential water rate structure from this utility's rate page.
+
+{f"Context: {context_line}" if context_line else ""}
+
+--- BEGIN SCRAPED TEXT ---
+{page_text}
+--- END SCRAPED TEXT ---
+
+Return a JSON object matching the required schema. Include all tier information you can find.
+If there is no rate information on this page, set parse_confidence to "failed" and explain why in notes."""
+
+    try:
+        client = _get_anthropic_client()
+
+        response = client.messages.create(
+            model=model,
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}],
+            # Request JSON output
+            response_format={"type": "json_object"},
+        )
+
+        # Extract the text response
+        response_text = response.content[0].text
+
+        # Parse JSON
+        data = json.loads(response_text)
+
+        result = ParseResult(
+            rate_effective_date=data.get("rate_effective_date"),
+            rate_structure_type=data.get("rate_structure_type"),
+            billing_frequency=data.get("billing_frequency"),
+            fixed_charge_monthly=data.get("fixed_charge_monthly"),
+            meter_size_inches=data.get("meter_size_inches"),
+            tier_1_limit_ccf=data.get("tier_1_limit_ccf"),
+            tier_1_rate=data.get("tier_1_rate"),
+            tier_2_limit_ccf=data.get("tier_2_limit_ccf"),
+            tier_2_rate=data.get("tier_2_rate"),
+            tier_3_limit_ccf=data.get("tier_3_limit_ccf"),
+            tier_3_rate=data.get("tier_3_rate"),
+            tier_4_limit_ccf=data.get("tier_4_limit_ccf"),
+            tier_4_rate=data.get("tier_4_rate"),
+            parse_confidence=data.get("parse_confidence", "low"),
+            parse_notes=data.get("notes", ""),
+            parse_model=model,
+            parsed_at=datetime.now(timezone.utc).isoformat(),
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+        )
+
+        logger.info(
+            f"Parsed {utility_name}: {result.rate_structure_type} "
+            f"[{result.parse_confidence}] "
+            f"(tokens: {result.input_tokens}+{result.output_tokens})"
+        )
+        return result
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse error for {utility_name}: {e}")
+        return ParseResult(
+            parse_confidence="failed",
+            parse_notes=f"Claude response was not valid JSON: {e}",
+            parse_model=model,
+            parsed_at=datetime.now(timezone.utc).isoformat(),
+        )
+    except Exception as e:
+        logger.error(f"Claude API error for {utility_name}: {e}")
+        return ParseResult(
+            parse_confidence="failed",
+            parse_notes=f"API error: {e}",
+            parse_model=model,
+            error=str(e),
+        )

@@ -226,8 +226,8 @@ def _prepare_mdwd_records(
 
     # Map columns — try multiple naming conventions
     # NOTE: MDWD (Harvard Dataverse) is a Census of Governments fiscal dataset.
-    # It does NOT contain water rate/bill data (avg_monthly_bill columns).
-    # Rate data is a Sprint 3 deliverable (LLM parsing from utility websites).
+    # It does NOT contain water rate/bill data. Rate data lives in the
+    # utility.water_rates table, populated by the LLM rate parsing pipeline.
     # Financial columns map to water-utility-specific revenues, not general govt.
     col_mapping = {}
     search_map = {
@@ -272,7 +272,6 @@ def _prepare_mdwd_records(
 
     # Convert numeric columns
     numeric_cols = [
-        "avg_monthly_bill_5ccf", "avg_monthly_bill_10ccf",
         "median_household_income", "pct_below_poverty",
         "water_utility_revenue", "water_utility_expenditure",
         "water_utility_debt", "population",

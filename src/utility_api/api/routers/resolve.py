@@ -76,8 +76,6 @@ sdwis_match AS (
 mdwd_match AS (
     SELECT
         m.year AS mdwd_year,
-        m.avg_monthly_bill_5ccf,
-        m.avg_monthly_bill_10ccf,
         m.median_household_income,
         m.pct_below_poverty,
         m.water_utility_revenue,
@@ -88,6 +86,12 @@ mdwd_match AS (
     WHERE m.pwsid = (SELECT pwsid FROM cws_match)
     ORDER BY m.year DESC
     LIMIT 1
+),
+rate_match AS (
+    SELECT TRUE AS has_rate_data
+    FROM utility.water_rates r
+    WHERE r.pwsid = (SELECT pwsid FROM cws_match)
+    LIMIT 1
 )
 SELECT
     -- CWS
@@ -97,10 +101,11 @@ SELECT
     s.is_wholesaler, s.activity_status,
     s.violation_count_5yr, s.health_violation_count_5yr, s.last_violation_date,
     -- MDWD
-    m.mdwd_year, m.avg_monthly_bill_5ccf, m.avg_monthly_bill_10ccf,
-    m.median_household_income, m.pct_below_poverty,
+    m.mdwd_year, m.median_household_income, m.pct_below_poverty,
     m.water_utility_revenue, m.water_utility_expenditure,
     m.water_utility_debt, m.mdwd_population,
+    -- Rate data
+    COALESCE(r.has_rate_data, FALSE) AS has_rate_data,
     -- Aqueduct
     a.aqueduct_id, a.water_stress_score, a.water_stress_label,
     a.water_depletion_score, a.drought_risk_score,
@@ -110,6 +115,7 @@ FROM
     LEFT JOIN cws_match c ON TRUE
     LEFT JOIN sdwis_match s ON TRUE
     LEFT JOIN mdwd_match m ON TRUE
+    LEFT JOIN rate_match r ON TRUE
     LEFT JOIN aqueduct_match a ON TRUE
 """)
 
@@ -159,8 +165,7 @@ def resolve(
         # MDWD
         mdwd_available=mdwd_available,
         mdwd_year=result["mdwd_year"],
-        avg_monthly_bill_5ccf=result["avg_monthly_bill_5ccf"],
-        avg_monthly_bill_10ccf=result["avg_monthly_bill_10ccf"],
+        has_rate_data=result["has_rate_data"],
         median_household_income=result["median_household_income"],
         pct_below_poverty=result["pct_below_poverty"],
         water_utility_revenue=result["water_utility_revenue"],

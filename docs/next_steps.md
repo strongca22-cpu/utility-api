@@ -96,14 +96,49 @@
 | 24-2491 | Mattameade Data Center | Caroline | Flexential Richmond | 52.7 km |
 | 24-2396 | Northeast Creek Technology Campus | Louisa | Equinix CU2 | 52.7 km |
 
-## Sprint 3 — LLM Rate Parsing
+## Completed (Sprint 3 v0 — Session 4)
 
-- [ ] Build utility website scraper (agent-driven URL discovery)
-- [ ] Rate page content extraction (requests + Playwright for JS-heavy sites)
-- [ ] Claude Batch API rate parsing with structured prompt
-- [ ] MDWD 2022 baseline validation
-- [ ] Populate `avg_monthly_bill_5ccf` and `avg_monthly_bill_10ccf` from parsed rates
-- [ ] Build `/provider/{id}` and `/site-report` endpoints
+- [x] `utility.water_rates` table (migration 007) — structured rate tier storage with provenance
+  - Replaces never-populated `avg_monthly_bill` columns on `mdwd_financials` (dropped)
+  - Schema: fixed charge + 4 volumetric tiers + computed bill snapshots + LLM parse metadata
+- [x] Rate pipeline modules built:
+  - `rate_discovery.py` — DuckDuckGo web search per utility name → rate page URL
+  - `rate_scraper.py` — HTTP fetch + BeautifulSoup HTML text extraction
+  - `rate_parser.py` — Claude API structured extraction (JSON output, Sonnet default)
+  - `rate_calculator.py` — tier structure → bill calculation at any CCF level
+  - `rates.py` — end-to-end orchestrator (discover → scrape → parse → calculate → store)
+- [x] CLI command: `ua-ingest rates --state VA --limit 10` (with `--dry-run` mode)
+- [x] Dependencies added: `anthropic>=0.40`, `beautifulsoup4>=4.12`
+- [x] `/resolve` endpoint updated: `avg_monthly_bill` fields replaced with `has_rate_data` boolean
+
+### Sprint 3 v0 Findings
+
+- **Most VA/CA municipal sites are JS-rendered** (CivicPlus, Granicus CMS) — static HTTP scraping gets empty pages
+- **403 blocks** common from municipal sites detecting bot User-Agent
+- **PDF rate schedules** are the most common format (linked from CivicPlus pages)
+- **Fairfax Water** (`fairfaxwater.org/rates`) is a working static HTML site — proved the scraping pipeline works (5,575 chars extracted with real rate data)
+- **Search discovery works** — DuckDuckGo HTML search finds relevant rate pages/PDFs for most utilities
+- **Key blocker**: ANTHROPIC_API_KEY needed to test Claude parsing end-to-end
+
+### Sprint 3 v0 Design Decisions
+
+- **`water_rates` as separate table** (not columns on `mdwd_financials`): rate data has its own provenance, tier structure, and vintage. MDWD is fiscal data; rates are a distinct dataset.
+- **4 tiers max**: covers ~95% of US rate structures. Budget-based and seasonal flagged for review.
+- **Residential only** for v0. Commercial/industrial rate classes are future expansion.
+- **DuckDuckGo HTML** for URL discovery (no API key required). Query: `{utility_name} {county} {state} water rates`.
+- **Sonnet** for extraction (fast, cheap, good at structured output). Model is configurable per call.
+
+## Sprint 3 — Remaining Work
+
+- [ ] Add ANTHROPIC_API_KEY to .env and test Claude parsing on Fairfax Water text
+- [ ] Add Playwright for JS-rendered sites (CivicPlus, Granicus) — this is the majority of utilities
+- [ ] Add PDF rate schedule extraction (many rate schedules are PDF, not HTML)
+- [ ] Run full pipeline on VA MDWD utilities (31 targets)
+- [ ] Run full pipeline on CA MDWD utilities (194 targets)
+- [ ] Manual spot-check: validate ~20 parsed rates against source URLs
+- [ ] Claude Batch API integration (replace single calls once prompt is stable)
+- [ ] Build `/rates/{pwsid}` endpoint to serve parsed rate data
+- [ ] Hughes et al. 2025 outreach — request raw rate data for validation corpus
 
 ## Future Enhancements (Parking Lot)
 
@@ -113,31 +148,34 @@
 - [ ] Stormwater pond identification from VPDES SWI_GP permits
 - [ ] Cross-reference matched DC permits → enrich SS facility records with permit IDs
 - [ ] Face value unit normalization (AFY → GPD) for cross-comparison with diversion rates
+- [ ] UNC EFC state dashboards (NC, IA, WV, FL) as verification data source
+- [ ] Strong et al. (WRI) governance indicators: supply reliability, CCR availability, drought plans — natural scraping expansion targets
 
 ## Current API Surface
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /resolve?lat=X&lng=Y` | Water utility + SDWIS + MDWD + Aqueduct for a point |
+| `GET /resolve?lat=X&lng=Y` | Water utility + SDWIS + MDWD + Aqueduct + rate flag for a point |
 | `GET /permits?lat=X&lng=Y&radius_km=10` | All permits within radius (filters: `category_group`, `source`) |
 | `GET /facility/{id}/permits` | Linked + nearby permits for an SS facility |
-| `GET /health` | Data vintage for all 7 pipeline steps |
+| `GET /health` | Data vintage for all pipeline steps |
 
-## Database State (as of Session 3)
+## Database State (as of Session 4)
 
 | Table | Rows | Source |
 |-------|------|--------|
 | `utility.cws_boundaries` | 44,643 | EPA CWS |
 | `utility.aqueduct_polygons` | 68,506 | WRI Aqueduct 4.0 |
 | `utility.sdwis_systems` | 3,711 | EPA ECHO (VA + CA) |
-| `utility.mdwd_financials` | 225 | Harvard Dataverse (VA + CA) |
+| `utility.mdwd_financials` | 225 | Harvard Dataverse (VA + CA) — bill columns removed |
 | `utility.county_boundaries` | 3,235 | Census TIGER |
 | `utility.permits` | 61,530 | VA DEQ (16,519) + CA eWRIMS (45,011) |
 | `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
+| `utility.water_rates` | 0 | Pending — API key needed |
 | `utility.pipeline_runs` | 8 | Audit trail |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 3 v0 — LLM rate parsing: utility website scraping + Claude Batch API for water rate extraction. Populate avg_monthly_bill columns. Start from docs/next_steps.md.
+UAPI Sprint 3 v1 — Playwright integration for JS-rendered municipal sites + Claude API end-to-end test. API key is in .env. Start from docs/next_steps.md.
 ```

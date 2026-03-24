@@ -9,7 +9,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-23
-Modified: 2026-03-23 (renamed financial columns to water-utility-specific)
+Modified: 2026-03-23 (removed bill columns — moved to water_rates table in Sprint 3)
 """
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
@@ -35,8 +35,6 @@ class MDWDFinancial(Base):
     )
     fips_place_code: Mapped[str | None] = mapped_column(String(7))
     year: Mapped[int] = mapped_column(Integer)
-    avg_monthly_bill_5ccf: Mapped[float | None] = mapped_column(Float)
-    avg_monthly_bill_10ccf: Mapped[float | None] = mapped_column(Float)
     median_household_income: Mapped[float | None] = mapped_column(Float)
     pct_below_poverty: Mapped[float | None] = mapped_column(Float)
     water_utility_revenue: Mapped[float | None] = mapped_column(Float)

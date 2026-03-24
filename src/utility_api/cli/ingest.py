@@ -83,6 +83,32 @@ def ca_ewrims():
 
 
 @app.command()
+def rates(
+    state: list[str] = typer.Option(None, "--state", "-s", help="Filter to state(s): VA, CA"),
+    pwsid: list[str] = typer.Option(None, "--pwsid", "-p", help="Specific PWSID(s) to process"),
+    limit: int = typer.Option(None, "--limit", "-n", help="Max utilities to process"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Discover + scrape only, no API calls"),
+    search_delay: float = typer.Option(2.0, "--search-delay", help="Seconds between web searches"),
+    scrape_delay: float = typer.Option(1.5, "--scrape-delay", help="Seconds between page scrapes"),
+):
+    """Discover, scrape, and parse water rates via Claude API.
+
+    Pipeline: URL discovery → web scrape → Claude API parse → bill calculation → DB store.
+    Requires ANTHROPIC_API_KEY in environment or .env file.
+    """
+    from utility_api.ingest.rates import run_rate_ingest
+
+    run_rate_ingest(
+        pwsids=pwsid or None,
+        state_filter=state or None,
+        limit=limit,
+        search_delay=search_delay,
+        scrape_delay=scrape_delay,
+        dry_run=dry_run,
+    )
+
+
+@app.command()
 def all():
     """Run all ingest steps in dependency order."""
     typer.echo("=== Step 1/7: CWS Boundaries ===")

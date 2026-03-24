@@ -7,6 +7,7 @@ from utility_api.models.mdwd_financial import MDWDFinancial
 from utility_api.models.aqueduct_polygon import AqueductPolygon
 from utility_api.models.county_boundary import CountyBoundary
 from utility_api.models.pipeline_run import PipelineRun
+from utility_api.models.water_rate import WaterRate
 
 __all__ = [
     "Base",
@@ -16,4 +17,5 @@ __all__ = [
     "AqueductPolygon",
     "CountyBoundary",
     "PipelineRun",
+    "WaterRate",
 ]
