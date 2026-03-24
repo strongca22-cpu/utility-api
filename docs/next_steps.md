@@ -58,14 +58,40 @@
 - **Targeted CA load**: Excluded "Domestic" USE_CODE. All other use types included.
 - **Multi-use CA rights**: Stored as list in `use_codes` JSONB column. `category_group` assigned based on highest-priority use code (industrial > energy > municipal > mining > environmental > ...).
 - **No volume data from VA DEQ**: GIS layers expose permit ID, facility name, county, activity type, status, and point geometry only. Volume data would require cross-referencing individual permit PDFs from DEQ CEDS.
-- **CA volume data**: `face_value_amount` (always Acre-feet/Year or NULL) and `max_diversion_rate` (7 different unit types) are stored as-is. Unit normalization deferred.
+- **CA volume data**: `face_value_amount` (always Acre-feet/Year or NULL) and `max_diversion_rate` (7 different unit types) normalized to `max_diversion_rate_gpd` (gallons per day).
 
 ### Sprint 2 Data Quality Notes
 
 - **VA DEQ has no volume/quantity fields** in any GIS layer — just administrative/spatial data.
 - **CA eWRIMS face values can be extremely large** (e.g., 9.1M AFY for State Water Project) — these are aggregate permitted volumes for large infrastructure, not individual facility withdrawals.
 - **1,572 CA records lack geometry** (2.5%) — APPLICATION_NUMBERs with no lat/lng in the flat file.
-- **CA county data is in the POD Detail table** (not the flat file used for ingest) — county column is NULL for CA records. Could be enriched via spatial join to TIGER counties.
+
+## Completed (Sprint 2 Enrichment — Session 3, cont.)
+
+- [x] CA county enrichment: 43,438 permits filled via spatial join to TIGER counties (1 with geom but outside county boundaries, 1,572 without geom)
+- [x] VA VPDES county enrichment: 10,736 permits filled via spatial join
+- [x] `permit_facility_xref` table (migration 005): cross-references DEQ data center permits with SS facilities
+  - 30 matched (23 high confidence <1km, 5 medium 1-3km, 2 low 3-5km)
+  - 11 flagged as `data_center_candidate` (unproven new locations >5km from any SS facility)
+- [x] `max_diversion_rate_gpd` column (migration 006): normalized 24,156 CA records to gallons/day
+  - CFS × 646,317 | GPM × 1,440 | GPD × 1 | AFY × 893 | AF × 325,851
+  - NULL units assumed CFS (most common)
+
+### Data Center Candidates (11 unproven locations)
+
+| Permit | Name | County | Nearest SS Facility | Distance |
+|--------|------|--------|---------------------|----------|
+| 22-2715 | LYH03 Bailey Data Center | Mecklenburg | Microsoft Boydton | 13.4 km |
+| 22-1758 | AVC17 Lakeside | Mecklenburg | Microsoft Boydton | 13.9 km |
+| 25-1440 | Hanover Technology Park - Phase I | Hanover | Flexential Richmond | 15.3 km |
+| 19-0029 | Chirisa Data Center | Chesterfield | Meta Henrico | 15.6 km |
+| 19-1094 | American Tobacco - Data Center | Chesterfield | Meta Henrico | 16.3 km |
+| 22-1432 | Hillcrest Site Data Center | Mecklenburg | Microsoft Boydton | 25.2 km |
+| 22-0149 | Melrod | Stafford | CloudHQ MCC3 | 36.2 km |
+| 23-2060 | Lake Anna Tech Campus | Louisa | Equinix CU2 | 47.5 km |
+| 24-1857 | Cosner Tech Park | Spotsylvania | Equinix CU2 | 51.9 km |
+| 24-2491 | Mattameade Data Center | Caroline | Flexential Richmond | 52.7 km |
+| 24-2396 | Northeast Creek Technology Campus | Louisa | Equinix CU2 | 52.7 km |
 
 ## Sprint 3 — LLM Rate Parsing
 
@@ -78,15 +104,15 @@
 
 ## Future Enhancements (Parking Lot)
 
-- [ ] CA county enrichment via spatial join to TIGER counties
 - [ ] VA DEQ volume enrichment from CEDS permit documents
-- [ ] Unit normalization for CA max_diversion_rate (7 unit types → standard)
-- [ ] Cross-reference VA DEQ data center permits with Strong Strategic entity registry
-- [ ] Additional states: TX TCEQ, AZ ADWR, OR WRD
+- [ ] Validate 11 data_center_candidate permits (imagery review → confirm/reject)
+- [ ] Additional states: TX TCEQ, AZ ADWR, OR WRD (water, wastewater, energy permits as facility discovery)
 - [ ] Stormwater pond identification from VPDES SWI_GP permits
+- [ ] Cross-reference matched DC permits → enrich SS facility records with permit IDs
+- [ ] Face value unit normalization (AFY → GPD) for cross-comparison with diversion rates
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 2 v1 — CA county enrichment + VA DEQ entity cross-reference. Start from docs/next_steps.md.
+UAPI Sprint 2 v2 — Validate DC candidates + expand permit scraping to additional states. Start from docs/next_steps.md.
 ```
