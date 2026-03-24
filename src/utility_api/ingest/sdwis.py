@@ -259,6 +259,97 @@ def _load_violations(zip_path: Path, target_pwsids: set[str]) -> pd.DataFrame:
     return agg
 
 
+def _load_county_mapping(
+    zip_path: Path, target_pwsids: set[str]
+) -> dict[str, str]:
+    """Extract PWSID → county mapping from SDWA_GEOGRAPHIC_AREAS.
+
+    Parameters
+    ----------
+    zip_path : Path
+        Path to the ECHO SDWA ZIP file.
+    target_pwsids : set[str]
+        Set of PWSIDs to filter to.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of PWSID to county name. For systems serving multiple
+        counties, the first county listed is used (~0.01% of systems).
+    """
+    logger.info("Reading SDWA_GEOGRAPHIC_AREAS from ZIP for county mapping")
+
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        geo_file = None
+        for name in zf.namelist():
+            if "GEOGRAPHIC_AREA" in name.upper() and name.endswith(".csv"):
+                geo_file = name
+                break
+
+        if geo_file is None:
+            logger.warning("No GEOGRAPHIC_AREAS file found — county enrichment skipped")
+            return {}
+
+        with zf.open(geo_file) as f:
+            df = pd.read_csv(
+                io.TextIOWrapper(f, encoding="utf-8", errors="replace"),
+                dtype=str,
+                low_memory=False,
+                usecols=["PWSID", "COUNTY_SERVED"],
+            )
+
+    # Filter to target systems and non-null county
+    df = df[df["PWSID"].isin(target_pwsids) & df["COUNTY_SERVED"].notna()].copy()
+    df["COUNTY_SERVED"] = df["COUNTY_SERVED"].str.strip()
+
+    # Deduplicate: keep first county per PWSID
+    county_map = df.drop_duplicates(subset=["PWSID"], keep="first")
+    result = dict(zip(county_map["PWSID"], county_map["COUNTY_SERVED"]))
+
+    logger.info(f"Extracted county mapping for {len(result)} systems")
+    return result
+
+
+def _update_cws_counties(county_map: dict[str, str]) -> int:
+    """Update cws_boundaries.county_served from SDWIS geographic areas.
+
+    Parameters
+    ----------
+    county_map : dict[str, str]
+        PWSID → county name mapping.
+
+    Returns
+    -------
+    int
+        Number of rows updated.
+    """
+    if not county_map:
+        return 0
+
+    schema = settings.utility_schema
+    updated = 0
+
+    with engine.connect() as conn:
+        # Batch update in chunks
+        items = list(county_map.items())
+        for i in range(0, len(items), 500):
+            batch = items[i:i + 500]
+            for pwsid, county in batch:
+                result = conn.execute(
+                    text(
+                        f"UPDATE {schema}.cws_boundaries "
+                        f"SET county_served = :county "
+                        f"WHERE pwsid = :pwsid AND (county_served IS NULL OR county_served != :county)"
+                    ),
+                    {"pwsid": pwsid, "county": county},
+                )
+                updated += result.rowcount
+            conn.commit()
+
+    logger.info(f"Updated county_served for {updated} CWS boundaries")
+    return updated
+
+
 def _build_sdwis_records(
     systems: pd.DataFrame,
     violations: pd.DataFrame,
@@ -408,6 +499,15 @@ def run_sdwis_ingest() -> None:
         chunksize=500,
     )
 
+    # --- County Enrichment ---
+    # Extract PWSID → county from SDWA_GEOGRAPHIC_AREAS and backfill
+    # into cws_boundaries.county_served. This covers all CWS systems in
+    # the geographic areas file, not just the SDWIS-matched subset.
+    logger.info("--- County Enrichment Phase ---")
+    all_pwsids = existing_pwsids  # All CWS boundary PWSIDs
+    county_map = _load_county_mapping(zip_path, all_pwsids)
+    county_updated = _update_cws_counties(county_map)
+
     # Log completion
     with engine.connect() as conn:
         count = conn.execute(
@@ -416,14 +516,19 @@ def run_sdwis_ingest() -> None:
         conn.execute(
             text(
                 f"INSERT INTO {schema}.pipeline_runs "
-                f"(step_name, started_at, finished_at, row_count, status) "
-                f"VALUES (:step, :started, NOW(), :count, 'success')"
+                f"(step_name, started_at, finished_at, row_count, status, notes) "
+                f"VALUES (:step, :started, NOW(), :count, 'success', :notes)"
             ),
-            {"step": "sdwis", "started": started, "count": count},
+            {
+                "step": "sdwis",
+                "started": started,
+                "count": count,
+                "notes": f"County enrichment: {county_updated} CWS boundaries updated",
+            },
         )
         conn.commit()
 
-    logger.info(f"=== SDWIS Ingest Complete: {count} systems loaded ===")
+    logger.info(f"=== SDWIS Ingest Complete: {count} systems loaded, {county_updated} counties enriched ===")
 
 
 if __name__ == "__main__":

@@ -11,11 +11,25 @@
 - [x] `/resolve` endpoint live and tested
 - [x] Validation: 20/20 CWS match, 20/20 Aqueduct match
 
+## Completed (Sprint 1 Cleanup — Session 2)
+
+- [x] MDWD column mapping fix — `pct_below_poverty` (mapped to `POV_PCT`) and `water_utility_debt` (mapped to `Total_Debt_Outstanding`) now resolve correctly
+- [x] MDWD financial columns renamed for clarity: `total_revenue` → `water_utility_revenue`, `total_expenditure` → `water_utility_expenditure`, `debt_outstanding` → `water_utility_debt` (Alembic migration 002)
+- [x] MDWD ingest now maps water-utility-specific columns (`Water_Utility_Revenue`, `Water_Util_Total_Exp`) instead of general government financials
+- [x] MDWD year-preference fix: prefers 2017 Census of Governments vintage (has both financials + demographics) over 2018 ACS-only vintage
+- [x] County enrichment: `county_served` populated for 44,100/44,643 CWS boundaries (98.8%) from SDWA_GEOGRAPHIC_AREAS
+- [x] `/health` endpoint now returns data vintage (last pipeline run timestamps, row counts per layer)
+- [x] `/resolve` response expanded with `water_utility_revenue`, `water_utility_expenditure`, `water_utility_debt`, `mdwd_population`
+
+## Data Quality Notes
+
+- **Bill columns** (`avg_monthly_bill_5ccf`, `avg_monthly_bill_10ccf`) remain NULL — MDWD is a Census of Governments fiscal dataset, not a rate survey. Rate data is a Sprint 3 deliverable (LLM parsing from utility websites).
+- **MDWD dual cadence**: Census of Governments financials publish every 5 years (2017 latest), ACS demographics are annual (2018 latest). Ingest prefers the vintage with financial data.
+- **County gaps** (543 systems without county): Mostly tribal systems and independent cities (e.g., Richmond, VA) where SDWIS geographic areas don't list a county. Could be filled via spatial join to Census TIGER in a future pass.
+
 ## Remaining for Sprint 1
 
-- [ ] MDWD column mapping incomplete — `avg_monthly_bill_5ccf` and `avg_monthly_bill_10ccf` returned NULL for all records. The MDWD tab file has different column names than expected. Need to inspect the MDWD codebook to find the correct bill columns.
-- [ ] county_served field is NULL in CWS data — the EPA feature service may have a county field under a different name, or it needs to be derived from spatial join to county boundaries
-- [ ] Add `/health` endpoint with data vintage info (last pipeline run timestamps)
+- [ ] Census TIGER county boundary spatial join — infrastructure for future spatial enrichment, would cover the 543 CWS systems missing county from SDWIS
 
 ## Sprint 2 — State Regulatory Layers
 
@@ -30,10 +44,11 @@
 - [ ] Rate page content extraction (requests + Playwright for JS-heavy sites)
 - [ ] Claude Batch API rate parsing with structured prompt
 - [ ] MDWD 2022 baseline validation
+- [ ] Populate `avg_monthly_bill_5ccf` and `avg_monthly_bill_10ccf` from parsed rates
 - [ ] Build `/provider/{id}` and `/site-report` endpoints
 
 ## Recommended Next Chat Prompt
 
 ```
-Utility API Sprint 1 cleanup v1 — MDWD column mapping fix, county enrichment, data vintage endpoint. Start from docs/next_steps.md.
+UAPI Sprint 2 v0 — VA DEQ + CA SWRCB permit layers and /permits endpoint. Start from docs/next_steps.md.
 ```

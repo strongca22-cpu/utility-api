@@ -51,10 +51,14 @@ class ResolveResponse(BaseModel):
     # MDWD financials (nullable — only ~2,200 systems nationally)
     mdwd_available: bool = Field(False, description="Whether MDWD financial data exists")
     mdwd_year: int | None = Field(None, description="Year of MDWD data")
-    avg_monthly_bill_5ccf: float | None = Field(None, description="Avg monthly bill at 5 CCF")
-    avg_monthly_bill_10ccf: float | None = Field(None, description="Avg monthly bill at 10 CCF")
-    median_household_income: float | None = None
-    pct_below_poverty: float | None = None
+    avg_monthly_bill_5ccf: float | None = Field(None, description="Avg monthly bill at 5 CCF (Sprint 3 — LLM rate parsing)")
+    avg_monthly_bill_10ccf: float | None = Field(None, description="Avg monthly bill at 10 CCF (Sprint 3 — LLM rate parsing)")
+    median_household_income: float | None = Field(None, description="Median household income for service area")
+    pct_below_poverty: float | None = Field(None, description="Percent of population below poverty line")
+    water_utility_revenue: float | None = Field(None, description="Water utility revenue (CPI-adjusted, from Census of Governments)")
+    water_utility_expenditure: float | None = Field(None, description="Water utility total expenditure (CPI-adjusted)")
+    water_utility_debt: float | None = Field(None, description="Total debt outstanding (CPI-adjusted)")
+    mdwd_population: int | None = Field(None, description="MDWD census population for service area")
 
     # Aqueduct water risk
     aqueduct_id: str | None = Field(None, description="Aqueduct polygon composite key")

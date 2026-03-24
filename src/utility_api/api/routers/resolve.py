@@ -79,7 +79,11 @@ mdwd_match AS (
         m.avg_monthly_bill_5ccf,
         m.avg_monthly_bill_10ccf,
         m.median_household_income,
-        m.pct_below_poverty
+        m.pct_below_poverty,
+        m.water_utility_revenue,
+        m.water_utility_expenditure,
+        m.water_utility_debt,
+        m.population AS mdwd_population
     FROM utility.mdwd_financials m
     WHERE m.pwsid = (SELECT pwsid FROM cws_match)
     ORDER BY m.year DESC
@@ -95,6 +99,8 @@ SELECT
     -- MDWD
     m.mdwd_year, m.avg_monthly_bill_5ccf, m.avg_monthly_bill_10ccf,
     m.median_household_income, m.pct_below_poverty,
+    m.water_utility_revenue, m.water_utility_expenditure,
+    m.water_utility_debt, m.mdwd_population,
     -- Aqueduct
     a.aqueduct_id, a.water_stress_score, a.water_stress_label,
     a.water_depletion_score, a.drought_risk_score,
@@ -157,6 +163,10 @@ def resolve(
         avg_monthly_bill_10ccf=result["avg_monthly_bill_10ccf"],
         median_household_income=result["median_household_income"],
         pct_below_poverty=result["pct_below_poverty"],
+        water_utility_revenue=result["water_utility_revenue"],
+        water_utility_expenditure=result["water_utility_expenditure"],
+        water_utility_debt=result["water_utility_debt"],
+        mdwd_population=result["mdwd_population"],
         # Aqueduct
         aqueduct_id=result["aqueduct_id"],
         water_stress_score=result["water_stress_score"],

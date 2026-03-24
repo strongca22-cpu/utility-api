@@ -225,21 +225,24 @@ def _prepare_mdwd_records(
     logger.info(f"Filtered to {len(df)} records in {target_states}")
 
     # Map columns — try multiple naming conventions
+    # NOTE: MDWD (Harvard Dataverse) is a Census of Governments fiscal dataset.
+    # It does NOT contain water rate/bill data (avg_monthly_bill columns).
+    # Rate data is a Sprint 3 deliverable (LLM parsing from utility websites).
+    # Financial columns map to water-utility-specific revenues, not general govt.
     col_mapping = {}
     search_map = {
         "fips_place_code": ["fips_place", "fips", "place_fips", "FIPS"],
         "year": ["year", "YEAR", "data_year", "survey_year"],
-        "avg_monthly_bill_5ccf": ["bill_5ccf", "avg_bill_5", "monthly_bill_5ccf",
-                                   "water_bill_5ccf", "avg_monthly_bill"],
-        "avg_monthly_bill_10ccf": ["bill_10ccf", "avg_bill_10", "monthly_bill_10ccf",
-                                    "water_bill_10ccf"],
         "median_household_income": ["median_income", "med_hh_income", "median_household_income",
                                      "mhi", "medincome"],
-        "pct_below_poverty": ["poverty_rate", "pct_poverty", "pct_below_poverty",
+        "pct_below_poverty": ["pov_pct", "poverty_rate", "pct_poverty", "pct_below_poverty",
                                "poverty_pct", "pov_rate"],
-        "total_revenue": ["total_revenue", "revenue", "tot_revenue", "water_revenue"],
-        "total_expenditure": ["total_expenditure", "expenditure", "tot_expenditure"],
-        "debt_outstanding": ["debt_outstanding", "outstanding_debt", "debt", "total_debt"],
+        "water_utility_revenue": ["water_utility_revenue", "water_util_revenue",
+                                   "water_revenue"],
+        "water_utility_expenditure": ["water_util_total_exp", "water_utility_expenditure",
+                                       "water_util_expenditure"],
+        "water_utility_debt": ["total_debt_outstanding", "debt_outstanding",
+                                "outstanding_debt", "water_utility_debt"],
         "population": ["population", "pop", "total_population", "pop_served"],
     }
 
@@ -271,7 +274,8 @@ def _prepare_mdwd_records(
     numeric_cols = [
         "avg_monthly_bill_5ccf", "avg_monthly_bill_10ccf",
         "median_household_income", "pct_below_poverty",
-        "total_revenue", "total_expenditure", "debt_outstanding", "population",
+        "water_utility_revenue", "water_utility_expenditure",
+        "water_utility_debt", "population",
     ]
     for col in numeric_cols:
         if col in records.columns:
@@ -282,11 +286,18 @@ def _prepare_mdwd_records(
     records = records[records["pwsid"].isin(existing_pwsids)]
     logger.info(f"Matched {len(records)}/{before} records to CWS boundaries")
 
-    # Keep most recent year per PWSID
+    # Keep most recent year per PWSID, preferring rows with financial data.
+    # MDWD has two cadences: Census of Governments financials (every 5yr: 2017)
+    # and ACS demographics (annual: 2018). Prefer the vintage that has both.
     if "year" in records.columns:
-        records = records.sort_values("year", ascending=False).drop_duplicates(
-            subset=["pwsid"], keep="first"
-        )
+        # Flag rows that have financial data (water_utility_revenue)
+        has_financials = records["water_utility_revenue"].notna()
+        records["_has_financials"] = has_financials.astype(int)
+        # Sort: prefer rows WITH financials, then most recent year
+        records = records.sort_values(
+            ["_has_financials", "year"], ascending=[False, False]
+        ).drop_duplicates(subset=["pwsid"], keep="first")
+        records = records.drop(columns=["_has_financials"])
 
     logger.info(f"Prepared {len(records)} MDWD records for insert")
     return records
