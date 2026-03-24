@@ -53,10 +53,13 @@ water rate structure and return a JSON object with the following fields.
 Rules:
 - Extract RESIDENTIAL rates only (not commercial, industrial, or irrigation)
 - If multiple meter sizes are listed, use the smallest standard residential size (typically 5/8" or 3/4")
-- Convert all volumetric rates to $/CCF (100 cubic feet = 748 gallons)
-  - If rates are in $/1,000 gallons: multiply by 7.48 to get $/CCF
-  - If rates are in $/gallon: multiply by 74,800 to get $/CCF (but this is very unusual)
+- Convert all volumetric rates to $/CCF (1 CCF = 100 cubic feet = 748 gallons)
+  - If rates are in $/1,000 gallons: multiply by 0.748 to get $/CCF (since 1 CCF = 748 gal, which is 0.748 thousand gal)
+  - If rates are in $/gallon: multiply by 748 to get $/CCF
   - If rates are in $/HCF: that IS $/CCF (HCF = hundred cubic feet = CCF)
+- Convert tier limits to CCF:
+  - If limits are in gallons: divide by 748 to get CCF
+  - If limits are in thousands of gallons (Kgal): multiply by 1.337 to get CCF (1 Kgal = 1.337 CCF)
 - If billing is bimonthly or quarterly, normalize fixed_charge_monthly to monthly (divide by 2 or 3)
 - List tiers in ascending order of consumption
 - For flat/uniform rates (single volumetric price), use tier_1 only with null limit
@@ -245,7 +248,11 @@ def parse_rate_text(
 {page_text}
 --- END SCRAPED TEXT ---
 
-Return a JSON object matching the required schema. Include all tier information you can find.
+Return ONLY a valid JSON object (no markdown, no explanation) with these fields:
+rate_effective_date, rate_structure_type, billing_frequency, fixed_charge_monthly,
+meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, tier_2_rate,
+tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, tier_4_rate, parse_confidence, notes.
+
 If there is no rate information on this page, set parse_confidence to "failed" and explain why in notes."""
 
     try:
@@ -255,13 +262,18 @@ If there is no rate information on this page, set parse_confidence to "failed" a
             model=model,
             max_tokens=1024,
             system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
-            # Request JSON output
-            response_format={"type": "json_object"},
+            messages=[
+                {"role": "user", "content": user_message},
+                {"role": "assistant", "content": "{"},
+            ],
         )
 
-        # Extract the text response
-        response_text = response.content[0].text
+        # Extract the text response — prefill with "{" so prepend it back
+        response_text = "{" + response.content[0].text
+
+        # Strip markdown code fences if present
+        if response_text.startswith("```"):
+            response_text = response_text.split("\n", 1)[1].rsplit("```", 1)[0]
 
         # Parse JSON
         data = json.loads(response_text)
