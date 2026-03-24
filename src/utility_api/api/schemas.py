@@ -136,3 +136,41 @@ class PermitsResponse(BaseModel):
             "distance_km": 2.3,
         }],
     }}}
+
+
+class PermitXrefRecord(BaseModel):
+    """Permit linked to a facility via cross-reference, with match metadata."""
+
+    source: str
+    permit_number: str
+    facility_name: str | None = None
+    source_category: str | None = None
+    category_group: str | None = None
+    use_codes: list[str] | None = None
+    status: str | None = None
+    state_code: str | None = None
+    county: str | None = None
+    issued_date: date | None = None
+    expiration_date: date | None = None
+    face_value_amount: float | None = None
+    face_value_units: str | None = None
+    max_diversion_rate: float | None = None
+    max_diversion_units: str | None = None
+    max_diversion_rate_gpd: float | None = None
+    lat: float | None = None
+    lng: float | None = None
+    match_type: str = Field(description="How the link was established: spatial_match, manual")
+    match_distance_km: float | None = Field(None, description="Distance between permit and facility centroids")
+    match_confidence: str | None = Field(None, description="high (<1km), medium (1-5km), low (>5km)")
+
+
+class FacilityPermitsResponse(BaseModel):
+    """Response from the /facility/{id}/permits endpoint."""
+
+    facility_id: str
+    facility_name: str | None = None
+    operator: str | None = None
+    state_code: str | None = None
+    linked_permits: list[PermitXrefRecord] = Field(description="Permits directly cross-referenced to this facility")
+    nearby_permits: list[PermitRecord] = Field(description="Other permits within search radius")
+    radius_km: float
