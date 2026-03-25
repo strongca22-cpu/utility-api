@@ -893,11 +893,33 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 ### Deliverable 4: Fresh Export
 - [x] Exported `data/sdwis_for_guessing.csv`: 21,197 rows with city_name column
 
+## Completed (Sprint 17 Bugfix — 2026-03-25)
+
+### Deep Crawl for Corporate Rate Landing Pages
+- [x] `_is_thin_content()` now checks for precise dollar amounts ($X.XX with 2+ decimals), not just keyword presence
+  - Corporate landing pages (keywords but no rate prices) → classified as thin → deep crawl activates
+  - Actual rate schedules (keywords + rate prices) → classified as substantive → parsed directly
+- [x] `ScrapeResult.raw_html` field added — raw HTML preserved for deep crawl link extraction
+  - Previously, HTML was stripped to plain text before deep crawl, losing `href` attributes
+  - `_follow_best_links()` now receives actual HTML, can find tariff PDF links
+- [x] Smart PDF extraction for large tariff documents (20+ pages)
+  - Extracts pages containing dollar amounts + rate keywords, not just first 15K chars
+  - Cover page + TOC → skipped. Rate schedule pages → extracted. Up to 45K chars / 30 rate pages.
+  - NJ AmWater tariff (130 pages): extracted 72 rate pages with actual $/unit data
+- [x] Validated: Middlesex Water Company (NJ1225001) successfully parsed from tariff PDF via deep crawl
+
+### Known Issue: American Water Link Scoring
+- [ ] AmWater NJ rate page links to both the tariff PDF AND a 1,020-page rate case petition
+  - Rate case petition scores higher (65 vs 60) because its link text ("here") contains "rate" in surrounding context
+  - Deep crawl picks the rate case first; it passes thin-content check (has dollar amounts); tariff is never tried
+  - Fix: boost score for links with "tariff" or "rate schedule" in text; penalize vague link text like "here" or "click here"
+  - Affects all AmWater state subsidiaries (same page template). ~110 PWSIDs.
+
 ## Next (Sprint 18+)
 
-- [ ] Deliverable 4 execution: National coverage push (IOU batch + domain guess sweep + SearXNG gap fill)
+- [ ] Fix AmWater link scoring (boost tariff-specific text, penalize "here"/"click here")
+- [ ] Re-run IOU batch after link scoring fix — expect 60-80% success
 - [ ] Run domain guesser with city patterns on full 21K uncovered CWS (measure city vs county hit rate)
-- [ ] Run 5+ IOU subsidiary matches through orchestrator (verify scrape+parse works)
 - [ ] Automate EPA CCR APEX form scraping (currently manual CSV input)
 - [ ] Stripe/payment integration for API tiers
 - [ ] Self-hosted LLM for discovery scoring (Llama 3.1 8B)

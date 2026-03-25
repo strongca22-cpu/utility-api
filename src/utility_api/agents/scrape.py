@@ -11,6 +11,11 @@ Purpose:
     page without rate data), extracts links, scores for rate-relevance,
     and follows top candidates on the same domain.
 
+    Sprint 17: Improved thin-content detection — checks for actual rate
+    numbers ($/unit patterns), not just keywords. Corporate landing pages
+    that discuss rates but link to tariff PDFs are now correctly classified
+    as thin. Deep crawl now uses raw HTML for link extraction.
+
     This agent does NOT use an LLM. No `anthropic` import.
 
 Author: AI-Generated
@@ -166,9 +171,11 @@ class ScrapeAgent(BaseAgent):
                 and char_count > 100  # has some content (not empty)
             ):
                 logger.info(f"  Thin content ({char_count} chars) — attempting deep crawl")
+                # Use raw HTML for link extraction (plain text strips href attributes)
+                crawl_html = getattr(scrape_result, "raw_html", None) or scrape_result.text
                 deeper = self._follow_best_links(
                     base_url=url,
-                    page_html=scrape_result.text,
+                    page_html=crawl_html,
                     pwsid=row.pwsid,
                     max_links=3,
                 )
@@ -219,20 +226,39 @@ class ScrapeAgent(BaseAgent):
     def _is_thin_content(self, text: str) -> bool:
         """Heuristic: does this page likely contain actual rate data?
 
-        Returns True if the page is too short or lacks rate-specific keywords,
-        indicating it's a landing page rather than a rate schedule.
+        Returns True if the page is too short, lacks rate-specific keywords,
+        or has rate keywords but no actual rate numbers (corporate landing page).
+
+        The key insight: a page that TALKS ABOUT rates (keywords present) but
+        doesn't CONTAIN rates (no precise dollar amounts like $22.65, $0.88724)
+        is a landing page that links to the real rate schedule.
         """
+        import re
+
         if not text:
             return True
         if len(text) < 2000:
             return True  # Too short to contain a rate schedule
 
         text_lower = text.lower()
-        matches = sum(1 for kw in self._RATE_INDICATORS if kw in text_lower)
-        if matches < 2:
-            return True  # Content doesn't look like a rate schedule
+        keyword_matches = sum(1 for kw in self._RATE_INDICATORS if kw in text_lower)
+        if keyword_matches < 2:
+            return True  # Content doesn't look rate-related at all
 
-        return False
+        # Count precise dollar amounts ($X.XX with 2+ decimals).
+        # Rate prices: $22.65, $0.88724, $3.42 — always have 2+ decimal places.
+        # News figures: $1.4 billion, $10 per month, $608M — 0-1 decimals.
+        precise_dollars = len(re.findall(r'\$\d{1,3}\.\d{2,5}', text))
+
+        if precise_dollars >= 3:
+            return False  # Has multiple rate-like dollar amounts — substantive
+
+        # Has rate keywords but few/no precise dollar amounts → landing page
+        logger.debug(
+            f"  Thin content: {keyword_matches} rate keywords, "
+            f"{precise_dollars} precise dollar amounts"
+        )
+        return True
 
     def _follow_best_links(
         self,

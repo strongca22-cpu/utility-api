@@ -77,6 +77,7 @@ class ScrapeResult:
     is_js_heavy: bool = False
     error: str | None = None
     char_count: int = 0
+    raw_html: str | None = None  # Preserved for deep crawl link extraction
 
 
 def _clean_html_text(soup: BeautifulSoup) -> str:
@@ -288,20 +289,57 @@ def _extract_pdf_text(url: str, timeout: float = 30.0) -> ScrapeResult:
 
     try:
         doc = pymupdf.open(stream=response.content, filetype="pdf")
-        pages_text = []
+        all_pages = []
         for page in doc:
-            pages_text.append(page.get_text())
+            all_pages.append(page.get_text())
         doc.close()
 
-        text = "\n\n".join(pages_text).strip()
+        total_pages = len(all_pages)
+        full_text = "\n\n".join(all_pages).strip()
 
-        # Truncate if too long
-        if len(text) > MAX_TEXT_LENGTH:
-            text = text[:MAX_TEXT_LENGTH] + "\n\n[TRUNCATED — PDF exceeded 15,000 chars]"
+        # For short PDFs, take everything (up to limit)
+        if len(full_text) <= MAX_TEXT_LENGTH:
+            text = full_text
+        elif total_pages <= 20:
+            # Moderate PDFs: truncate at limit
+            text = full_text[:MAX_TEXT_LENGTH] + "\n\n[TRUNCATED]"
+        else:
+            # Large tariff PDFs (20+ pages): extract rate-relevant pages
+            # instead of blindly taking the first N chars (which is usually
+            # just the table of contents and definitions)
+            import re
+            rate_page_indices = []
+            for i, page_text in enumerate(all_pages):
+                # Pages with dollar amounts or rate keywords are rate-relevant
+                has_dollars = bool(re.search(r'\$\d+\.\d{2}', page_text))
+                has_rate_kw = bool(re.search(
+                    r'(?:rate|charge|tariff|gallons|ccf|per\s+1,?000|service charge)',
+                    page_text, re.IGNORECASE,
+                ))
+                if has_dollars and has_rate_kw:
+                    rate_page_indices.append(i)
+
+            if rate_page_indices:
+                # Take rate-relevant pages, plus page 0-1 for context
+                include = set(rate_page_indices[:30])  # Cap at 30 rate pages
+                include.add(0)  # Cover page
+                if 1 < total_pages:
+                    include.add(1)  # Usually TOC
+                selected = [all_pages[i] for i in sorted(include)]
+                text = "\n\n".join(selected).strip()
+                if len(text) > MAX_TEXT_LENGTH * 3:
+                    text = text[: MAX_TEXT_LENGTH * 3]
+                logger.info(
+                    f"  PDF smart extract: {len(rate_page_indices)} rate pages "
+                    f"of {total_pages} total, {len(text)} chars"
+                )
+            else:
+                # No rate pages found — fall back to first N chars
+                text = full_text[:MAX_TEXT_LENGTH] + "\n\n[TRUNCATED]"
 
         text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
-        logger.info(f"PDF extracted {url}: {len(text)} chars from {len(pages_text)} pages")
+        logger.info(f"PDF extracted {url}: {len(text)} chars from {total_pages} pages")
 
         return ScrapeResult(
             url=url,
@@ -407,6 +445,7 @@ def scrape_rate_page(url: str, timeout: float = 30.0, use_playwright: bool = Tru
         is_pdf=False,
         is_js_heavy=False,
         char_count=len(text),
+        raw_html=html,  # Preserve for deep crawl link extraction
     )
 
     logger.info(f"Scraped {url}: {len(text)} chars")
