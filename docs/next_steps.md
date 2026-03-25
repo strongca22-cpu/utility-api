@@ -716,49 +716,103 @@
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 14.5 — URL Discovery Strategy + SearXNG Rate Limiting
+UAPI Sprint 14.5 — Bulk URL Discovery from State Directories
 
 ## Context
-Sprint 14 infrastructure is complete (cron, Batch API, source checker, health monitoring, change detection). All deliverables shipped. But the VA coverage push (25 utilities) yielded only 1 new PWSID.
+Sprint 14 infrastructure is complete (cron, Batch API, source checker, health monitoring). The VA coverage push (25 utilities) yielded only 1 new PWSID. Root cause: SearXNG rate-limits after ~15-20 queries regardless of config (Google disabled, 5s delays, 60+ engines). This is an IP-level upstream engine constraint, not fixable via SearXNG tuning.
+
+## The strategic shift
+Stop searching for each utility one at a time. Instead: scrape state utility directories to bulk-discover website URLs, then feed them directly into the existing pipeline. SearXNG becomes a gap-filler for the 20-30% not in any directory.
+
+The infrastructure already supports this. The pipeline ingests URLs from YAML config files via a migration script. The output of this session is YAML files.
 
 ## Failure analysis (from Sprint 14 session)
-Exact breakdown of 25 VA utility attempts:
-- 12/25 (48%): SearXNG returned 0 URLs — upstream engines rate-limited after ~15-20 queries
-- 9/25 (36%): URLs found but keyword scorer filtered them all out (none scored >50)
-- 1/25: Scrape got 0 chars (issuu.com embedded viewer)
-- 2/25: Parse failed (1 DB truncation bug now fixed, 1 API overload)
-- 1/25: Success (VA1191883, Washington County SA, $98.73/mo)
+- 12/25 (48%): SearXNG returned 0 URLs — upstream rate-limited
+- 9/25 (36%): URLs found but keyword scorer filtered them out
+- 2/25: Parse or scrape failed (bugs now fixed)
+- 1/25: Success (VA1191883, $98.73/mo)
 
-## What's already been fixed this session
-1. Search delay: 2s → 5s between SearXNG queries
-2. Batch cap: 50 → 15 utilities per orchestrator run
-3. Haiku LLM fallback band: 30-60 → 15-60. Validated: Stafford County's rate page scored 15 on keywords but 95 from Haiku. The wider band catches URLs with weak keyword signals.
-4. SearXNG config: Google disabled (most aggressive rate-limiter). All other engines at defaults for maximum redundancy.
-5. Parse agent: _parse_date() handles varied LLM date formats, VARCHAR(30) truncation fixed.
-
-## The open problem: SearXNG rate limiting
-Even with Google disabled and 5s delays, SearXNG returns 0 results after ~1 utility (15-20 queries). The defaults-minus-Google config was tested and rate limiting still occurs at the same threshold. This appears to be an IP-level rate limit from upstream engines, not a SearXNG config issue.
-
-## Strategic shift proposed
-The per-PWSID SearXNG discovery model (search → score → scrape → parse) doesn't scale. The alternative: bulk URL discovery from state utility directories, treating SearXNG as a gap-filler for the 20-30% not in any directory.
-
-The infrastructure already supports this — config/rate_urls_{state}.yaml files feed into scrape_registry via scripts/migrate_urls_to_registry.py. The ScrapeAgent reads pending URLs from the registry regardless of how they got there.
+## What's already fixed
+1. Search delay 2s → 5s, batch cap 50 → 15
+2. Haiku LLM fallback band 30-60 → 15-60 (validated: Stafford County rate page scored kw=15 → Haiku=95)
+3. SearXNG: Google disabled, all others default
+4. Parse agent: _parse_date(), VARCHAR(30) truncation
 
 ## What this session should do
-1. Diagnose: is the SearXNG rate limit fixable (proxy rotation, engine tuning, delay increase) or a hard constraint?
-2. If hard constraint: identify VA state utility directories (DEQ waterworks, VDH drinking water) and build a directory-scrape ingest module
-3. If fixable: tune SearXNG + rerun VA push
-4. Either way: validate the Haiku scoring fix works at scale by running utilities where SearXNG does return results
+
+### Step 1: Research VA utility directories
+Identify state-level directories that list water utilities with website URLs:
+- VA DEQ drinking water program
+- VA Department of Health waterworks directory
+- SDWIS state pages
+- Any other state directory that maps PWSID → utility website
+
+### Step 2: Output YAML files
+For each directory found, produce a YAML file in this exact format:
+
+```yaml
+# VA utility rate page URLs from {directory name}
+# Source: state_directory
+# Generated: {date}
+
+# {Utility Name} (pop {N})
+VA1234567: "https://example.com/rates"
+
+# {Utility Name} (pop {N})
+VA2345678: "https://example.com/water/fees"
+```
+
+Rules:
+- One file per source directory: config/rate_urls_va_directory_{source}.yaml
+- Simple flat mapping: PWSID → URL string
+- Comments with utility name and population are helpful but optional
+- URL should point to the utility's rate/billing page if identifiable, or the utility homepage if not
+- Only include URLs that start with http/https
+- If the directory gives a homepage but not a rate page, use the homepage — the parse agent can handle it
+
+### Step 3: Load into pipeline
+After YAML files are created:
+```bash
+# Add new file to the migration script's YAML_FILES list
+# Then run:
+python scripts/migrate_urls_to_registry.py
+```
+
+This writes all URLs to scrape_registry with status='pending'. The orchestrator will pick them up on the next run.
+
+### Step 4: Test pipeline
+Run a small batch through the full pipeline:
+```bash
+ua-run-orchestrator --execute 5 --state VA
+```
+Verify: the orchestrator should find PWSIDs where scrape_status='url_discovered' (URLs already in registry) and skip discovery, going straight to scrape → parse.
+
+## YAML file contract
+The migration script (scripts/migrate_urls_to_registry.py) reads YAML files as:
+```python
+data = yaml.safe_load(f)  # returns dict
+for pwsid, url in data.items():
+    if isinstance(url, str) and url.startswith("http"):
+        # insert into scrape_registry with status='pending'
+```
+That's the entire contract. Comments are ignored. Non-string values are skipped.
+
+## Existing curated URLs (don't duplicate these)
+- config/rate_urls_va.yaml — 31 VA utilities already curated
+- config/rate_urls_ca.yaml — 56 CA utilities
+- 104 active entries in scrape_registry
+
+## Current VA coverage gap
+- 44,633 total SDWIS PWSIDs (all states)
+- VA has ~900 community water systems
+- 30 VA PWSIDs currently have rate data
+- ~870 VA PWSIDs need URLs
 
 ## Key files
-- agents/discovery.py — SearXNG search + scoring
-- agents/scrape.py — URL fetching from scrape_registry
-- agents/parse.py — Claude API extraction
-- config/rate_urls_va.yaml — curated VA URLs (31 entries)
+- config/rate_urls_va.yaml — existing curated VA URLs (31 entries, reference format)
 - scripts/migrate_urls_to_registry.py — YAML → scrape_registry loader
-- ops/registry_writer.py — direct scrape_registry writer
-- config/agent_config.yaml — thresholds
-- ~/searxng/searxng/settings.yml — SearXNG config (Google disabled, all others default)
-- docs/uapi_implementation_guide.md — Sprint 14 spec
-- docs/uapi_agent_cost_analysis.md — cost projections
+- agents/scrape.py — reads pending URLs from registry, fetches content
+- agents/parse.py — Claude API extraction
+- agents/discovery.py — SearXNG search (fallback path)
+- ops/registry_writer.py — direct registry writer (alternative to YAML path)
 ```
