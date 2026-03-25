@@ -12,11 +12,12 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-24
+Modified: 2026-03-25
 
 Dependencies:
     - requests (SearXNG API)
     - anthropic (optional, Haiku for ambiguous URL scoring)
+    - sqlalchemy
 
 Usage:
     from utility_api.agents.discovery import DiscoveryAgent
@@ -27,8 +28,10 @@ Notes:
     - Writes to scrape_registry with status='pending'
     - Updates pwsid_coverage.scrape_status to 'url_discovered'
     - Keyword heuristic handles ~80% of cases without LLM
+    - Query builder uses SDWIS metadata (county, owner_type) for better queries
 """
 
+import re
 import time
 
 from loguru import logger
@@ -39,21 +42,157 @@ from utility_api.config import settings
 from utility_api.db import engine
 
 
+# --- Utility Name Expansion ---
+
+# Common SDWIS abbreviations → full words (regex patterns, word-boundary aware)
+_ABBREVIATION_PATTERNS = [
+    (r"\bCO\b", "County"),
+    (r"\bCTY\b", "County"),
+    (r"\bUTIL(?:S)?\b", "Utilities"),
+    (r"\bSVC\b", "Service"),
+    (r"\bAUTH\b", "Authority"),
+    (r"\bDEPT\b", "Department"),
+    (r"\bDIST\b", "District"),
+    (r"\bWTR\b", "Water"),
+    (r"\bW/S\b", "Water and Sewer"),
+    (r"\bCOMM\b", "Commission"),
+    (r"\bTWP\b", "Township"),
+    (r"\bBORO\b", "Borough"),
+    (r"\bMUN\b", "Municipal"),
+    (r"\bPSA\b", "Public Service Authority"),
+    (r"\bWSA\b", "Water and Sewer Authority"),
+]
+
+
+def expand_utility_name(name: str, county: str | None = None) -> str:
+    """Expand abbreviated SDWIS utility names to searchable form.
+
+    Examples:
+        "STAFFORD CO UTIL" + county="Stafford" → "Stafford County Utilities"
+        "PWCSA - EAST" + county="Prince William" → "Prince William County Service Authority"
+        "ACSA URBAN AREA" + county="Albemarle" → "Albemarle County Service Authority"
+        "NAVAL STATION NORFOLK" → "NAVAL STATION NORFOLK" (no expansion)
+    """
+    # Strip directional/system suffixes that clutter search
+    cleaned = re.sub(
+        r"\s*[-–]\s*(EAST|WEST|NORTH|SOUTH|CENTRAL|MAIN|PRIMARY)\s*$",
+        "", name, flags=re.IGNORECASE,
+    ).strip()
+
+    # Expand known abbreviations using regex word boundaries
+    expanded = cleaned
+    for pattern, replacement in _ABBREVIATION_PATTERNS:
+        expanded = re.sub(pattern, replacement, expanded)
+
+    # Handle short acronyms (PWCSA, ACSA, JCSA, HRSD, BVU, etc.)
+    # Only trigger for tokens <=6 chars that are all uppercase and we have county.
+    # This avoids false positives on real words like STAFFORD (8), HENRICO (7).
+    first_token = cleaned.split("-")[0].split()[0].strip()
+    is_likely_acronym = (
+        len(first_token) <= 6
+        and first_token.isupper()
+        and county
+    )
+    if is_likely_acronym:
+        core = first_token
+        if core.endswith("SA") or core.endswith("CA"):
+            # X Service Authority / X County Authority
+            expanded = f"{county} County Service Authority"
+        elif core.endswith("SD") or core.endswith("WD"):
+            expanded = f"{county} Water District"
+        elif core.endswith("PSA"):
+            expanded = f"{county} Public Service Authority"
+        else:
+            # Generic: use county + water utility
+            expanded = f"{county} County Water"
+
+    return expanded
+
+
+def _get_system_metadata(pwsid: str) -> dict:
+    """Fetch SDWIS + CWS metadata for a PWSID.
+
+    Returns dict with: pws_name, state_code, county, population, owner_type.
+    """
+    schema = settings.utility_schema
+    with engine.connect() as conn:
+        row = conn.execute(text(f"""
+            SELECT
+                s.pws_name, s.state_code, s.population_served_count,
+                s.owner_type_code, c.county_served
+            FROM {schema}.sdwis_systems s
+            LEFT JOIN {schema}.cws_boundaries c ON c.pwsid = s.pwsid
+            WHERE s.pwsid = :pwsid
+        """), {"pwsid": pwsid}).fetchone()
+
+    if not row:
+        return {"pws_name": None, "state_code": pwsid[:2], "county": None,
+                "population": None, "owner_type": None}
+
+    return {
+        "pws_name": row.pws_name,
+        "state_code": row.state_code,
+        "county": row.county_served,
+        "population": row.population_served_count,
+        "owner_type": row.owner_type_code,
+    }
+
+
 # --- Search Query Construction ---
 
-def build_search_queries(utility_name: str, state: str) -> list[str]:
-    """Generate targeted search queries for rate page discovery."""
-    queries = [
-        f'"{utility_name}" water rate schedule',
-        f'"{utility_name}" schedule of rates fees charges',
-        f'"{utility_name}" water rates {state} filetype:pdf',
-    ]
-    name_lower = utility_name.lower()
-    if "water" not in name_lower:
-        queries.append(f'"{utility_name}" water department rates')
-    if "authority" in name_lower or "district" in name_lower:
-        queries.append(f'"{utility_name}" rate schedule')
-    return queries
+def build_search_queries(
+    utility_name: str,
+    state: str,
+    county: str | None = None,
+    owner_type: str | None = None,
+) -> list[str]:
+    """Generate 3-5 targeted search queries using all available metadata.
+
+    Parameters
+    ----------
+    utility_name : str
+        SDWIS pws_name (may be abbreviated).
+    state : str
+        2-letter state code.
+    county : str, optional
+        County name from CWS boundaries.
+    owner_type : str, optional
+        SDWIS owner_type_code: F/S/L/P/M.
+
+    Returns
+    -------
+    list[str]
+        Up to 5 search query strings for SearXNG.
+    """
+    queries = []
+
+    # Expand the SDWIS name using county context
+    expanded = expand_utility_name(utility_name, county)
+    best_name = expanded if expanded != utility_name else utility_name
+
+    # Query 1: Expanded name + "water rates"
+    queries.append(f'"{best_name}" water rates {state}')
+
+    # Query 2: County-based search (if we have county data)
+    if county:
+        queries.append(f"{county} County water rates {state}")
+
+    # Query 3: Original SDWIS name (if different from expanded)
+    if expanded != utility_name:
+        queries.append(f'"{utility_name}" water rate schedule')
+
+    # Query 4: PDF rate schedule search
+    queries.append(f'{best_name} rate schedule {state} filetype:pdf')
+
+    # Query 5: County government water department (local/mixed owners only)
+    if county and owner_type in ("L", "M", None):
+        queries.append(f"{county} {state} water department rates fees")
+
+    # For federal systems (military bases), add installation-specific query
+    if owner_type == "F":
+        queries.append(f'"{utility_name}" utility rates')
+
+    return queries[:5]
 
 
 # --- URL Relevance Scoring ---
@@ -175,24 +314,22 @@ class DiscoveryAgent(BaseAgent):
         """
         schema = settings.utility_schema
 
-        # Look up utility info if not provided
-        if not utility_name or not state:
-            with engine.connect() as conn:
-                row = conn.execute(text(f"""
-                    SELECT pws_name, state_code FROM {schema}.pwsid_coverage
-                    WHERE pwsid = :pwsid
-                """), {"pwsid": pwsid}).fetchone()
-                if row:
-                    utility_name = utility_name or row.pws_name
-                    state = state or row.state_code
-                else:
-                    state = state or pwsid[:2]
-                    utility_name = utility_name or pwsid
+        # Fetch full metadata from SDWIS + CWS
+        meta = _get_system_metadata(pwsid)
+        utility_name = utility_name or meta["pws_name"] or pwsid
+        state = state or meta["state_code"] or pwsid[:2]
+        county = meta.get("county")
+        owner_type = meta.get("owner_type")
 
-        logger.info(f"DiscoveryAgent: {utility_name} ({pwsid}, {state})")
+        # Log the expanded name for debugging
+        expanded = expand_utility_name(utility_name, county)
+        if expanded != utility_name:
+            logger.info(f"DiscoveryAgent: {utility_name} → {expanded} ({pwsid}, {state}, county={county})")
+        else:
+            logger.info(f"DiscoveryAgent: {utility_name} ({pwsid}, {state}, county={county})")
 
         # Build and run search queries
-        queries = build_search_queries(utility_name, state)
+        queries = build_search_queries(utility_name, state, county, owner_type)
         all_candidates = []
         seen_urls = set()
 
