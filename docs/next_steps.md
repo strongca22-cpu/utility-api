@@ -616,12 +616,25 @@
 | `utility.water_rates` | 1,472 | Legacy fixed-tier — kept as audit table |
 | All other tables | (unchanged from Sprint 10) | |
 
-### Sprint 12 — Scrape Registry Wiring + Agents
-- [ ] Migrate pwsid_coverage mat view → regular table with mutable operational columns
-- [ ] BaseAgent ABC interface
-- [ ] BulkIngestAgent (wrapper on existing ingest modules)
-- [ ] BestEstimateAgent (wraps ops/best_estimate.py)
-- [ ] Wire scraping pipeline to read from scrape_registry
+### Completed (Sprint 12 — Scrape Registry Wiring + Agent Skeleton — Session 10 cont.)
+
+- [x] **Migration 011**: pwsid_coverage mat view → regular table with `scrape_status` + `priority_tier` columns. Also added `ingest_log` table for agent audit trail.
+- [x] **Coverage refresh**: `ua-ops refresh-coverage` recomputes derived columns via UPDATE, preserves mutable columns (scrape_status, priority_tier). Also syncs scrape_status from scrape_registry.
+- [x] **BaseAgent ABC** (`src/utility_api/agents/base.py`): minimal abstract base class with `run()` and `log_run()`. No LLM, no framework, no async.
+- [x] **BulkIngestAgent** (`src/utility_api/agents/bulk_ingest.py`): wraps existing ingest modules. Updates source_catalog.last_ingested_at, syncs rate_schedules, logs to ingest_log.
+- [x] **BestEstimateAgent** (`src/utility_api/agents/best_estimate.py`): wraps ops/best_estimate.py. Refreshes pwsid_coverage after building estimates.
+- [x] **Scraping pipeline wired** (write-only): `rates.py` now writes to scrape_registry at each stage — discovery (URL found), fetch (HTTP status, content hash), parse (confidence, cost, model). Wrapped in try/except — never breaks the pipeline.
+- [x] **Registry writer** (`src/utility_api/ops/registry_writer.py`): `log_discovery()`, `log_fetch()`, `log_parse()` helper functions.
+- [x] **`ua-ops scrape-status [--state XX]`**: URL status breakdown, parse outcomes, HTTP codes, recent failures.
+- [x] **pwsid_coverage.scrape_status**: populated from scrape_registry — 97 succeeded, 3 url_discovered, 44,543 not_attempted.
+
+### Database State (as of Sprint 12)
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `utility.pwsid_coverage` | 44,643 | **Regular table** (was mat view) — scrape_status + priority_tier |
+| `utility.ingest_log` | 1 | Agent audit trail |
+| All other tables | (unchanged from Sprint 11) | |
 
 ### Sprint 13 — Orchestrator + Discovery + Parse Agents
 - [ ] OrchestratorAgent (Python + SQL, reads from source_catalog + pwsid_coverage + scrape_registry)
@@ -662,9 +675,10 @@
 | **`ua-ops refresh-coverage`** | Refresh pwsid_coverage mat view |
 | **`ua-ops build-best-estimate`** | Build best-estimate rates (all states) |
 | **`ua-ops sync-rate-schedules`** | Sync water_rates → rate_schedules |
+| **`ua-ops scrape-status [--state]`** | Scrape registry status breakdown |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 12 — Scrape registry wiring + agent skeleton. Migrate pwsid_coverage mat view to regular table with mutable columns (scrape_status, priority_tier). Build BaseAgent ABC, BulkIngestAgent, BestEstimateAgent. Wire scraping pipeline to write to scrape_registry. See docs/uapi_implementation_guide.md Sprint 12 spec.
+UAPI Sprint 13 — Orchestrator + autonomous agents. Build OrchestratorAgent (Python+SQL, reads source_catalog + pwsid_coverage + scrape_registry, produces ranked task queue). Build DiscoveryAgent (SearXNG + optional Haiku scoring). Build ScrapeAgent (HTTP+Playwright). Build ParseAgent (Claude API structured extraction). Wire pipeline: orchestrator → discovery → scrape → parse → best estimate. CLI: ua-run-orchestrator. Test: autonomously find, scrape, parse, and store rate data for 5 VA utilities. See docs/uapi_implementation_guide.md Sprint 13 spec.
 ```

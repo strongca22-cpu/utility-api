@@ -382,9 +382,19 @@ def run_rate_ingest(
         if pwsid in curated_urls:
             rate_url = curated_urls[pwsid]
             logger.info(f"  Using curated URL: {rate_url}")
+            # Registry: log curated URL
+            from utility_api.ops.registry_writer import log_discovery
+            log_discovery(pwsid, rate_url, url_source="curated")
         else:
             discovery = discover_rate_url(pwsid, name, state, county)
             rate_url = discovery.best_url
+            # Registry: log discovered URL
+            if rate_url:
+                from utility_api.ops.registry_writer import log_discovery
+                log_discovery(
+                    pwsid, rate_url, url_source="searxng",
+                    discovery_query=getattr(discovery, "search_query", None),
+                )
 
         if not rate_url:
             logger.warning(f"  No URL found for {name}")
@@ -412,6 +422,17 @@ def run_rate_ingest(
 
         # Step 3: Scrape
         scrape = scrape_rate_page(rate_url)
+
+        # Registry: log fetch outcome
+        from utility_api.ops.registry_writer import log_fetch
+        log_fetch(
+            pwsid, rate_url,
+            http_status=getattr(scrape, "status_code", None),
+            content_hash=getattr(scrape, "text_hash", None),
+            content_length=getattr(scrape, "char_count", None),
+            error=scrape.error if scrape.error else None,
+        )
+
         if scrape.error and not scrape.is_pdf:
             logger.warning(f"  Scrape failed: {scrape.error}")
             stats["failed"] += 1
@@ -449,6 +470,17 @@ def run_rate_ingest(
                      + parse.output_tokens * COST_PER_OUTPUT_TOKEN)
         stats["estimated_cost_usd"] += call_cost
         logger.info(f"  API cost: ${call_cost:.4f} (cumulative: ${stats['estimated_cost_usd']:.4f})")
+
+        # Registry: log parse outcome
+        from utility_api.ops.registry_writer import log_parse
+        parse_result = "success" if parse.parse_confidence in ("high", "medium") else "failed"
+        log_parse(
+            pwsid, rate_url,
+            parse_result=parse_result,
+            parse_confidence=parse.parse_confidence,
+            parse_cost_usd=call_cost,
+            parse_model=parse.parse_model,
+        )
 
         if max_cost_usd and stats["estimated_cost_usd"] >= max_cost_usd:
             logger.warning(

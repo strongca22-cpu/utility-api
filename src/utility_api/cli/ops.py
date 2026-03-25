@@ -58,8 +58,9 @@ def status():
         typer.echo("\n── Table Sizes ──")
         tables = [
             "cws_boundaries", "sdwis_systems", "mdwd_financials",
-            "water_rates", "rate_best_estimate", "permits",
-            "source_catalog", "scrape_registry", "pipeline_runs",
+            "water_rates", "rate_schedules", "rate_best_estimate",
+            "permits", "source_catalog", "scrape_registry",
+            "pwsid_coverage", "ingest_log", "pipeline_runs",
         ]
         for table in tables:
             try:
@@ -322,34 +323,26 @@ def coverage_report():
 
 @app.command("refresh-coverage")
 def refresh_coverage():
-    """Refresh the pwsid_coverage materialized view.
+    """Refresh derived columns in pwsid_coverage table.
 
-    Run this after any ingest, best-estimate build, or SDWIS expansion
-    to update coverage statistics.
+    Recomputes rate coverage, best-estimate, and SDWIS columns from source
+    tables. Also updates scrape_status from scrape_registry. Does NOT
+    overwrite priority_tier (manually set).
+
+    Run this after any ingest, best-estimate build, or SDWIS expansion.
     """
-    from utility_api.config import settings
-    from utility_api.db import engine
+    from utility_api.ops.coverage import refresh_coverage_derived, update_scrape_status
 
-    schema = settings.utility_schema
+    typer.echo("Refreshing pwsid_coverage derived columns...")
+    stats = refresh_coverage_derived()
+    typer.echo(f"  {stats['total']:,} PWSIDs, {stats['with_rates']:,} rates, {stats['with_sdwis']:,} SDWIS")
 
-    typer.echo("Refreshing pwsid_coverage materialized view...")
-    with engine.connect() as conn:
-        conn.execute(text(
-            f"REFRESH MATERIALIZED VIEW CONCURRENTLY {schema}.pwsid_coverage"
-        ))
-        conn.commit()
+    typer.echo("Updating scrape_status from scrape_registry...")
+    scrape_stats = update_scrape_status()
+    for status, cnt in sorted(scrape_stats.items(), key=lambda x: -x[1]):
+        typer.echo(f"  {status:20s} {cnt:>7,}")
 
-        # Report new stats
-        row = conn.execute(text(f"""
-            SELECT
-                COUNT(*) AS total,
-                SUM(CASE WHEN has_rate_data THEN 1 ELSE 0 END) AS with_rates,
-                SUM(CASE WHEN has_sdwis THEN 1 ELSE 0 END) AS with_sdwis
-            FROM {schema}.pwsid_coverage
-        """)).fetchone()
-
-    typer.echo(f"Done. {row.total:,} PWSIDs total, "
-               f"{row.with_rates:,} with rates, {row.with_sdwis:,} with SDWIS.")
+    typer.echo("Done.")
 
 
 @app.command("build-best-estimate")
@@ -376,6 +369,98 @@ def build_best_estimate(
 
     if not dry_run and stats.get("inserted", 0) > 0:
         typer.echo("\nTip: Run 'ua-ops refresh-coverage' to update the coverage mat view.")
+
+
+@app.command("scrape-status")
+def scrape_status(
+    state: str = typer.Option(None, "--state", "-s", help="Filter by state code"),
+):
+    """Show scrape registry status breakdown.
+
+    Summarizes URL statuses (pending, active, failed, dead, stale) and
+    parse outcomes from scrape_registry. Use --state to filter.
+    """
+    from utility_api.config import settings
+    from utility_api.db import engine
+
+    schema = settings.utility_schema
+
+    with engine.connect() as conn:
+        state_filter = ""
+        params = {}
+        if state:
+            state_filter = "WHERE sr.pwsid LIKE :prefix"
+            params["prefix"] = f"{state.upper()}%"
+
+        typer.echo("=" * 60)
+        typer.echo(f"  Scrape Registry Status{' — ' + state.upper() if state else ''}")
+        typer.echo("=" * 60)
+
+        # Status breakdown
+        typer.echo("\n── URL Status ──")
+        rows = conn.execute(text(f"""
+            SELECT sr.status, COUNT(*) AS cnt
+            FROM {schema}.scrape_registry sr
+            {state_filter}
+            GROUP BY sr.status
+            ORDER BY cnt DESC
+        """), params).fetchall()
+        total = sum(r.cnt for r in rows)
+        for r in rows:
+            typer.echo(f"  {r.status:20s} {r.cnt:>6,}")
+        typer.echo(f"  {'─'*20} {'─'*6}")
+        typer.echo(f"  {'TOTAL':20s} {total:>6,}")
+
+        # Parse outcome breakdown
+        typer.echo("\n── Parse Outcomes ──")
+        rows = conn.execute(text(f"""
+            SELECT
+                COALESCE(sr.last_parse_result, 'not_parsed') AS result,
+                COALESCE(sr.last_parse_confidence, '-') AS confidence,
+                COUNT(*) AS cnt
+            FROM {schema}.scrape_registry sr
+            {state_filter}
+            GROUP BY sr.last_parse_result, sr.last_parse_confidence
+            ORDER BY cnt DESC
+        """), params).fetchall()
+        for r in rows:
+            typer.echo(f"  {r.result:15s} [{r.confidence:6s}] {r.cnt:>6,}")
+
+        # HTTP status breakdown
+        typer.echo("\n── HTTP Status Codes ──")
+        rows = conn.execute(text(f"""
+            SELECT
+                COALESCE(sr.last_http_status::text, 'no fetch') AS http_status,
+                COUNT(*) AS cnt
+            FROM {schema}.scrape_registry sr
+            {state_filter}
+            GROUP BY sr.last_http_status
+            ORDER BY cnt DESC
+            LIMIT 10
+        """), params).fetchall()
+        for r in rows:
+            typer.echo(f"  {r.http_status:12s} {r.cnt:>6,}")
+
+        # Top failing URLs
+        typer.echo("\n── Recent Failures (last 5) ──")
+        fail_where = "WHERE sr.status IN ('failed', 'dead', 'blocked')"
+        if state:
+            fail_where += " AND sr.pwsid LIKE :prefix"
+        rows = conn.execute(text(f"""
+            SELECT sr.pwsid, sr.url, sr.status, sr.notes
+            FROM {schema}.scrape_registry sr
+            {fail_where}
+            ORDER BY sr.updated_at DESC NULLS LAST
+            LIMIT 5
+        """), params).fetchall()
+        if rows:
+            for r in rows:
+                typer.echo(f"  {r.pwsid} [{r.status}] {(r.notes or '')[:60]}")
+                typer.echo(f"    {r.url[:80]}")
+        else:
+            typer.echo("  (no failures)")
+
+        typer.echo("\n" + "=" * 60)
 
 
 @app.command("sync-rate-schedules")
