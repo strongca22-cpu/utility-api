@@ -636,13 +636,24 @@
 | `utility.ingest_log` | 1 | Agent audit trail |
 | All other tables | (unchanged from Sprint 11) | |
 
-### Sprint 13 — Orchestrator + Discovery + Parse Agents
-- [ ] OrchestratorAgent (Python + SQL, reads from source_catalog + pwsid_coverage + scrape_registry)
-- [ ] DiscoveryAgent (SearXNG + optional Haiku scoring)
-- [ ] ScrapeAgent (HTTP + Playwright)
-- [ ] ParseAgent (Claude API structured extraction)
+### Completed (Sprint 13 — Orchestrator + Research Agents — Session 10 cont.)
 
-### State Expansion (after Sprint 12)
+- [x] **priority_tier populated**: Tier 2 = 19,478 (DC states), Tier 3 = 226 (pop >100K), Tier 4 = 24,939. Tier 1 (DC-adjacent) deferred — requires cross-schema spatial join.
+- [x] **OrchestratorAgent** (`agents/orchestrator.py`): generates ranked task queue from 4 SQL queries — bulk source freshness, coverage gaps, retriable failures, change detection. Pure Python + SQL, no LLM.
+- [x] **DiscoveryAgent** (`agents/discovery.py`): SearXNG search with targeted queries + keyword relevance scoring. Optional Haiku fallback for ambiguous URLs (score 30-60). Writes to scrape_registry with status='pending'.
+- [x] **ScrapeAgent** (`agents/scrape.py`): reads from scrape_registry, fetches URLs via rate_scraper.py, updates registry with HTTP status/hash/length. Retry logic: 403 → exponential backoff, 404 → dead, 5xx → 6h retry. Returns raw text in memory for ParseAgent.
+- [x] **ParseAgent** (`agents/parse.py`): Claude API extraction with complexity routing (Sonnet for complex, Haiku for simple). Prompt caching enabled. Writes to rate_schedules (JSONB), triggers BestEstimateAgent. Cost tracking per parse.
+- [x] **ua-run-orchestrator** CLI: generates queue, optionally executes top N tasks. Pipeline: orchestrator → discovery → scrape → parse → best estimate. Sequential for-loop execution.
+- [x] **End-to-end test**: Fairfax County Water Authority (VA6059501) — discovered 3 URLs via SearXNG, scraped all 3 successfully (14-15K chars each). Parse requires ANTHROPIC_API_KEY in environment.
+
+### Sprint 14 — Cron + Change Detection + Batch API
+- [ ] Cron job calling ua-run-orchestrator on schedule
+- [ ] Batch API routing for parse agent (50% cost reduction at volume)
+- [ ] check_bulk_source implementation (HTTP GET → check for new vintage)
+- [ ] Health monitoring and alerting
+- [ ] Filesystem-based raw content storage (for decoupled scrape/parse)
+
+### State Expansion (after Sprint 13)
 - [ ] UNC EFC IA dashboard (690 utilities, per-utility HTML scrape)
 - [ ] OR League of Cities 2023 CSV
 - [ ] EFC states with CSV downloads
@@ -676,9 +687,10 @@
 | **`ua-ops build-best-estimate`** | Build best-estimate rates (all states) |
 | **`ua-ops sync-rate-schedules`** | Sync water_rates → rate_schedules |
 | **`ua-ops scrape-status [--state]`** | Scrape registry status breakdown |
+| **`ua-run-orchestrator [--execute N]`** | Autonomous pipeline: discover → scrape → parse |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 13 — Orchestrator + autonomous agents. Build OrchestratorAgent (Python+SQL, reads source_catalog + pwsid_coverage + scrape_registry, produces ranked task queue). Build DiscoveryAgent (SearXNG + optional Haiku scoring). Build ScrapeAgent (HTTP+Playwright). Build ParseAgent (Claude API structured extraction). Wire pipeline: orchestrator → discovery → scrape → parse → best estimate. CLI: ua-run-orchestrator. Test: autonomously find, scrape, parse, and store rate data for 5 VA utilities. See docs/uapi_implementation_guide.md Sprint 13 spec.
+UAPI Sprint 14 — Cron + Batch API + Production Hardening. Add cron scheduling for ua-run-orchestrator. Implement Batch API routing for parse agent at volume. Build check_bulk_source task (HTTP GET source URL, check for new vintage, trigger BulkIngestAgent). Add health monitoring. Test: run 20 VA utilities end-to-end with Batch API, then set up daily cron. See docs/uapi_implementation_guide.md Sprint 14 spec.
 ```

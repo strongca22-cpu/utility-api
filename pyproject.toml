@@ -42,6 +42,7 @@ dev = [
 ua-ingest = "utility_api.cli.ingest:app"
 ua-api = "utility_api.cli.serve:main"
 ua-ops = "utility_api.cli.ops:app"
+ua-run-orchestrator = "utility_api.cli.orchestrator:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
