@@ -1,0 +1,203 @@
+# Investor-Owned Utility Subsidiary Name Database
+# Purpose: Maps local subsidiary names to parent company rate page URLs.
+#          Used by iou_mapper.py for name-based matching beyond simple regex.
+#
+# Sources:
+#   - American Water: SEC Exhibit 21 (2024 10-K), amwater.com/corp/About-Us
+#   - Essential/Aqua: essential.co/about, Wikipedia, press releases
+#   - SJW Group: sjwgroup.com/about-us, 2019 merger press releases
+#   - CalWater: calwatergroup.com, calwater.com/about
+#   - Others: Company websites, Wikipedia, public filings
+#
+# Created: 2026-03-25
+# Modified: 2026-03-25
+#
+# Match types:
+#   pattern: regex matched against SDWIS pws_name (existing Sprint 15 logic)
+#   name: exact/fuzzy match against SDWIS pws_name (new Sprint 16 logic)
+#
+# IMPORTANT: Many entries are from publicly available sources but may be
+# incomplete. Entries marked TODO need verification from SEC 10-K filings.
+
+american_water:
+  parent: "American Water Works Company"
+  ticker: "AWK"
+  rate_url_template: "https://www.amwater.com/{state_lower}aw/Customer-Service-Billing/your-water-and-wastewater-rates"
+  subsidiaries:
+    # Standard state-branded subsidiaries (matched by existing regex patterns)
+    # These are already caught by (?i)american water in iou_mapper.py
+    # Listed here for completeness.
+
+    # Non-standard subsidiary names (NOT caught by "american water" regex)
+    - name: "Elizabethtown Water Company"
+      state: NJ
+      # Elizabethtown Water was acquired by American Water in 2007
+    - name: "Applied Water Management"
+      state: NJ
+    - name: "Mount Holly Water Company"
+      state: NJ
+    - name: "E'town Properties"
+      state: NJ
+    - name: "Consumers Illinois Water"
+      state: IL
+    - name: "Illinois-American Water"
+      state: IL
+    - name: "United Water"
+      state: NJ
+      # TODO: verify — United Water was a separate company (Suez subsidiary)
+    - name: "Kanawha Valley Water"
+      state: WV
+    - name: "Thomas Jefferson Water"
+      state: VA
+    - name: "Charleston Water"
+      state: WV
+      # TODO: verify if this is AWK subsidiary or municipal
+    - name: "Bluefield Valley Water Works"
+      state: WV
+    - name: "Beckley Water"
+      state: WV
+      # TODO: verify
+    - name: "Mercer County Water"
+      state: WV
+      # TODO: verify
+    - name: "Dunbar Water Works"
+      state: WV
+      # TODO: verify
+
+essential_utilities:
+  parent: "Essential Utilities (Aqua)"
+  ticker: "WTRG"
+  rate_url: "https://www.aquawater.com/customers/water-rates"
+  subsidiaries:
+    # Standard Aqua-branded subsidiaries (caught by existing regex)
+    # Listed for completeness:
+    # Aqua Pennsylvania, Aqua Ohio, Aqua North Carolina, Aqua Texas,
+    # Aqua Illinois, Aqua Indiana, Aqua Virginia, Aqua New Jersey
+
+    # Non-standard names
+    - name: "Peoples Gas"
+      state: PA
+      # Natural gas subsidiary, not water — skip for water rate mapping
+      skip: true
+    - name: "Peoples Natural Gas"
+      state: PA
+      skip: true
+    - name: "Delta Natural Gas"
+      state: KY
+      skip: true
+    # Aqua subsidiaries with non-standard names
+    - name: "Consumers Water"
+      state: PA
+      # TODO: verify — may have been rebranded to Aqua Pennsylvania
+    - name: "Artesian Water Pennsylvania"
+      state: PA
+      # TODO: verify if Essential acquired Artesian PA operations
+
+california_water_service:
+  parent: "California Water Service Group"
+  ticker: "CWT"
+  subsidiaries:
+    # Standard Cal Water branded subsidiaries (caught by existing regex)
+    # California Water Service, Hawaii Water Service,
+    # Washington Water Service, New Mexico Water Service
+
+    # Cal Water operates 23 districts in CA under "California Water Service"
+    # brand — all matched by existing regex. No non-standard names known.
+    # TODO: verify from CWT 10-K whether any districts use local names
+
+sjw_group:
+  parent: "SJW Group"
+  ticker: "SJW"
+  subsidiaries:
+    # Standard branded subsidiaries (caught by existing regex):
+    # San Jose Water Company (CA)
+    # SJWTX / Canyon Lake Water Service Company / Texas Water Company (TX)
+    # Connecticut Water Company (CT)
+    # Maine Water Company (ME)
+
+    # Non-standard names from SJW subsidiaries
+    - name: "Avon Water Company"
+      state: CT
+      url: "https://www.ctwater.com/service-billing/your-bill/pay-your-bill/#rate-schedules"
+    - name: "Heritage Village Water"
+      state: CT
+      url: "https://www.ctwater.com/service-billing/your-bill/pay-your-bill/#rate-schedules"
+    - name: "Canyon Lake Water Service"
+      state: TX
+      url: "https://www.sjwtx.com/customer-care/help-information/rates-regulations/"
+    - name: "Texas Water Company"
+      state: TX
+      url: "https://www.txwaterco.com/"
+      # TODO: verify rate page URL for Texas Water Company
+
+middlesex_water:
+  parent: "Middlesex Water Company"
+  ticker: "MSEX"
+  subsidiaries:
+    # Standard branded (caught by existing regex):
+    # Middlesex Water Company (NJ)
+    # Tidewater Utilities (DE)
+
+    # Non-standard names
+    - name: "Pinelands Water Company"
+      state: NJ
+      url: "https://www.middlesexwater.com/customer-care/rate-information/"
+    - name: "Pinelands Wastewater Company"
+      state: NJ
+      url: "https://www.middlesexwater.com/customer-care/rate-information/"
+    - name: "Utility Service Affiliates"
+      state: NJ
+      url: "https://www.middlesexwater.com/customer-care/rate-information/"
+    - name: "Tidewater Environmental Services"
+      state: DE
+      url: "https://www.tidewaterutilities.com/rates/"
+    - name: "Southern Shores Water"
+      state: DE
+      url: "https://www.tidewaterutilities.com/rates/"
+      # TODO: verify
+
+artesian_resources:
+  parent: "Artesian Resources Corporation"
+  ticker: "ARTNA"
+  subsidiaries:
+    # Standard branded (caught by existing regex):
+    # Artesian Water Company (DE, MD, PA)
+
+    # Non-standard names
+    - name: "Artesian Wastewater"
+      state: DE
+      skip: true  # Wastewater, not water supply
+    - name: "Artesian Utility Development"
+      state: DE
+      skip: true  # Development company
+    # TODO: research Artesian rate page URL — artesianwater.com/customer-service/rates was 404
+
+aquarion_water:
+  parent: "Aquarion Water Company (Eversource subsidiary)"
+  subsidiaries:
+    # Standard branded (caught by existing regex):
+    # Aquarion Water Company of CT, MA, NH
+
+    # Non-standard names — Aquarion serves under local names in some areas
+    - name: "Birmingham Utilities"
+      state: CT
+      url: "https://www.aquarionwater.com/customer-service/rates-billing"
+      # Aquarion acquired Birmingham Utilities (Ansonia/Derby CT area)
+    - name: "Stamford Water"
+      state: CT
+      url: "https://www.aquarionwater.com/customer-service/rates-billing"
+      # TODO: verify if still operating under this name in SDWIS
+
+central_states_water:
+  parent: "Central States Water Resources"
+  subsidiaries:
+    # CSWR operates many small systems under various local names.
+    # Too many to enumerate individually. No single corporate rate page.
+    # TODO: research CSWR subsidiary list — may have 50+ small utilities
+    #        across MO, IL, AR, KY, TN, MS, LA
+
+nexus_water:
+  parent: "Nexus Water Group (formerly Corix/GWRI)"
+  subsidiaries:
+    # Nexus operates under various local names.
+    # TODO: research Nexus/Corix subsidiary list

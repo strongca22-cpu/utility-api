@@ -213,6 +213,118 @@ def _match_system(pws_name: str, state_code: str) -> tuple[str, str] | None:
     return None
 
 
+# --- Subsidiary Name Matching (Sprint 16) ---
+
+# Common SDWIS abbreviations for normalization
+_NAME_NORMALIZE = [
+    (r"\bCO\.?\b", "COMPANY"),
+    (r"\bCORP\.?\b", "CORPORATION"),
+    (r"\bWTR\b", "WATER"),
+    (r"\bSVC\b", "SERVICE"),
+    (r"\bUTIL(?:S)?\b", "UTILITIES"),
+    (r"\bINC\.?\b", ""),
+    (r"\bLLC\b", ""),
+    (r"\bLTD\b", ""),
+    (r"\s+", " "),
+]
+
+
+def _normalize_name(name: str) -> str:
+    """Normalize a utility name for fuzzy matching.
+
+    Expands abbreviations, strips punctuation and suffixes.
+    """
+    upper = name.upper().strip()
+    for pattern, replacement in _NAME_NORMALIZE:
+        upper = re.sub(pattern, replacement, upper)
+    # Strip trailing/leading whitespace and punctuation
+    return re.sub(r"[^A-Z0-9 ]", "", upper).strip()
+
+
+def _load_subsidiary_database() -> list[dict]:
+    """Load subsidiary name database from config/iou_subsidiaries.yaml.
+
+    Returns a list of {normalized_name, parent, state, url, match_type} dicts
+    ready for matching.
+    """
+    config_path = PROJECT_ROOT / "config" / "iou_subsidiaries.yaml"
+    if not config_path.exists():
+        return []
+
+    import yaml
+    with open(config_path) as f:
+        data = yaml.safe_load(f) or {}
+
+    entries = []
+    for company_key, company in data.items():
+        parent = company.get("parent", company_key)
+        rate_url = company.get("rate_url")
+        rate_url_template = company.get("rate_url_template")
+
+        for sub in (company.get("subsidiaries") or []):
+            if sub.get("skip"):
+                continue
+            name = sub.get("name")
+            if not name:
+                continue
+
+            state = sub.get("state")
+            url = sub.get("url")
+
+            # Determine URL: explicit > template > company-level
+            if not url and rate_url_template and state:
+                url = rate_url_template.format(state_lower=state.lower())
+            if not url and rate_url:
+                url = rate_url
+
+            if not url:
+                continue  # No URL available — skip
+
+            entries.append({
+                "normalized_name": _normalize_name(name),
+                "original_name": name,
+                "parent": parent,
+                "state": state,
+                "url": url,
+            })
+
+    return entries
+
+
+# Cache the subsidiary database at module level
+_SUBSIDIARY_DB: list[dict] | None = None
+
+
+def _get_subsidiary_db() -> list[dict]:
+    """Get the subsidiary database (cached)."""
+    global _SUBSIDIARY_DB
+    if _SUBSIDIARY_DB is None:
+        _SUBSIDIARY_DB = _load_subsidiary_database()
+    return _SUBSIDIARY_DB
+
+
+def _match_subsidiary(pws_name: str, state_code: str) -> tuple[str, str] | None:
+    """Try to match a PWS name against the subsidiary name database.
+
+    Uses normalized name comparison (abbreviation expansion, case folding).
+    Returns (parent_name, url) or None.
+    """
+    db = _get_subsidiary_db()
+    if not db:
+        return None
+
+    normalized = _normalize_name(pws_name)
+
+    for entry in db:
+        if entry["state"] and entry["state"] != state_code:
+            continue
+        # Check if the subsidiary name appears in the SDWIS name
+        if entry["normalized_name"] in normalized or normalized in entry["normalized_name"]:
+            return (entry["parent"], entry["url"])
+
+    return None
+
+
 def run_iou_mapping(
     state_filter: str | None = None,
     dry_run: bool = False,
@@ -259,9 +371,21 @@ def run_iou_mapping(
     by_parent: dict[str, int] = defaultdict(int)
     by_state: dict[str, int] = defaultdict(int)
 
+    matched_pwsids = set()
+    pattern_matches = 0
+    subsidiary_matches = 0
+
     for row in rows:
+        # Step 1: Try regex pattern matching (existing logic)
         result = _match_system(row.pws_name, row.state_code)
-        if result:
+        match_type = "pattern"
+
+        # Step 2: If regex didn't match, try subsidiary name database
+        if not result:
+            result = _match_subsidiary(row.pws_name, row.state_code)
+            match_type = "subsidiary_name"
+
+        if result and row.pwsid not in matched_pwsids:
             parent, url = result
             matches.append({
                 "pwsid": row.pwsid,
@@ -270,11 +394,20 @@ def run_iou_mapping(
                 "population": row.population_served_count or 0,
                 "parent": parent,
                 "url": url,
+                "match_type": match_type,
             })
+            matched_pwsids.add(row.pwsid)
             by_parent[parent] += 1
             by_state[row.state_code] += 1
+            if match_type == "pattern":
+                pattern_matches += 1
+            else:
+                subsidiary_matches += 1
 
-    logger.info(f"IOU mapper: matched {len(matches)} systems to {len(by_parent)} parent companies")
+    logger.info(
+        f"IOU mapper: matched {len(matches)} systems to {len(by_parent)} parent companies "
+        f"({pattern_matches} pattern, {subsidiary_matches} subsidiary name)"
+    )
 
     if dry_run:
         return {
