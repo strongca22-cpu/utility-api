@@ -29,6 +29,7 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "playwright>=1.40",
     "pymupdf>=1.23",
+    "mcp>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +44,7 @@ ua-ingest = "utility_api.cli.ingest:app"
 ua-api = "utility_api.cli.serve:main"
 ua-ops = "utility_api.cli.ops:app"
 ua-run-orchestrator = "utility_api.cli.orchestrator:app"
+ua-mcp = "utility_api.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

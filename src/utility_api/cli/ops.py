@@ -804,6 +804,50 @@ def process_batches():
         typer.echo("\nRun 'ua-ops refresh-coverage' to update coverage stats.")
 
 
+@app.command("create-api-key")
+def create_api_key(
+    name: str = typer.Option(..., "--name", "-n", help="Human-readable key name"),
+    tier: str = typer.Option("free", "--tier", "-t", help="Rate limit tier: free, basic, premium"),
+):
+    """Create a new API key for the Utility Intelligence API.
+
+    Generates a random API key, stores its SHA-256 hash in the database,
+    and prints the plaintext key ONCE. The plaintext is never stored.
+
+    Tiers: free (100 req/day), basic (1000 req/day), premium (10000 req/day).
+    """
+    import hashlib
+    import secrets
+
+    from utility_api.config import settings
+    from utility_api.db import engine
+
+    if tier not in ("free", "basic", "premium"):
+        typer.echo(f"Invalid tier '{tier}'. Must be: free, basic, or premium.")
+        raise typer.Exit(1)
+
+    # Generate key: ua-key-<32 random hex chars>
+    raw_key = f"ua-key-{secrets.token_hex(16)}"
+    key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+    schema = settings.utility_schema
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        conn.execute(text(f"""
+            INSERT INTO {schema}.api_keys (key_hash, name, tier)
+            VALUES (:key_hash, :name, :tier)
+        """), {"key_hash": key_hash, "name": name, "tier": tier})
+        conn.commit()
+
+    typer.echo(f"\nAPI Key Created")
+    typer.echo("=" * 50)
+    typer.echo(f"  Name:  {name}")
+    typer.echo(f"  Tier:  {tier}")
+    typer.echo(f"  Key:   {raw_key}")
+    typer.echo(f"\n  Store this key securely — it cannot be recovered.")
+    typer.echo(f"  Usage: curl -H 'X-API-Key: {raw_key}' http://localhost:8000/resolve?lat=38.85&lng=-77.35")
+
+
 @app.command("iou-map")
 def iou_map(
     state: str = typer.Option(None, "--state", "-s", help="Limit to a single state code"),

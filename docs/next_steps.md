@@ -816,3 +816,28 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - agents/discovery.py — SearXNG search (fallback path)
 - ops/registry_writer.py — direct registry writer (alternative to YAML path)
 ```
+
+## Completed (Sprint 15 Half 1 — 2026-03-25)
+
+- [x] IOU mapper (`ua-ops iou-map`): matched 231 PWSIDs across 17 states to 7 parent companies
+  - American Water Works: 110, Aqua/Essential: 70, CalWater: 24, SJW: 16, Aquarion: 7, Artesian: 3, Middlesex: 1
+  - All 231 written to scrape_registry (status=pending) + per-state YAML config files
+  - Lower than spec estimate of 1,000-1,500 — name-based regex is conservative; many subsidiaries don't contain parent name
+- [x] CCR link ingester (`ua-ops ingest-ccr-links`): manual CSV pipeline for EPA CCR URL → candidate rate URLs
+- [x] Discovery query templates: added CCR search + .gov site operator to DiscoveryAgent (query budget 5→7)
+- [x] `log_discovery()` now accepts `notes` parameter for annotations
+
+## In Progress (Sprint 15 Half 2 — 2026-03-25)
+
+- [ ] Alembic migration 013 for api_keys table
+- [ ] FastAPI auth middleware + `ua-ops create-api-key` CLI
+- [ ] API docs improvements (better docstrings for OpenAPI spec)
+- [ ] `/bulk-download` endpoint (CSV + GeoJSON export)
+- [ ] MCP server wrapping `/resolve` and `/utility/{pwsid}`
+
+## Next (Sprint 16+)
+
+- [ ] Expand IOU mapper with subsidiary name database (not just regex) for 1,000+ coverage
+- [ ] Automate EPA CCR APEX form scraping (currently manual CSV input)
+- [ ] Stripe/payment integration for API tiers
+- [ ] Self-hosted LLM for discovery scoring (Llama 3.1 8B)
