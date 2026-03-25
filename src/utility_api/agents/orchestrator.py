@@ -108,6 +108,8 @@ class OrchestratorAgent(BaseAgent):
             logger.info(f"  Bulk source checks: {len(rows)}")
 
             # 2. Coverage gaps — discover_and_scrape for uncovered PWSIDs
+            # Include both 'not_attempted' (need discovery) and 'url_discovered'
+            # (have pending URLs from IOU mapper or other sources, need scrape/parse)
             state_clause = ""
             params = {"batch": batch_size}
             if state_filter:
@@ -116,14 +118,17 @@ class OrchestratorAgent(BaseAgent):
 
             rows = conn.execute(text(f"""
                 SELECT pc.pwsid, pc.pws_name, pc.state_code,
-                       pc.priority_tier, pc.population_served
+                       pc.priority_tier, pc.population_served, pc.scrape_status
                 FROM {schema}.pwsid_coverage pc
                 WHERE pc.has_rate_data = FALSE
-                  AND pc.scrape_status = 'not_attempted'
+                  AND pc.scrape_status IN ('not_attempted', 'url_discovered')
                   AND pc.priority_tier IS NOT NULL
                   {state_clause}
-                ORDER BY pc.priority_tier ASC,
-                         pc.population_served DESC NULLS LAST
+                ORDER BY
+                    -- Prioritize url_discovered (ready to scrape, no search needed)
+                    CASE WHEN pc.scrape_status = 'url_discovered' THEN 0 ELSE 1 END,
+                    pc.priority_tier ASC,
+                    pc.population_served DESC NULLS LAST
                 LIMIT :batch
             """), params).fetchall()
             for r in rows:

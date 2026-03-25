@@ -125,41 +125,58 @@ def main(
             typer.echo(f"\n── Task {executed + 1}: {task.task_type} ──")
 
             if task.task_type == "discover_and_scrape":
-                # Enforce discovery caps
-                if discovery_count >= max_discoveries:
-                    typer.echo(f"  SKIPPED — discovery cap reached ({max_discoveries})")
-                    executed += 1
-                    continue
-                est_queries = total_queries_sent + 5
-                if est_queries > query_budget:
-                    typer.echo(f"  SKIPPED — query budget reached ({total_queries_sent}/{query_budget})")
-                    executed += 1
-                    continue
-
                 typer.echo(f"  PWSID: {task.pwsid} — {task.utility_name}")
 
-                # Inter-utility delay (skip before first utility)
-                if discovery_count > 0:
-                    typer.echo(f"  (waiting {utility_delay}s between utilities)")
-                    time.sleep(utility_delay)
+                # Check if this PWSID already has pending URLs in scrape_registry
+                # (e.g., from IOU mapper, CCR ingester, or prior discovery)
+                from sqlalchemy import text as sa_text
+                from utility_api.config import settings as app_settings
+                from utility_api.db import engine as app_engine
+                _schema = app_settings.utility_schema
+                with app_engine.connect() as _conn:
+                    pending_count = _conn.execute(sa_text(f"""
+                        SELECT COUNT(*) FROM {_schema}.scrape_registry
+                        WHERE pwsid = :pwsid AND status IN ('pending', 'pending_retry')
+                    """), {"pwsid": task.pwsid}).scalar()
 
-                # Step 1: Discover URLs
-                disc_result = discovery.run(
-                    pwsid=task.pwsid,
-                    utility_name=task.utility_name,
-                    state=task.state_code,
-                    use_llm=not no_llm,
-                    search_delay=search_delay,
-                )
-                discovery_count += 1
-                total_queries_sent += len(disc_result.get("queries_sent", [])) or 5
+                if pending_count > 0:
+                    # URLs already exist — skip discovery, go straight to scrape
+                    typer.echo(f"  {pending_count} pending URL(s) in registry — skipping discovery")
+                else:
+                    # No pending URLs — run discovery via SearXNG
+                    # Enforce discovery caps
+                    if discovery_count >= max_discoveries:
+                        typer.echo(f"  SKIPPED — discovery cap reached ({max_discoveries})")
+                        executed += 1
+                        continue
+                    est_queries = total_queries_sent + 5
+                    if est_queries > query_budget:
+                        typer.echo(f"  SKIPPED — query budget reached ({total_queries_sent}/{query_budget})")
+                        executed += 1
+                        continue
 
-                if disc_result["urls_written"] == 0:
-                    typer.echo(f"  No URLs found — skipping")
-                    executed += 1
-                    continue
+                    # Inter-utility delay (skip before first utility)
+                    if discovery_count > 0:
+                        typer.echo(f"  (waiting {utility_delay}s between utilities)")
+                        time.sleep(utility_delay)
 
-                # Step 2: Scrape discovered URLs
+                    # Step 1: Discover URLs
+                    disc_result = discovery.run(
+                        pwsid=task.pwsid,
+                        utility_name=task.utility_name,
+                        state=task.state_code,
+                        use_llm=not no_llm,
+                        search_delay=search_delay,
+                    )
+                    discovery_count += 1
+                    total_queries_sent += len(disc_result.get("queries_sent", [])) or 5
+
+                    if disc_result["urls_written"] == 0:
+                        typer.echo(f"  No URLs found — skipping")
+                        executed += 1
+                        continue
+
+                # Step 2: Scrape pending URLs
                 time.sleep(scrape_delay)
                 scrape_result = scrape.run(pwsid=task.pwsid)
 
