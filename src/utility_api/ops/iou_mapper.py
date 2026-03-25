@@ -57,6 +57,8 @@ from utility_api.ops.registry_writer import log_discovery
 
 INVESTOR_OWNED = [
     {
+        # Verified 2026-03-25: American Water migrated from {state}amwater.com
+        # to amwater.com/{state_code}aw/ path-based structure.
         "parent": "American Water Works",
         "patterns": [
             r"(?i)american water",
@@ -64,23 +66,24 @@ INVESTOR_OWNED = [
             r"(?i)cal[\-/\s]am\s+water",
         ],
         "state_url_map": {
-            "NJ": "https://www.newjerseyamwater.com/customer-service/rates",
-            "PA": "https://www.pennsylvaniaamwater.com/customer-service/rates",
-            "IN": "https://www.indianaamwater.com/customer-service/rates",
-            "WV": "https://www.westvirginiaamwater.com/customer-service/rates",
-            "IL": "https://www.illinoisamwater.com/customer-service/rates",
-            "CA": "https://www.californiaamwater.com/customer-service/rates",
-            "MO": "https://www.missouriamwater.com/customer-service/rates",
-            "VA": "https://www.virginiaamwater.com/customer-service/rates",
-            "IA": "https://www.iowaamericanwater.com/customer-service/rates",
-            "TN": "https://www.tennesseeamwater.com/customer-service/rates",
-            "MD": "https://www.marylandamwater.com/customer-service/rates",
-            "GA": "https://www.georgiaamwater.com/customer-service/rates",
-            "KY": "https://www.kentuckyamwater.com/customer-service/rates",
-            "HI": "https://www.hawaiiamwater.com/customer-service/rates",
+            "NJ": "https://www.amwater.com/njaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "PA": "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "IN": "https://www.amwater.com/inaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "WV": "https://www.amwater.com/wvaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "IL": "https://www.amwater.com/ilaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "CA": "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "MO": "https://www.amwater.com/moaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "VA": "https://www.amwater.com/vaaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "IA": "https://www.amwater.com/iaaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "TN": "https://www.amwater.com/tnaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "MD": "https://www.amwater.com/mdaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "GA": "https://www.amwater.com/gaaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "KY": "https://www.amwater.com/kyaw/Customer-Service-Billing/your-water-and-wastewater-rates",
+            "HI": "https://www.amwater.com/hiaw/Customer-Service-Billing/your-water-and-wastewater-rates",
         },
     },
     {
+        # Verified 2026-03-25: Aqua uses single URL for all states, not per-state paths.
         "parent": "Aqua / Essential Utilities",
         "patterns": [
             r"(?i)aqua\s+(america|pennsylvania|ohio|north\s+carolina|texas|"
@@ -89,17 +92,18 @@ INVESTOR_OWNED = [
             r"(?i)essential\s+utilities",
         ],
         "state_url_map": {
-            "PA": "https://www.aquawater.com/pa/rates",
-            "OH": "https://www.aquawater.com/oh/rates",
-            "NC": "https://www.aquawater.com/nc/rates",
-            "TX": "https://www.aquawater.com/tx/rates",
-            "IL": "https://www.aquawater.com/il/rates",
-            "IN": "https://www.aquawater.com/in/rates",
-            "VA": "https://www.aquawater.com/va/rates",
-            "NJ": "https://www.aquawater.com/nj/rates",
+            "PA": "https://www.aquawater.com/customers/water-rates",
+            "OH": "https://www.aquawater.com/customers/water-rates",
+            "NC": "https://www.aquawater.com/customers/water-rates",
+            "TX": "https://www.aquawater.com/customers/water-rates",
+            "IL": "https://www.aquawater.com/customers/water-rates",
+            "IN": "https://www.aquawater.com/customers/water-rates",
+            "VA": "https://www.aquawater.com/customers/water-rates",
+            "NJ": "https://www.aquawater.com/customers/water-rates",
         },
     },
     {
+        # Verified 2026-03-25: CalWater URL works.
         "parent": "California Water Service",
         "patterns": [
             r"(?i)california\s+water\s+service",
@@ -116,6 +120,7 @@ INVESTOR_OWNED = [
         },
     },
     {
+        # Verified 2026-03-25: SJW rate pages moved; CT/ME use SJW-style billing page.
         "parent": "SJW Group / San Jose Water",
         "patterns": [
             r"(?i)san\s+jose\s+water",
@@ -125,13 +130,14 @@ INVESTOR_OWNED = [
             r"(?i)maine\s+water\s+company",
         ],
         "state_url_map": {
-            "CA": "https://www.sjwater.com/customer-care/rate-information",
-            "TX": "https://www.sjwtx.com/customer-care/rate-information",
-            "CT": "https://www.ctwater.com/rates",
-            "ME": "https://www.mainewater.com/rates",
+            "CA": "https://www.sjwater.com/customer-care/help-information/rates-regulations/",
+            "TX": "https://www.sjwtx.com/customer-care/help-information/rates-regulations/",
+            "CT": "https://www.ctwater.com/service-billing/your-bill/pay-your-bill/#rate-schedules",
+            "ME": "https://www.mainewater.com/service-billing/your-bill/pay-your-bill/#rate-schedules",
         },
     },
     {
+        # Verified 2026-03-25: Middlesex URL corrected.
         "parent": "Middlesex Water Company",
         "patterns": [
             r"(?i)middlesex\s+water",
@@ -139,23 +145,25 @@ INVESTOR_OWNED = [
             r"(?i)tidewater\s+environmental",
         ],
         "state_url_map": {
-            "NJ": "https://www.middlesexwater.com/customer-service/rates-and-tariff",
+            "NJ": "https://www.middlesexwater.com/customer-care/rate-information/",
             "DE": "https://www.tidewaterutilities.com/rates/",
         },
     },
     {
+        # Verified 2026-03-25: Artesian homepage shows no clear rate link.
+        # TODO: deeper research needed for Artesian rate page URL.
         "parent": "Artesian Resources",
         "patterns": [
             r"(?i)artesian\s+water",
             r"(?i)artesian\s+resources",
         ],
         "state_url_map": {
-            "DE": "https://www.artesianwater.com/customer-service/rates",
-            "MD": "https://www.artesianwater.com/customer-service/rates",
-            "PA": "https://www.artesianwater.com/customer-service/rates",
+            # Artesian URLs were 404 as of 2026-03-25 — removed until verified
         },
     },
     {
+        # Verified 2026-03-25: Aquarion blocks curl (403). May work with browser
+        # user-agent via Playwright. Keeping URLs but expect scrape failures.
         "parent": "Aquarion Water / Eversource",
         "patterns": [
             r"(?i)aquarion\s+water",

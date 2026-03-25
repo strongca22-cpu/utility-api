@@ -1,40 +1,34 @@
 # Investor-owned water utility URL mappings — PA
 # Source: iou_pattern_match against sdwis_systems
 # Generated: 2026-03-25
-# Total matches: 16
+# Total matches: 14
 
 # American Water Works (14 systems)
 # PA AMERICAN WATER CO WEST (pop 105,127)
-PA7210029: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA7210029: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER CO BUTLER (pop 43,286)
-PA5100012: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA5100012: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER CO YARDLEY (pop 33,171)
-PA1090074: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA1090074: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA-AMERICAN WATER- UNIONTOWN (pop 23,125)
-PA5260020: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA5260020: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER CO-INDIANA D (pop 22,360)
-PA5320025: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA5320025: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER CO CLARION (pop 16,600)
-PA6160001: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA6160001: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER BERWICK (pop 15,282)
-PA4190013: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA4190013: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER CO WARREN (pop 14,650)
-PA6620020: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA6620020: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA-AMERICAN WATER CO-CONNELLSV (pop 11,425)
-PA5260022: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA5260022: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER PUNXSY (pop 8,800)
-PA6330010: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA6330010: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA-AMERICAN WATER-BROWNSVILLE (pop 7,844)
-PA5260005: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA5260005: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER STEELTON (pop 6,428)
-PA7220036: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA7220036: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER CO KANE (pop 5,725)
-PA6420019: "https://www.pennsylvaniaamwater.com/customer-service/rates"
+PA6420019: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER KITTANNING (pop 4,617)
-PA5030008: "https://www.pennsylvaniaamwater.com/customer-service/rates"
-
-# Artesian Resources (2 systems)
-# NEWTOWN ARTESIAN WATER CO (pop 38,500)
-PA1090043: "https://www.artesianwater.com/customer-service/rates"
-# ARTESIAN WATER PA INC (pop 95)
-PA1150002: "https://www.artesianwater.com/customer-service/rates"
+PA5030008: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"

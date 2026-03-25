@@ -5,35 +5,35 @@
 
 # American Water Works (15 systems)
 # CAL-AM WATER CORONADO (pop 106,000)
-CA3710001: "https://www.californiaamwater.com/customer-service/rates"
+CA3710001: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AM WATER COMPANY - MONTEREY (pop 92,450)
-CA2710004: "https://www.californiaamwater.com/customer-service/rates"
+CA2710004: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AMERICAN WATER CO (pop 66,809)
-CA5610040: "https://www.californiaamwater.com/customer-service/rates"
+CA5610040: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL/AM WATER COMPANY - SAN MARINO (pop 47,995)
-CA1910139: "https://www.californiaamwater.com/customer-service/rates"
+CA1910139: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL-AM WATER COMPANY - DUARTE (pop 24,773)
-CA1910186: "https://www.californiaamwater.com/customer-service/rates"
+CA1910186: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL/AM WATER COMPANY - BALDWIN HILLS (pop 20,724)
-CA1910052: "https://www.californiaamwater.com/customer-service/rates"
+CA1910052: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # AMERICAN WATER O&M, LLC - VSFB (pop 14,971)
-CA4210700: "https://www.californiaamwater.com/customer-service/rates"
+CA4210700: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL-AM WATER COMPANY - EAST PASADENA (pop 9,949)
-CA1910020: "https://www.californiaamwater.com/customer-service/rates"
+CA1910020: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AMERICAN WATER COMPANY - PIRU (pop 2,003)
-CA5610021: "https://www.californiaamwater.com/customer-service/rates"
+CA5610021: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AM WATER COMPANY - CHUALAR (pop 1,139)
-CA2701202: "https://www.californiaamwater.com/customer-service/rates"
+CA2701202: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AM WATER COMPANY - HIDDEN HILLS (pop 1,106)
-CA2710022: "https://www.californiaamwater.com/customer-service/rates"
+CA2710022: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AM WATER COMPANY - TORO (pop 1,065)
-CA2710021: "https://www.californiaamwater.com/customer-service/rates"
+CA2710021: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AM WATER COMPANY - AMBLER PARK (pop 980)
-CA2710006: "https://www.californiaamwater.com/customer-service/rates"
+CA2710006: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AM WATER COMPANY - RALPH LANE (pop 96)
-CA2702004: "https://www.californiaamwater.com/customer-service/rates"
+CA2702004: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # CAL AM WATER COMPANY - GARRAPATA (pop 30)
-CA2701257: "https://www.californiaamwater.com/customer-service/rates"
+CA2701257: "https://www.amwater.com/caaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 
 # California Water Service (23 systems)
 # CALIFORNIA WATER SERVICE - STOCKTON (pop 176,266)
@@ -85,4 +85,4 @@ CA5200657: "https://www.calwater.com/rates/"
 
 # SJW Group / San Jose Water (1 systems)
 # SAN JOSE WATER (pop 1,039,920)
-CA4310011: "https://www.sjwater.com/customer-care/rate-information"
+CA4310011: "https://www.sjwater.com/customer-care/help-information/rates-regulations/"
