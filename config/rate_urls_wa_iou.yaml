@@ -1,0 +1,8 @@
+# Investor-owned water utility URL mappings — WA
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 1
+
+# California Water Service (1 systems)
+# CAL WATERWORKS (pop 239)
+WA5331040: "https://www.washingtonwaterservice.com/rates/"

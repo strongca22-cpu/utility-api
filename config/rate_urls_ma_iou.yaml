@@ -1,0 +1,18 @@
+# Investor-owned water utility URL mappings — MA
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 6
+
+# Aquarion Water / Eversource (6 systems)
+# AQUARION WATER COMPANY, MILLBURY (pop 11,326)
+MA2186000: "https://www.aquarionwater.com/customer-service/rates-billing"
+# AQUARION WATER COMPANY, PINEHILLS (pop 9,195)
+MA4239055: "https://www.aquarionwater.com/customer-service/rates-billing"
+# AQUARION WATER COMPANY OXFORD (pop 7,343)
+MA2226000: "https://www.aquarionwater.com/customer-service/rates-billing"
+# AQUARION WATER COMPANY (DOVER) (pop 1,922)
+MA3078006: "https://www.aquarionwater.com/customer-service/rates-billing"
+# AQUARION WATER COMPANY (pop 987)
+MA1267000: "https://www.aquarionwater.com/customer-service/rates-billing"
+# AQUARION WATER CO. (SPRINGDALE FARMS) (pop 126)
+MA3078008: "https://www.aquarionwater.com/customer-service/rates-billing"

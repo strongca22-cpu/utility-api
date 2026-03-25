@@ -1,0 +1,8 @@
+# Investor-owned water utility URL mappings — DE
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 1
+
+# Artesian Resources (1 systems)
+# ARTESIAN WATER COMPANY (pop 231,114)
+DE0000552: "https://www.artesianwater.com/customer-service/rates"

@@ -50,22 +50,37 @@ def log_discovery(
     url: str,
     url_source: str = "searxng",
     discovery_query: str | None = None,
+    notes: str | None = None,
 ) -> None:
     """Record a URL discovery in scrape_registry.
 
     Called after rate_discovery.py finds a URL via search or curated list.
+
+    Parameters
+    ----------
+    pwsid : str
+        EPA PWSID.
+    url : str
+        Discovered URL.
+    url_source : str
+        How the URL was found (searxng, curated, state_directory, etc.).
+    discovery_query : str, optional
+        The search query that found this URL.
+    notes : str, optional
+        Free-text annotation (e.g., 'IOU pattern match: American Water Works').
     """
     schema = settings.utility_schema
     try:
         with engine.connect() as conn:
             conn.execute(text(f"""
                 INSERT INTO {schema}.scrape_registry
-                    (pwsid, url, url_source, discovery_query, content_type, status)
+                    (pwsid, url, url_source, discovery_query, content_type, status, notes)
                 VALUES
-                    (:pwsid, :url, :url_source, :query, :ctype, 'pending')
+                    (:pwsid, :url, :url_source, :query, :ctype, 'pending', :notes)
                 ON CONFLICT (pwsid, url) DO UPDATE SET
                     url_source = COALESCE(EXCLUDED.url_source, {schema}.scrape_registry.url_source),
                     discovery_query = COALESCE(EXCLUDED.discovery_query, {schema}.scrape_registry.discovery_query),
+                    notes = COALESCE(EXCLUDED.notes, {schema}.scrape_registry.notes),
                     updated_at = NOW()
             """), {
                 "pwsid": pwsid,
@@ -73,6 +88,7 @@ def log_discovery(
                 "url_source": url_source,
                 "query": discovery_query,
                 "ctype": _detect_content_type(url),
+                "notes": notes,
             })
             conn.commit()
     except Exception as e:

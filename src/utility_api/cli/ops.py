@@ -804,5 +804,87 @@ def process_batches():
         typer.echo("\nRun 'ua-ops refresh-coverage' to update coverage stats.")
 
 
+@app.command("iou-map")
+def iou_map(
+    state: str = typer.Option(None, "--state", "-s", help="Limit to a single state code"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview matches without writing"),
+    no_yaml: bool = typer.Option(False, "--no-yaml", help="Skip YAML file generation"),
+):
+    """Map investor-owned utility PWSIDs to known corporate rate page URLs.
+
+    Scans sdwis_systems for name patterns matching major IOUs (American Water,
+    Aqua/Essential, CalWater, SJW, Middlesex, Artesian, Aquarion, CSWR, Nexus).
+    Writes matched URLs to scrape_registry and per-state YAML config files.
+
+    Expects ~1,000-1,500 matches nationally. Zero search queries needed.
+    """
+    from utility_api.ops.iou_mapper import run_iou_mapping
+
+    result = run_iou_mapping(
+        state_filter=state,
+        dry_run=dry_run,
+        write_yaml=not no_yaml,
+    )
+
+    typer.echo(f"\nIOU Mapping Results")
+    typer.echo("=" * 50)
+    typer.echo(f"  Total matched:        {result['total_matched']:>6,}")
+    typer.echo(f"  Registry writes:      {result['urls_written_registry']:>6,}")
+    typer.echo(f"  YAML entries written:  {result['urls_written_yaml']:>6,}")
+
+    typer.echo(f"\n  By parent company:")
+    for parent, count in sorted(result["by_parent"].items(), key=lambda x: -x[1]):
+        typer.echo(f"    {parent:40s} {count:>5,}")
+
+    typer.echo(f"\n  By state:")
+    for st, count in sorted(result["by_state"].items()):
+        typer.echo(f"    {st:6s} {count:>5,}")
+
+    if dry_run:
+        typer.echo("\n  (dry run — no writes performed)")
+        # Show first 10 matches
+        for m in result.get("matches", [])[:10]:
+            typer.echo(f"    {m['pwsid']} {m['pws_name'][:40]:40s} → {m['parent']}")
+        remaining = result["total_matched"] - 10
+        if remaining > 0:
+            typer.echo(f"    ... and {remaining:,} more")
+    else:
+        typer.echo(f"\nRun 'ua-ops refresh-coverage' to update coverage stats.")
+        typer.echo(f"Run 'ua-run-orchestrator --execute 10' to start scraping IOU URLs.")
+
+
+@app.command("ingest-ccr-links")
+def ingest_ccr_links(
+    csv_file: str = typer.Argument(..., help="Path to CSV file with pwsid,ccr_url columns"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview without writing"),
+):
+    """Ingest CCR (Consumer Confidence Report) links and derive candidate rate URLs.
+
+    Accepts a CSV with columns: pwsid, ccr_url
+    Extracts base domains from CCR URLs and generates candidate rate page
+    URLs (e.g., /water/rates, /utilities, /rates). Writes candidates to
+    scrape_registry for the ScrapeAgent to validate.
+
+    The CSV is produced manually from the EPA CCR search at
+    https://sdwis.epa.gov/fylccr — automation of that APEX form is not
+    currently supported.
+    """
+    from utility_api.ops.ccr_ingester import ingest_ccr_csv
+
+    result = ingest_ccr_csv(csv_file, dry_run=dry_run)
+
+    typer.echo(f"\nCCR Link Ingestion Results")
+    typer.echo("=" * 50)
+    typer.echo(f"  CSV rows read:          {result['rows_read']:>6,}")
+    typer.echo(f"  Valid base domains:     {result['domains_extracted']:>6,}")
+    typer.echo(f"  Candidate URLs generated: {result['candidates_generated']:>6,}")
+    typer.echo(f"  Registry writes:        {result['urls_written']:>6,}")
+
+    if dry_run:
+        typer.echo("\n  (dry run — no writes performed)")
+        for c in result.get("candidates", [])[:10]:
+            typer.echo(f"    {c['pwsid']} → {c['url']}")
+
+
 if __name__ == "__main__":
     app()

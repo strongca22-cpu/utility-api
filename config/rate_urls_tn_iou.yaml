@@ -1,0 +1,8 @@
+# Investor-owned water utility URL mappings — TN
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 1
+
+# American Water Works (1 systems)
+# TENNESSEE AMERICAN WATER (pop 211,499)
+TN0000107: "https://www.tennesseeamwater.com/customer-service/rates"

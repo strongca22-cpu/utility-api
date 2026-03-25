@@ -1,0 +1,8 @@
+# Investor-owned water utility URL mappings — NH
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 1
+
+# Aquarion Water / Eversource (1 systems)
+# AQUARION WATER/NH (pop 34,000)
+NH1051010: "https://www.aquarionwater.com/customer-service/rates-billing"

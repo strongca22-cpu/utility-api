@@ -1,0 +1,78 @@
+# Investor-owned water utility URL mappings — OH
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 36
+
+# Aqua / Essential Utilities (36 systems)
+# AQUA OHIO - MASSILLON PWS (pop 95,636)
+OH7604512: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MENTOR (pop 74,500)
+OH4301511: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - STRUTHERS (pop 58,551)
+OH5001611: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MARION (pop 46,317)
+OH5100414: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - ASHTABULA (pop 32,408)
+OH0400711: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - TIFFIN (pop 20,035)
+OH7400614: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - LAWRENCE COUNTY (pop 8,130)
+OH4400803: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - BLACKLICK (pop 7,100)
+OH2502412: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - HUBER RIDGE PWS (pop 6,950)
+OH2502512: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MASURY (pop 4,016)
+OH7802711: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - LAKE DARBY (pop 3,562)
+OH2502612: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - VILLAGE OF JEFFERSON (pop 3,226)
+OH0401812: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - WORTHINGTON HILLS PWS (pop 2,500)
+OH2502812: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MOHAWK PWS (pop 2,376)
+OH1000812: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MIDVALE (pop 2,147)
+OH7900612: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - BEECHCREST (pop 1,496)
+OH6705212: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - LAKE WHITE PWS (pop 1,229)
+OH6600312: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - TIMBERBROOK PW (pop 865)
+OH2502712: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #01 (pop 813)
+OH7002812: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - LA RUE VILLAGE (pop 800)
+OH5100312: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #07 (pop 766)
+OH7001612: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - AURORA E (pop 766)
+OH6700512: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - SENECA (pop 750)
+OH8601512: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - SHEPARD HILLS PWS (pop 725)
+OH7704212: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - TOMAHAWK UTILITIES (pop 715)
+OH1502512: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #02 (pop 588)
+OH7005912: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #03 (pop 525)
+OH7005812: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #06 (pop 412)
+OH7005612: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - NORLICK (pop 345)
+OH8601012: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - FIRESTONE TRACE (pop 336)
+OH7709412: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #11 (pop 280)
+OH7003312: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #08 (pop 170)
+OH7003212: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #04 (pop 142)
+OH7001412: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #05 (pop 123)
+OH7004912: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - SOUTHWOOD (pop 81)
+OH0301512: "https://www.aquawater.com/oh/rates"
+# AQUA OHIO - MANSFIELD SYSTEM #10 (pop 45)
+OH7006612: "https://www.aquawater.com/oh/rates"

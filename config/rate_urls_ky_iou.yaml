@@ -1,0 +1,12 @@
+# Investor-owned water utility URL mappings — KY
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 3
+
+# American Water Works (3 systems)
+# KENTUCKY-AMERICAN WATER CO (pop 299,501)
+KY0340250: "https://www.kentuckyamwater.com/customer-service/rates"
+# KENTUCKY AMERICAN WATER - EASTERN ROCKCA (pop 1,732)
+KY1020288: "https://www.kentuckyamwater.com/customer-service/rates"
+# KENTUCKY AMERICAN WATER- MILLERSBURG (pop 1,366)
+KY0090287: "https://www.kentuckyamwater.com/customer-service/rates"

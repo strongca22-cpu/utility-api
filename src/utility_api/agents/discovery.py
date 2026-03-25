@@ -163,7 +163,7 @@ def build_search_queries(
     county: str | None = None,
     owner_type: str | None = None,
 ) -> list[str]:
-    """Generate 3-5 targeted search queries using all available metadata.
+    """Generate 3-7 targeted search queries using all available metadata.
 
     Parameters
     ----------
@@ -179,7 +179,7 @@ def build_search_queries(
     Returns
     -------
     list[str]
-        Up to 5 search query strings for SearXNG.
+        Up to 7 search query strings for SearXNG.
     """
     queries = []
 
@@ -209,7 +209,23 @@ def build_search_queries(
     if owner_type == "F":
         queries.append(f'"{utility_name}" utility rates')
 
-    return queries[:5]
+    # Query 6: CCR search — Consumer Confidence Reports are often hosted on
+    # utility websites, so finding a CCR reveals the utility's domain.
+    # (Sprint 15 toolkit integration)
+    from datetime import date
+    current_year = date.today().year
+    queries.append(
+        f'"{best_name}" "consumer confidence report" {current_year}'
+    )
+
+    # Query 7: Government site operator — for local/state-owned utilities,
+    # rate pages are often on .gov domains. The site: operator may or may
+    # not work through SearXNG depending on search engine backends.
+    # (Sprint 15 toolkit integration)
+    if owner_type in ("L", "S", "M", None):
+        queries.append(f'site:.gov "{best_name}" water rates')
+
+    return queries[:7]
 
 
 # --- URL Relevance Scoring ---

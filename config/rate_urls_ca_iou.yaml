@@ -1,0 +1,88 @@
+# Investor-owned water utility URL mappings — CA
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 39
+
+# American Water Works (15 systems)
+# CAL-AM WATER CORONADO (pop 106,000)
+CA3710001: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AM WATER COMPANY - MONTEREY (pop 92,450)
+CA2710004: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AMERICAN WATER CO (pop 66,809)
+CA5610040: "https://www.californiaamwater.com/customer-service/rates"
+# CAL/AM WATER COMPANY - SAN MARINO (pop 47,995)
+CA1910139: "https://www.californiaamwater.com/customer-service/rates"
+# CAL-AM WATER COMPANY - DUARTE (pop 24,773)
+CA1910186: "https://www.californiaamwater.com/customer-service/rates"
+# CAL/AM WATER COMPANY - BALDWIN HILLS (pop 20,724)
+CA1910052: "https://www.californiaamwater.com/customer-service/rates"
+# AMERICAN WATER O&M, LLC - VSFB (pop 14,971)
+CA4210700: "https://www.californiaamwater.com/customer-service/rates"
+# CAL-AM WATER COMPANY - EAST PASADENA (pop 9,949)
+CA1910020: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AMERICAN WATER COMPANY - PIRU (pop 2,003)
+CA5610021: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AM WATER COMPANY - CHUALAR (pop 1,139)
+CA2701202: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AM WATER COMPANY - HIDDEN HILLS (pop 1,106)
+CA2710022: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AM WATER COMPANY - TORO (pop 1,065)
+CA2710021: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AM WATER COMPANY - AMBLER PARK (pop 980)
+CA2710006: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AM WATER COMPANY - RALPH LANE (pop 96)
+CA2702004: "https://www.californiaamwater.com/customer-service/rates"
+# CAL AM WATER COMPANY - GARRAPATA (pop 30)
+CA2701257: "https://www.californiaamwater.com/customer-service/rates"
+
+# California Water Service (23 systems)
+# CALIFORNIA WATER SERVICE - STOCKTON (pop 176,266)
+CA3910001: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO. - ELA (pop 152,474)
+CA1910036: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO. - DOMINGUEZ (pop 143,996)
+CA1910033: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE - SAN MATEO (pop 102,348)
+CA4110008: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO. - HERM/REDO (pop 96,853)
+CA1910134: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO. - PALOS VER (pop 71,452)
+CA1910104: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE-S SAN FRANCISCO (pop 64,146)
+CA4110009: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE - BEAR GULCH (pop 61,431)
+CA4110006: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE - LIVERMORE (pop 60,414)
+CA0110003: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE - SAN CARLOS (pop 35,344)
+CA4110007: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO - WESTLAKE (pop 19,533)
+CA5610016: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO.-TRAVIS AFB (pop 18,111)
+CA4810701: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO. - DIXON (pop 10,623)
+CA4810002: "https://www.calwater.com/rates/"
+# LUCERNE WATER CO. - CAL WATER SERVICE (pop 2,129)
+CA1710005: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO.-LANCASTER (pop 1,387)
+CA1910010: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO-LAKE HUGHES (pop 929)
+CA1910242: "https://www.calwater.com/rates/"
+# CALIFORNIA WATER SERVICE CO-LEONA VALLEY (pop 878)
+CA1910243: "https://www.calwater.com/rates/"
+# ARMSTRONG VALLEY-CAL WATER SERVICE (PUC) (pop 473)
+CA4910018: "https://www.calwater.com/rates/"
+# BLACK RASCAL WATER COMPANY (pop 367)
+CA2400046: "https://www.calwater.com/rates/"
+# RANCHO DEL PARADISO-CAL WATER SVC (PUC) (pop 94)
+CA4900514: "https://www.calwater.com/rates/"
+# HAWKINS WATER CO-CAL WATER SERVICE (PUC) (pop 81)
+CA4900546: "https://www.calwater.com/rates/"
+# NOEL HEIGHTS-CAL WATER SERVICE (PUC) (pop 79)
+CA4900785: "https://www.calwater.com/rates/"
+# NORCAL WATER WORKS (pop 45)
+CA5200657: "https://www.calwater.com/rates/"
+
+# SJW Group / San Jose Water (1 systems)
+# SAN JOSE WATER (pop 1,039,920)
+CA4310011: "https://www.sjwater.com/customer-care/rate-information"

@@ -1,0 +1,22 @@
+# Investor-owned water utility URL mappings — VA
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 8
+
+# American Water Works (8 systems)
+# VIRGINIA-AMERICAN WATER CO. (pop 30,317)
+VA3670800: "https://www.virginiaamwater.com/customer-service/rates"
+# VA AMERICAN WATER BAY HARBOR (pop 119)
+VA4133030: "https://www.virginiaamwater.com/customer-service/rates"
+# VA AMERICAN WATER LUCOM POINT (pop 90)
+VA4133600: "https://www.virginiaamwater.com/customer-service/rates"
+# VA AMERICAN WATER GREENFIELD HARBOR I (pop 59)
+VA4133345: "https://www.virginiaamwater.com/customer-service/rates"
+# VA AMERICAN WATER GREENFIELD HARBOR II (pop 43)
+VA4133346: "https://www.virginiaamwater.com/customer-service/rates"
+# VA AMERICAN WATER UPPER BAY VIEW ESTATES (pop 35)
+VA4133865: "https://www.virginiaamwater.com/customer-service/rates"
+# VA AMERICAN WATER SPRIGGS LANDING (pop 30)
+VA4133822: "https://www.virginiaamwater.com/customer-service/rates"
+# VA AMERICAN WATER JETTY'S REACH III (pop 25)
+VA4133420: "https://www.virginiaamwater.com/customer-service/rates"

@@ -1,0 +1,72 @@
+# Investor-owned water utility URL mappings — NJ
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 32
+
+# American Water Works (31 systems)
+# NJ AMERICAN WATER - RARITAN (pop 615,430)
+NJ2004002: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - COASTAL NORTH (pop 377,613)
+NJ1345001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - WESTERN (pop 264,586)
+NJ0327001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - SHORT HILLS (pop 217,230)
+NJ0712001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - LIBERTY (pop 134,000)
+NJ2004001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - OCEAN CITY (pop 127,000)
+NJ0508001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - ATLANTIC COUNTY (pop 120,146)
+NJ0119002: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - MOUNT HOLLY (pop 47,427)
+NJ0323001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - SHORELANDS (pop 36,164)
+NJ1339001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - PENNS GROVE (pop 14,406)
+NJ1707001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - ROXBURY (pop 11,793)
+NJ1436002: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - LITTLE FALLS (pop 11,247)
+NJ1605001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - WASHINGTON/OXFORD (pop 10,719)
+NJ2121001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - HARRISON (pop 9,193)
+NJ0808001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - LOGAN (pop 6,650)
+NJ0809002: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - ITC (pop 6,463)
+NJ1427017: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - SALEM CITY (pop 6,199)
+NJ1712001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - UNION BEACH (pop 6,000)
+NJ1350001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - CAPE MAY COURT HOUSE (pop 5,625)
+NJ0506010: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER -  EGG HARBOR CITY (pop 4,300)
+NJ0107001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - NEW EGYPT (pop 3,495)
+NJ1523003: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - BELVIDERE (pop 2,854)
+NJ2103001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - HOMESTEAD (pop 2,420)
+NJ0318002: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - FRENCHTOWN (pop 1,373)
+NJ1011001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - STRATHMERE (pop 1,085)
+NJ0511001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - SUNBURY (pop 888)
+NJ0329006: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - BRIDGEPORT (pop 855)
+NJ0809001: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - WEST JERSEY (pop 837)
+NJ1427009: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - VINCENTOWN (pop 598)
+NJ0333004: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - TWIN LAKES (pop 250)
+NJ1803002: "https://www.newjerseyamwater.com/customer-service/rates"
+# NJ AMERICAN WATER - OLDWICK (pop 246)
+NJ1024001: "https://www.newjerseyamwater.com/customer-service/rates"
+
+# Middlesex Water Company (1 systems)
+# MIDDLESEX WATER COMPANY (pop 233,376)
+NJ1225001: "https://www.middlesexwater.com/customer-service/rates-and-tariff"
