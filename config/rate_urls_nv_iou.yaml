@@ -1,0 +1,16 @@
+# Investor-owned water utility URL mappings — NV
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 5
+
+# Nexus Water Group, Inc. (5 systems)
+# GREAT BASIN WATER COMPANY (pop 11,322)
+NV0000270: "https://nexuswatergroup.com"
+# GREAT BASIN WATER CO  COLD SPRINGS (pop 9,650)
+NV0000207: "https://nexuswatergroup.com"
+# GREAT BASIN WATER CO  SPRING CREEK (pop 9,340)
+NV0000036: "https://nexuswatergroup.com"
+# GREAT BASIN WATER CO  SPRING CREEK MHP (pop 3,640)
+NV0005027: "https://nexuswatergroup.com"
+# GREAT BASIN WATER CO  SPANISH SPRINGS (pop 1,460)
+NV0001086: "https://nexuswatergroup.com"

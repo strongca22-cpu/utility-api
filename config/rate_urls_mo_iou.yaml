@@ -1,0 +1,12 @@
+# Investor-owned water utility URL mappings — MO
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 3
+
+# Central States Water Resources (3 systems)
+# HILLCREST UTILITY OPERATING COMPANY INC (pop 700)
+MO4036038: "https://centralstateswaterresources.com"
+# ELM HILLS UTILITY OPERATING COMPANY INC (pop 154)
+MO3048155: "https://centralstateswaterresources.com"
+# CONFLUENCE RIVERS M & M MHP WTP (pop 100)
+MO1041228: "https://centralstateswaterresources.com"

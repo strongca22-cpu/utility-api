@@ -1,7 +1,53 @@
 # Investor-owned water utility URL mappings — CA
 # Source: iou_pattern_match against sdwis_systems
 # Generated: 2026-03-25
-# Total matches: 39
+# Total matches: 87
+
+# American States Water Company (22 systems)
+# GOLDEN STATE WATER CO. - CORDOVA (pop 47,161)
+CA3410015: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - SIMI VALLEY (pop 45,128)
+CA5610059: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - ORCUTT (pop 34,102)
+CA4210016: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO - BARSTOW (pop 32,547)
+CA3610043: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - BAY POINT (pop 23,731)
+CA0710002: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO - APPLE VLY SOUTH (pop 6,208)
+CA3610107: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - LOS OSOS (pop 5,924)
+CA4010017: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO - ARDEN WATER SERV (pop 5,658)
+CA3410003: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO.-CLEARLAKE SYSTEM (pop 4,644)
+CA1710002: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - NIPOMO (pop 4,506)
+CA4010018: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO - WRIGHTWOOD (pop 4,177)
+CA3610047: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO - APPLE VLY NORTH (pop 2,086)
+CA3610105: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY-CYPRESS RIDGE (pop 2,026)
+CA4010040: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - TANGLEWOOD (pop 1,947)
+CA4210021: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO - MORONGO DEL SUR (pop 1,717)
+CA3610063: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - EDNA (pop 1,493)
+CA4010023: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO - LUCERNE (pop 586)
+CA3610108: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - LAKE MARIE (pop 545)
+CA4210022: "https://www.gswater.com/"
+# GOLDEN STATE WATER MORONGO DELNORTE (pop 373)
+CA3600270: "https://www.gswater.com/"
+# GOLDEN STATE WATER CO. - ROBBINS (pop 205)
+CA5100107: "https://www.gswater.com/"
+# GOLDEN STATE WATER DESERT VIEW (pop 120)
+CA3600279: "https://www.gswater.com/"
+# GOLDEN STATE WATER COMPANY - SOUTH SHORE (pop 30)
+CA1700519: "https://www.gswater.com/"
 
 # American Water Works (15 systems)
 # CAL-AM WATER CORONADO (pop 106,000)
@@ -82,6 +128,64 @@ CA4900546: "https://www.calwater.com/rates/"
 CA4900785: "https://www.calwater.com/rates/"
 # NORCAL WATER WORKS (pop 45)
 CA5200657: "https://www.calwater.com/rates/"
+
+# California Water Service Group (6 systems)
+# CAL-WATER SERVICE CO.-CHICO (pop 114,925)
+CA0410002: "https://www.calwater.com/rates/"
+# CAL-WATER SERVICE CO.-MARYSVILLE (pop 12,419)
+CA5810001: "https://www.calwater.com/rates/"
+# CAL-WATER SERVICE CO.-OROVILLE (pop 11,106)
+CA0410005: "https://www.calwater.com/rates/"
+# CAL-WATER SERVICE CO.-WILLOWS (pop 7,240)
+CA1110003: "https://www.calwater.com/rates/"
+# CAL-WATER SERVICE CO.-HAMILTON CITY (pop 1,799)
+CA1110002: "https://www.calwater.com/rates/"
+# COAST SPRINGS - CAL. WATER SERVICE (PUC) (pop 388)
+CA2110007: "https://www.calwater.com/rates/"
+
+# Liberty Utilities Co. (Algonquin Power & Utilities Corp.) (13 systems)
+# BUCKINGHAM PARK WATER DISTRICT (pop 1,521)
+CA1710011: "https://california.libertyutilities.com/"
+# TAHOE PARK WATER COMPANY (pop 750)
+CA3110018: "https://california.libertyutilities.com/"
+# TOKAY PARK WATER CO (pop 653)
+CA3400172: "https://california.libertyutilities.com/"
+# SIERRA PARK WATER COMPANY INC. (pop 400)
+CA5510016: "https://california.libertyutilities.com/"
+# KING ISLAND TRAILER PARK WATER SYSTEM (pop 236)
+CA3901114: "https://california.libertyutilities.com/"
+# BIG REDWOOD PARK WATER (pop 182)
+CA4400526: "https://california.libertyutilities.com/"
+# BIG OAK MOBILE HOME PARK WATER (pop 156)
+CA0707588: "https://california.libertyutilities.com/"
+# SUSAN RIVER PARK WATER CO. (pop 140)
+CA1800503: "https://california.libertyutilities.com/"
+# LOCKEFORD MOBILE HOME PARK WTR SYS (pop 123)
+CA3900682: "https://california.libertyutilities.com/"
+# LIBERTY PARK WATER ASSOCIATION (pop 85)
+CA3000618: "https://california.libertyutilities.com/"
+# BIG LAGOON PARK WATER CO. (pop 70)
+CA1200591: "https://california.libertyutilities.com/"
+# ALMOND PARK WATER SYSTEM (pop 60)
+CA3900517: "https://california.libertyutilities.com/"
+# TAHOE PARK WATER CO - SKYLAND/NIELSEN (pop 50)
+CA3110049: "https://california.libertyutilities.com/"
+
+# Nexus Water Group, Inc. (7 systems)
+# SACRAMENTO SUBURBAN WATER DISTRICT (pop 194,444)
+CA3410001: "https://nexuswatergroup.com"
+# SUBURBAN WATER SYSTEMS-SAN JOSE (pop 168,843)
+CA1910205: "https://nexuswatergroup.com"
+# SUBURBAN WATER SYSTEMS-WHITTIER (pop 66,045)
+CA1910174: "https://nexuswatergroup.com"
+# SUBURBAN WATER SYSTEMS-LA MIRADA (pop 56,793)
+CA1910059: "https://nexuswatergroup.com"
+# SUBURBAN WATER SYSTEMS-GLENDORA (pop 5,249)
+CA1910046: "https://nexuswatergroup.com"
+# SUBURBAN WATER SYSTEMS - SATIVA (pop 4,363)
+CA1910147: "https://nexuswatergroup.com"
+# SUBURBAN WATER SYSTEMS-COVINA KNOLLS (pop 1,437)
+CA1910200: "https://nexuswatergroup.com"
 
 # SJW Group / San Jose Water (1 systems)
 # SAN JOSE WATER (pop 1,039,920)

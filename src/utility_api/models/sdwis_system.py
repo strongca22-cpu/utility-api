@@ -9,7 +9,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-23
-Modified: 2026-03-23
+Modified: 2026-03-25
 """
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, func
@@ -38,6 +38,7 @@ class SDWISSystem(Base):
     is_wholesaler_ind: Mapped[str | None] = mapped_column(String(1))
     activity_status_cd: Mapped[str | None] = mapped_column(String(5))
     state_code: Mapped[str | None] = mapped_column(String(2))
+    city: Mapped[str | None] = mapped_column(String(100))
     violation_count_5yr: Mapped[int | None] = mapped_column(Integer)
     health_violation_count_5yr: Mapped[int | None] = mapped_column(Integer)
     last_violation_date = mapped_column(Date, nullable=True)

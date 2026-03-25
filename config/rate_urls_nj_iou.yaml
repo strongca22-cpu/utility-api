@@ -1,7 +1,7 @@
 # Investor-owned water utility URL mappings — NJ
 # Source: iou_pattern_match against sdwis_systems
 # Generated: 2026-03-25
-# Total matches: 32
+# Total matches: 59
 
 # American Water Works (31 systems)
 # NJ AMERICAN WATER - RARITAN (pop 615,430)
@@ -67,6 +67,64 @@ NJ1803002: "https://www.amwater.com/njaw/Customer-Service-Billing/your-water-and
 # NJ AMERICAN WATER - OLDWICK (pop 246)
 NJ1024001: "https://www.amwater.com/njaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 
-# Middlesex Water Company (1 systems)
+# American Water Works Company, Inc. (1 systems)
+# GORDONS CORNER WATER CO (pop 46,196)
+NJ1326001: "https://amwater.com/njaw/Customer-Service-Billing/Your-Water-and-Wastewater-Rates/"
+
+# Essential Utilities, Inc. (25 systems)
+# AQUA NJ - BLACKWOOD (pop 44,396)
+NJ0415002: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - HAMILTON SQUARE (pop 39,128)
+NJ1103001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - PHILLIPSBURG (pop 26,686)
+NJ2119001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - EASTERN DIVISION (pop 12,000)
+NJ1505002: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - LAWRENCE (pop 8,655)
+NJ1107002: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - WOOLWICH (pop 6,271)
+NJ0824001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - WALLKILL (pop 1,050)
+NJ1911001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - CALIFON (pop 936)
+NJ1004001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - RIEGEL RIDGE (pop 621)
+NJ1015003: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - TRANQUILITY SPRINGS (pop 599)
+NJ1908001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - SPARTAN VILLAGE (pop 594)
+NJ0326008: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - VERNON (pop 515)
+NJ1922008: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - BYRAM (pop 400)
+NJ1904009: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - CALIFORNIA VILLAGE (pop 300)
+NJ0326001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - SEAVIEW HARBOR (pop 300)
+NJ0108005: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - HANOVER MOBILE VILLAGE (pop 285)
+NJ0326004: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - BUNNVALE (pop 252)
+NJ1019001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - BEAR BROOK (pop 226)
+NJ1907002: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - WARREN GLEN (pop 192)
+NJ2120002: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - SUMMIT LAKE (pop 177)
+NJ1911004: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - FOX HILL (pop 172)
+NJ1015004: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - BRAINARDS (pop 135)
+NJ2110001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ CLIFFSIDE PARK (pop 80)
+NJ1438001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - RIEGELSVILLE (pop 62)
+NJ2120001: "https://www.aquawater.com/nj/rates-background-information"
+# AQUA NJ - HARKERS HOLLOW (pop 40)
+NJ2110003: "https://www.aquawater.com/nj/rates-background-information"
+
+# Middlesex Water Company (2 systems)
 # MIDDLESEX WATER COMPANY (pop 233,376)
 NJ1225001: "https://www.middlesexwater.com/customer-care/rate-information/"
+# PINELANDS WATER CO (pop 4,926)
+NJ0333001: "https://www.middlesexwater.com"

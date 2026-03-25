@@ -4,7 +4,7 @@ Domain Guesser
 
 Purpose:
     Guess utility website domains from SDWIS metadata (utility name, county,
-    state) without using any search engine. Uses DNS lookups and common
+    city, state) without using any search engine. Uses DNS lookups and common
     domain patterns for municipal/county government sites.
 
     This bypasses SearXNG entirely — DNS lookups are free, instant, and
@@ -23,49 +23,72 @@ Usage:
     from utility_api.ops.domain_guesser import DomainGuesser
     guesser = DomainGuesser()
     candidates = guesser.guess_urls('VA4760100', 'FAIRFAX WATER',
-                                     'Fairfax', 'VA', 'L')
+                                     'Fairfax', 'VA', 'L', city='Herndon')
 
 Notes:
     - No search engine, no LLM, no rate limiting
     - DNS lookups are fast (~100ms each) and free
-    - Currently county-based only (no city column in SDWIS)
-    - TODO: Add city-based patterns when city data is available from ECHO API
+    - Patterns derived from config/domain_patterns.yaml research —
+      update both when changing patterns
     - Only generates candidates for local (L) and mixed (M) owner types
     - Private (P) and federal (F) systems have unpredictable domains
+
+Data Sources:
+    - Input: utility.sdwis_systems (pws_name, county, city, state_code)
+    - Output: utility.scrape_registry via log_discovery()
 """
 
 import re
 import socket
-from urllib.parse import urlparse
 
 from loguru import logger
 
 
-# County-based domain patterns (most common for municipal utilities)
+# =============================================================================
+# Domain Patterns — ordered by estimated hit rate (from domain_patterns.yaml)
+# =============================================================================
+
+# City-based .gov patterns (highest hit rate for municipal utilities)
+_CITY_PATTERNS = [
+    "{city_slug}{state_lower}.gov",          # fairfaxva.gov
+    "cityof{city_slug}.gov",                 # cityofroanoke.gov
+    "{city_slug}.gov",                        # seattle.gov
+    "{city_hyphen}-{state_lower}.gov",       # martinsville-va.gov
+    "cityof{city_slug}.org",                 # cityofroanoke.org
+    "{city_slug}{state_lower}.org",          # roanokeva.org
+    "cityof{city_slug}.net",                 # cityofpasadena.net
+    "{city_slug}.{state_lower}.us",          # roanoke.va.us
+    "ci.{city_slug}.{state_lower}.us",       # ci.roanoke.va.us
+    "{city_slug}water.org",                  # roanokewater.org
+    "{city_slug}water.com",                  # roanokewater.com
+]
+
+# County-based domain patterns
 _COUNTY_PATTERNS = [
-    "{county_slug}county.gov",
-    "{county_slug}countyva.gov",
-    "{county_slug}.{state_lower}.us",
-    "{county_slug}county.org",
-    "{county_slug}county.com",
-    "www.{county_slug}county.gov",
-    "www.{county_slug}county.org",
-    "{county_slug}co.gov",
-    "co.{county_slug}.{state_lower}.us",
+    "{county_slug}county{state_lower}.gov",  # staffordcountyva.gov
+    "{county_slug}county.gov",               # fairfaxcounty.gov
+    "{county_slug}.{state_lower}.us",        # stafford.va.us
+    "co.{county_slug}.{state_lower}.us",     # co.stafford.va.us
+    "{county_slug}county.org",               # staffordcounty.org
+    "{county_slug}county.com",               # staffordcounty.com
+    "{county_slug}co.gov",                   # staffordco.gov
 ]
 
 # Utility-name-based patterns
 _NAME_PATTERNS = [
     "{name_slug}.org",
     "{name_slug}.com",
-    "www.{name_slug}.org",
-    "www.{name_slug}.com",
 ]
+
+# Subdomain prefixes to check on confirmed base domains
+_SUBDOMAIN_PREFIXES = ["utilities", "water", "publicworks"]
 
 # Common rate page path suffixes
 RATE_PATHS = [
     "/water/rates",
+    "/utilities/water-rates",
     "/utilities/rates",
+    "/water/rates-fees",
     "/departments/public-works/water/rates",
     "/residents/water/rates",
     "/water-rates",
@@ -106,6 +129,7 @@ class DomainGuesser:
         county: str | None,
         state: str,
         owner_type: str | None = None,
+        city: str | None = None,
     ) -> list[dict]:
         """Generate candidate URLs from metadata via DNS guessing.
 
@@ -121,6 +145,8 @@ class DomainGuesser:
             2-letter state code.
         owner_type : str, optional
             SDWIS owner_type_code: L/M/P/F/S.
+        city : str, optional
+            City name (mailing address city from SDWIS).
 
         Returns
         -------
@@ -134,7 +160,22 @@ class DomainGuesser:
         state_lower = state.lower()
         domains = set()
 
-        # Generate county-based domain candidates
+        # --- City-based patterns (highest priority) ---
+        if city and len(city.strip()) > 2:
+            city_slug = _slugify(city)
+            city_hyphen = _slugify_hyphen(city)
+            for pattern in _CITY_PATTERNS:
+                try:
+                    domain = pattern.format(
+                        city_slug=city_slug,
+                        city_hyphen=city_hyphen,
+                        state_lower=state_lower,
+                    )
+                    domains.add(domain)
+                except (KeyError, IndexError):
+                    continue
+
+        # --- County-based patterns ---
         if county:
             county_slug = _slugify(county)
             for pattern in _COUNTY_PATTERNS:
@@ -147,7 +188,7 @@ class DomainGuesser:
                 except (KeyError, IndexError):
                     continue
 
-        # Generate name-based domain candidates
+        # --- Name-based patterns ---
         if pws_name:
             # Extract meaningful name parts (remove generic suffixes)
             clean_name = re.sub(
@@ -165,7 +206,7 @@ class DomainGuesser:
                     except (KeyError, IndexError):
                         continue
 
-        # DNS-check each candidate
+        # --- DNS-check each candidate ---
         live_domains = []
         for domain in domains:
             if not domain or domain.startswith("."):
@@ -178,10 +219,10 @@ class DomainGuesser:
 
         logger.debug(f"DomainGuesser: {pwsid} — {len(live_domains)}/{len(domains)} domains resolve")
 
-        # Build candidate URLs
+        # --- Build candidate URLs ---
         candidates = []
         for domain in live_domains:
-            base_url = f"https://{domain}" if not domain.startswith("www.") else f"https://{domain}"
+            base_url = f"https://{domain}"
 
             # Homepage — the deep crawl can find the rate page from here
             candidates.append({
@@ -199,6 +240,23 @@ class DomainGuesser:
                     "method": "domain_guess_path",
                     "domain": domain,
                 })
+
+            # --- Subdomain checks on confirmed base domains ---
+            # Strip leading www. or subdomain to get the base
+            base_domain = domain
+            if base_domain.startswith("www."):
+                base_domain = base_domain[4:]
+            # Only check subdomains on base domains (not already a subdomain)
+            if base_domain.count(".") <= 2:
+                for prefix in _SUBDOMAIN_PREFIXES:
+                    subdomain = f"{prefix}.{base_domain}"
+                    if _dns_resolves(subdomain):
+                        candidates.append({
+                            "url": f"https://{subdomain}",
+                            "confidence": "high",
+                            "method": "domain_guess_subdomain",
+                            "domain": subdomain,
+                        })
 
         return candidates
 
@@ -236,7 +294,7 @@ def run_domain_guessing(
     schema = settings.utility_schema
     guesser = DomainGuesser()
 
-    # Get uncovered PWSIDs with county data
+    # Get uncovered PWSIDs with county data, now including city
     state_clause = ""
     params: dict = {"limit": max_utilities}
     if state_filter:
@@ -246,13 +304,13 @@ def run_domain_guessing(
     with engine.connect() as conn:
         rows = conn.execute(text(f"""
             SELECT pc.pwsid, pc.pws_name, pc.state_code, c.county_served,
-                   s.owner_type_code, pc.population_served
+                   s.owner_type_code, pc.population_served, s.city
             FROM {schema}.pwsid_coverage pc
             LEFT JOIN {schema}.cws_boundaries c ON c.pwsid = pc.pwsid
             LEFT JOIN {schema}.sdwis_systems s ON s.pwsid = pc.pwsid
             WHERE pc.has_rate_data = FALSE
               AND pc.scrape_status = 'not_attempted'
-              AND c.county_served IS NOT NULL
+              AND (c.county_served IS NOT NULL OR s.city IS NOT NULL)
               {state_clause}
             ORDER BY pc.population_served DESC NULLS LAST
             LIMIT :limit
@@ -273,17 +331,21 @@ def run_domain_guessing(
             county=row.county_served,
             state=row.state_code,
             owner_type=row.owner_type_code,
+            city=row.city,
         )
 
         if candidates:
             domains_found += 1
-            # Take only the homepage candidates (deep crawl handles the rest)
-            homepage_candidates = [c for c in candidates if c["method"] == "domain_guess_homepage"]
+            # Take homepage + subdomain candidates (deep crawl handles path guessing)
+            write_candidates = [
+                c for c in candidates
+                if c["method"] in ("domain_guess_homepage", "domain_guess_subdomain")
+            ]
 
             if dry_run:
-                all_candidates.extend(homepage_candidates)
+                all_candidates.extend(write_candidates)
             else:
-                for c in homepage_candidates:
+                for c in write_candidates:
                     log_discovery(
                         pwsid=row.pwsid,
                         url=c["url"],

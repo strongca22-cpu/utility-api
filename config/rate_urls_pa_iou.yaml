@@ -1,7 +1,7 @@
 # Investor-owned water utility URL mappings — PA
 # Source: iou_pattern_match against sdwis_systems
 # Generated: 2026-03-25
-# Total matches: 14
+# Total matches: 123
 
 # American Water Works (14 systems)
 # PA AMERICAN WATER CO WEST (pop 105,127)
@@ -32,3 +32,229 @@ PA7220036: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and
 PA6420019: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
 # PA AMERICAN WATER KITTANNING (pop 4,617)
 PA5030008: "https://www.amwater.com/paaw/Customer-Service-Billing/your-water-and-wastewater-rates"
+
+# American Water Works Company, Inc. (1 systems)
+# INDIAN CREEK VALLEY WATER AUTH (pop 7,000)
+PA5260011: "https://amwater.com/paaw/"
+
+# Artesian Resources Corporation (1 systems)
+# ARTESIAN WATER PA INC (pop 95)
+PA1150002: "https://www.artesianwater.com"
+
+# Essential Utilities, Inc. (106 systems)
+# AQUA PA MAIN SYSTEM (pop 822,600)
+PA1460073: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA BENSALEM (pop 59,001)
+PA1090078: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WEST CHESTER (pop 48,600)
+PA1150098: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SHENANGO VALLEY WTP (pop 48,000)
+PA6430054: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA ROARING CREEK DIVISION (pop 43,000)
+PA4490024: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA UWCHLAN (pop 35,518)
+PA1150035: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA BRISTOL (pop 28,727)
+PA1090001: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SUSQUEHANNA DIVISION (pop 15,569)
+PA2080028: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA HATBORO (pop 12,901)
+PA1460028: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SUPERIOR MAIN SYSTEM (pop 11,400)
+PA1460085: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA FRIENDSHIP (pop 8,800)
+PA1150137: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SPRING RUN (pop 8,151)
+PA1150089: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA FAWN LAKE FOREST (pop 6,533)
+PA2520037: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA CHALFONT (pop 5,900)
+PA1090005: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO HONESDALE (pop 5,500)
+PA2640018: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA FLYING HILLS WA SYS (pop 5,100)
+PA3060018: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA JENKS TWP WTP (pop 4,320)
+PA6270008: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA INC TREASURE LAKE DIV (pop 4,155)
+PA6170048: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA PERKIOMEN TOWNSHIP (pop 3,600)
+PA1460069: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO SCI WAYMART (pop 3,200)
+PA2640020: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA BEECH MOUNTAIN (pop 2,646)
+PA2400114: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA MIDWAY (pop 2,450)
+PA2400104: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA MONROE TWP (pop 2,400)
+PA4550009: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA FACTORYVILLE (pop 2,323)
+PA2660036: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA CRAWFORD DIV (pop 2,300)
+PA6200014: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO HAWLEY (pop 1,800)
+PA2640028: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA HONEYBROOK (pop 1,600)
+PA1150195: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA LAKE LATONKA WTP (pop 1,600)
+PA6430059: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA HAMILTON WATER CO (pop 1,500)
+PA2450044: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA MOUNTAINHOME SYSTEM (pop 1,450)
+PA2450039: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SAND SPRINGS (pop 1,383)
+PA2400140: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA TANGLEWOOD LAKES (pop 1,321)
+PA2520065: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA MIFFLIN TOWNSHIP (pop 1,220)
+PA4190016: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WHITE HAVEN (pop 1,200)
+PA2400108: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA PERKIOMEN WOODS (pop 1,100)
+PA1460068: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO  WAYMART (pop 1,100)
+PA2640032: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA MT JEWETT (pop 972)
+PA6420018: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA EAGLE ROCK UTILITIES (pop 956)
+PA3540070: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA EMLENTON (pop 915)
+PA6610019: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO CHINCHILLA (pop 904)
+PA2350004: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA CLARENDON (pop 840)
+PA6620021: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA UPPER PROVIDENCE (pop 810)
+PA1460015: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA PAUPACKAN LAKE ESTATES (pop 800)
+PA2640048: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WHITE ROCK ACRES SYS (pop 790)
+PA7210048: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA TANGLWOOD NORTH (pop 690)
+PA2520066: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA EAST PIKELAND (pop 675)
+PA1150006: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SPRINGHOUSE FARMS (pop 645)
+PA3390068: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA RIVERCREST (pop 625)
+PA2660017: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO MOSCOW (pop 600)
+PA2350027: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA PEDDLERS VIEW (pop 600)
+PA1090147: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA STONECROFT (pop 600)
+PA3060134: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA ONEIDA (pop 568)
+PA3540071: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA JEFFERSON HEIGHTS (pop 556)
+PA2350057: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA LAUREL LAKES (pop 552)
+PA2400111: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SUPERIOR CENTER POINT (pop 500)
+PA1460092: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO THORNHURST CC (pop 500)
+PA2350053: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA PINECREST (pop 500)
+PA2450086: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA ROBIN HOOD LAKES (pop 492)
+PA2450093: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA YALICK FARMS (pop 442)
+PA2400149: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WILD PINES WATER SYS (pop 440)
+PA2450141: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA KRATZERVILLE (pop 435)
+PA4550008: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA OAKHILL (pop 434)
+PA2400095: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA FOREST PARK (pop 420)
+PA2400078: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA LINKS AT GETTYSBURG SY (pop 398)
+PA7010057: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA HEX ACRES (pop 386)
+PA2400053: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO GOULDSBORO (pop 350)
+PA2640022: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA PENNSVIEW SYSTEM (pop 350)
+PA4550024: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WASHINGTON PARK (pop 300)
+PA2660016: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO ELMBROOK (pop 300)
+PA2350034: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA COUNTRY CLUB GARDENS (pop 268)
+PA3390028: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO EDGEWOOD (pop 265)
+PA2350055: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA FRANKLIN (pop 265)
+PA1150126: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SHICKSHINNY LAKE (pop 250)
+PA2400029: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SUPERIOR MEADOWBROOK (pop 250)
+PA3060137: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA GREENBRIAR (pop 222)
+PA2400147: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA HILLCREST ESTATES II (pop 214)
+PA3060133: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA BUNKER HILL (pop 210)
+PA2660018: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA GARBUSH (pop 203)
+PA2400089: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA EAST CAMERON (pop 200)
+PA4490011: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA GEIGERTOWN WATER SYS (pop 200)
+PA3060030: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WARDEN PLACE (pop 175)
+PA2400102: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO HOP BOTTOM (pop 174)
+PA2580012: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WAPWALLOPEN (pop 165)
+PA2400066: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA MAPLE HILLS (pop 164)
+PA3390049: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WAYNE COUNTY PRISON (pop 160)
+PA2640031: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA THE PINES (pop 160)
+PA3540069: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WH CHRISTIAN SPRINGS (pop 153)
+PA3480030: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA PENN LAKE (pop 150)
+PA2400079: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SUPERIOR IVY RIDGE (pop 150)
+PA1460007: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO GLENBURN (pop 150)
+PA2350025: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO SUNSET HILLS (pop 145)
+PA2350029: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA INC MERIBAH WATER CO (pop 135)
+PA4340018: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA GOLDEN OAKS (pop 132)
+PA3130054: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA BARRETT (pop 120)
+PA2400085: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA SUN VALLEY (pop 120)
+PA2450054: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO MOUNT COBB (pop 120)
+PA2350070: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA FIELDCREST (pop 112)
+PA2400012: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA ST JOHNS ESTATES (pop 106)
+PA2400144: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA APPLEWOOD (pop 95)
+PA2400083: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO GARDEN HILLS (pop 90)
+PA2640017: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA RHODES TERRACE (pop 82)
+PA2400101: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA TAFTON WILSON HILL (pop 80)
+PA2520061: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA EAST POINTE (pop 75)
+PA3061153: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WHITEHAVEN EVANWOOD (pop 60)
+PA3480029: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WOODLEDGE VILLAGE (pop 58)
+PA2521031: "https://www.aquawater.com/pa/rates-background-information"
+# AQUA PA WATER CO BROOKLYN (pop 44)
+PA2580010: "https://www.aquawater.com/pa/rates-background-information"
+
+# Middlesex Water Company (1 systems)
+# TWIN LAKES UTILITIES INC (pop 300)
+PA2520051: "https://www.middlesexwater.com"

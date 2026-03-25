@@ -9,7 +9,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-23
-Modified: 2026-03-23
+Modified: 2026-03-25
 
 Dependencies:
     - requests
@@ -389,6 +389,7 @@ def _build_sdwis_records(
         ("OWNER_TYPE_CODE", "owner_type_code"),
         ("IS_WHOLESALER_IND", "is_wholesaler_ind"),
         ("PWS_ACTIVITY_CODE", "activity_status_cd"),
+        ("CITY_NAME", "city"),
     ]:
         if src in systems.columns:
             col_map[src] = dst
@@ -406,6 +407,7 @@ def _build_sdwis_records(
         "pwsid", "pws_name", "pws_type_code", "primary_source_code",
         "population_served_count", "service_connections_count",
         "owner_type_code", "is_wholesaler_ind", "activity_status_cd", "state_code",
+        "city",
     ]
     available = [c for c in target_cols if c in records.columns]
     records = records[available].copy()

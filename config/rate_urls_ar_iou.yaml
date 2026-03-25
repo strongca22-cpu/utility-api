@@ -1,0 +1,8 @@
+# Investor-owned water utility URL mappings — AR
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 1
+
+# Liberty Utilities Co. (Algonquin Power & Utilities Corp.) (1 systems)
+# LIBERTY UTILITIES (pop 43,438)
+AR0000272: "https://arkansas.libertyutilities.com/"

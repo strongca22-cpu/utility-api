@@ -15,6 +15,11 @@ Author: AI-Generated
 Created: 2026-03-25
 Modified: 2026-03-25
 
+Notes:
+    - Sprint 17: replaced iou_subsidiaries.yaml with SEC-sourced research data
+      (82 named subsidiaries with SDWIS name variants, confidence levels)
+    - Subsidiary loader now reads 'named_subsidiaries' key + sdwis_name_variants
+
 Dependencies:
     - sqlalchemy
     - loguru
@@ -244,8 +249,13 @@ def _normalize_name(name: str) -> str:
 def _load_subsidiary_database() -> list[dict]:
     """Load subsidiary name database from config/iou_subsidiaries.yaml.
 
-    Returns a list of {normalized_name, parent, state, url, match_type} dicts
-    ready for matching.
+    Returns a list of dicts ready for matching. Each entry has:
+    - normalized_names: list of normalized name strings to match against
+    - original_name: the primary subsidiary name
+    - parent: parent company name
+    - state: 2-letter state code
+    - url: rate page URL
+    - confidence: confirmed/likely/unverified
     """
     config_path = PROJECT_ROOT / "config" / "iou_subsidiaries.yaml"
     if not config_path.exists():
@@ -257,37 +267,37 @@ def _load_subsidiary_database() -> list[dict]:
 
     entries = []
     for company_key, company in data.items():
+        if not isinstance(company, dict):
+            continue
         parent = company.get("parent", company_key)
-        rate_url = company.get("rate_url")
-        rate_url_template = company.get("rate_url_template")
 
-        for sub in (company.get("subsidiaries") or []):
-            if sub.get("skip"):
-                continue
+        for sub in (company.get("named_subsidiaries") or []):
             name = sub.get("name")
             if not name:
                 continue
 
             state = sub.get("state")
             url = sub.get("url")
-
-            # Determine URL: explicit > template > company-level
-            if not url and rate_url_template and state:
-                url = rate_url_template.format(state_lower=state.lower())
-            if not url and rate_url:
-                url = rate_url
+            confidence = sub.get("confidence", "unverified")
 
             if not url:
                 continue  # No URL available — skip
 
+            # Build list of names to match: primary name + SDWIS variants
+            match_names = [name]
+            for variant in (sub.get("sdwis_name_variants") or []):
+                match_names.append(variant)
+
             entries.append({
-                "normalized_name": _normalize_name(name),
+                "normalized_names": [_normalize_name(n) for n in match_names],
                 "original_name": name,
                 "parent": parent,
                 "state": state,
                 "url": url,
+                "confidence": confidence,
             })
 
+    logger.debug(f"Loaded {len(entries)} subsidiary entries from YAML")
     return entries
 
 
@@ -303,24 +313,29 @@ def _get_subsidiary_db() -> list[dict]:
     return _SUBSIDIARY_DB
 
 
-def _match_subsidiary(pws_name: str, state_code: str) -> tuple[str, str] | None:
+def _match_subsidiary(pws_name: str, state_code: str) -> tuple[str, str, str] | None:
     """Try to match a PWS name against the subsidiary name database.
 
     Uses normalized name comparison (abbreviation expansion, case folding).
-    Returns (parent_name, url) or None.
+    Checks primary name and all SDWIS name variants.
+    Returns (parent_name, url, subsidiary_name) or None.
     """
     db = _get_subsidiary_db()
     if not db:
         return None
 
     normalized = _normalize_name(pws_name)
+    if len(normalized) < 4:
+        return None  # Too short to match reliably
 
     for entry in db:
         if entry["state"] and entry["state"] != state_code:
             continue
-        # Check if the subsidiary name appears in the SDWIS name
-        if entry["normalized_name"] in normalized or normalized in entry["normalized_name"]:
-            return (entry["parent"], entry["url"])
+        for candidate in entry["normalized_names"]:
+            if len(candidate) < 4:
+                continue
+            if candidate in normalized or normalized in candidate:
+                return (entry["parent"], entry["url"], entry["original_name"])
 
     return None
 
@@ -379,11 +394,15 @@ def run_iou_mapping(
         # Step 1: Try regex pattern matching (existing logic)
         result = _match_system(row.pws_name, row.state_code)
         match_type = "pattern"
+        subsidiary_name = None
 
         # Step 2: If regex didn't match, try subsidiary name database
         if not result:
-            result = _match_subsidiary(row.pws_name, row.state_code)
-            match_type = "subsidiary_name"
+            sub_result = _match_subsidiary(row.pws_name, row.state_code)
+            if sub_result:
+                parent, url, subsidiary_name = sub_result
+                result = (parent, url)
+                match_type = "subsidiary_name"
 
         if result and row.pwsid not in matched_pwsids:
             parent, url = result
@@ -395,6 +414,7 @@ def run_iou_mapping(
                 "parent": parent,
                 "url": url,
                 "match_type": match_type,
+                "subsidiary_name": subsidiary_name,
             })
             matched_pwsids.add(row.pwsid)
             by_parent[parent] += 1
@@ -422,13 +442,17 @@ def run_iou_mapping(
     # --- Write to scrape_registry ---
     urls_written_registry = 0
     for m in matches:
+        if m["match_type"] == "subsidiary_name":
+            notes = f"IOU subsidiary match: {m['parent']} ({m['subsidiary_name']})"
+        else:
+            notes = f"IOU pattern match: {m['parent']}"
         try:
             log_discovery(
                 pwsid=m["pwsid"],
                 url=m["url"],
                 url_source="state_directory",
                 discovery_query=None,
-                notes=f"IOU pattern match: {m['parent']}",
+                notes=notes,
             )
             urls_written_registry += 1
         except Exception as e:

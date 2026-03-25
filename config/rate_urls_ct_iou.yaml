@@ -1,0 +1,18 @@
+# Investor-owned water utility URL mappings — CT
+# Source: iou_pattern_match against sdwis_systems
+# Generated: 2026-03-25
+# Total matches: 5
+
+# Aquarion Water Company (Eversource Energy subsidiary) (1 systems)
+# TORRINGTON WATER COMPANY (pop 37,915)
+CT1430011: "https://www.aquarionwater.com/"
+
+# SJW Group (4 systems)
+# CROMWELL FIRE DISTRICT WATER DEPARTMENT (pop 14,316)
+CT0330011: "https://www.ctwater.com/"
+# AVON WATER CO (pop 11,590)
+CT0040011: "https://www.ctwater.com/"
+# SALMON BROOK DISTRICT WATER DEPT (pop 2,151)
+CT0560011: "https://www.ctwater.com/"
+# TARIFFVILLE FIRE DISTRICT WATER DEPT (pop 1,477)
+CT1280011: "https://www.ctwater.com/"

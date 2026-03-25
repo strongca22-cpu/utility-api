@@ -866,11 +866,38 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] Retry with rate-search addendum when first attempt fails with `no_tier_1_rate` on substantive content
 - [x] Same system prompt (cache hit) with modified user message
 
-## Next (Sprint 17+)
+## Completed (Sprint 17 — 2026-03-25)
+
+### Deliverable 1: IOU Subsidiary Database (SEC-sourced)
+- [x] Replaced sparse `config/iou_subsidiaries.yaml` with SEC-researched version (82 named subsidiaries)
+- [x] 12 parent companies, SDWIS name variants, confidence levels, corrected URLs
+- [x] Updated `_load_subsidiary_database()` to read `named_subsidiaries` key + `sdwis_name_variants`
+- [x] IOU mapper now produces 431 matches (228 pattern + 203 subsidiary), up from 231
+- [x] New parent companies matched: Liberty Utilities, Golden State Water, CSWR, Nexus Water Group
+- [x] Registry notes now distinguish "IOU pattern match" vs "IOU subsidiary match"
+
+### Deliverable 2: City Data in SDWIS
+- [x] Alembic migration 014: added `city VARCHAR(100)` to `utility.sdwis_systems`
+- [x] SDWIS ingest updated to capture `CITY_NAME` from ECHO bulk CSV
+- [x] Re-ran ingest: 44,633 systems loaded, 44,552 (99.8%) have city data
+- [x] ORM model updated (`SDWISSystem.city`)
+
+### Deliverable 3: Domain Guesser Pattern Update
+- [x] Added 11 city-based patterns (highest priority: `{city}{state}.gov`, `cityof{city}.gov`)
+- [x] Added hyphenated, .us, ci. prefix, cityof.net patterns from research
+- [x] Added subdomain checks: `utilities.`, `water.`, `publicworks.` on confirmed base domains
+- [x] `guess_urls()` now accepts `city` parameter
+- [x] `run_domain_guessing()` query updated to include `s.city` from sdwis_systems
+- [x] `config/domain_patterns.yaml` placed as reference documentation
+
+### Deliverable 4: Fresh Export
+- [x] Exported `data/sdwis_for_guessing.csv`: 21,197 rows with city_name column
+
+## Next (Sprint 18+)
 
 - [ ] Deliverable 4 execution: National coverage push (IOU batch + domain guess sweep + SearXNG gap fill)
-- [ ] Expand subsidiary YAML with SEC 10-K research (AWK has ~50+ subsidiaries not yet listed)
-- [ ] Add city column to SDWIS (from ECHO API) for better domain guessing
+- [ ] Run domain guesser with city patterns on full 21K uncovered CWS (measure city vs county hit rate)
+- [ ] Run 5+ IOU subsidiary matches through orchestrator (verify scrape+parse works)
 - [ ] Automate EPA CCR APEX form scraping (currently manual CSV input)
 - [ ] Stripe/payment integration for API tiers
 - [ ] Self-hosted LLM for discovery scoring (Llama 3.1 8B)

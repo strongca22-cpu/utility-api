@@ -1,0 +1,297 @@
+# config/domain_patterns.yaml
+# Domain Naming Patterns for US Municipal Water Utilities
+# Purpose: Configure the DomainGuesser agent to generate candidate URLs
+#          for ~44,000 community water systems in SDWIS
+#
+# Last updated: 2026-03-25
+#
+# NOTE: No proven_domains.csv reference file was provided for this session.
+# All patterns below are derived from general knowledge of US municipal
+# government and utility web presence conventions. Hit rates are ESTIMATES
+# based on the relative prevalence of each pattern across ~20,000 municipal
+# governments. These should be calibrated against actual DNS lookup results.
+#
+# Substitution variables available to DomainGuesser:
+#   {city}           — Full city name, spaces preserved (e.g., "San Jose")
+#   {city_slug}      — Lowercase, no spaces/punctuation (e.g., "sanjose")
+#   {city_hyphen}    — Lowercase, hyphenated (e.g., "san-jose")
+#   {county}         — Full county name (e.g., "Santa Clara")
+#   {county_slug}    — Lowercase, no spaces (e.g., "santaclara")
+#   {state}          — 2-letter state code uppercase (e.g., "CA")
+#   {state_lower}    — 2-letter state code lowercase (e.g., "ca")
+#   {state_full}     — Full state name lowercase (e.g., "california")
+#   {utility_name}   — PWS name from SDWIS
+#   {utility_slug}   — PWS name slugified
+
+# =============================================================================
+# TLD Distribution (estimated for municipal water utilities)
+# =============================================================================
+
+tld_distribution:
+  .gov: 0.35
+  .org: 0.25
+  .com: 0.15
+  .us:  0.10
+  .net: 0.05
+  other: 0.10  # includes .info, state-specific, no website
+
+# Notes on TLD distribution:
+# - .gov dominance has increased since 2020 as CISA encouraged .gov adoption
+#   for government entities. The DotGov program now offers free .gov domains.
+# - .org is common for water authorities, special districts, and regional utilities
+# - .com is typical for investor-owned utilities and some smaller municipalities
+# - .us was historically used by local governments (city.state.us) but declining
+# - Many small systems (<500 connections) have no website at all
+
+# =============================================================================
+# Domain Patterns — ordered by estimated hit rate (highest first)
+# =============================================================================
+
+domain_patterns:
+
+  # --- .gov patterns (most common for municipalities) ---
+
+  - pattern: "{city_slug}{state_lower}.gov"
+    estimated_hit_rate: 0.12
+    example: "fairfaxva.gov"
+    priority: 1
+    notes: "City+state abbreviated. Very common for mid-size cities."
+    applies_to: "municipal"
+
+  - pattern: "cityof{city_slug}.gov"
+    estimated_hit_rate: 0.08
+    example: "cityofroanoke.gov"
+    priority: 2
+    notes: "Common for cities that want to distinguish from county"
+    applies_to: "municipal"
+
+  - pattern: "{city_slug}.gov"
+    estimated_hit_rate: 0.06
+    example: "seattle.gov"
+    priority: 3
+    notes: "Short form, common for larger cities with unique names"
+    applies_to: "municipal"
+
+  - pattern: "{county_slug}county{state_lower}.gov"
+    estimated_hit_rate: 0.05
+    example: "staffordcountyva.gov"
+    priority: 4
+    notes: "County government sites — relevant for county-operated water systems"
+    applies_to: "county"
+
+  - pattern: "{county_slug}county.gov"
+    estimated_hit_rate: 0.04
+    example: "fairfaxcounty.gov"
+    priority: 5
+    notes: "County without state qualifier"
+    applies_to: "county"
+
+  - pattern: "{city_slug}-{state_lower}.gov"
+    estimated_hit_rate: 0.02
+    example: "roanoke-va.gov"
+    priority: 6
+    notes: "Hyphenated city-state variant"
+    applies_to: "municipal"
+
+  # --- .org patterns (water authorities and special districts) ---
+
+  - pattern: "{utility_slug}.org"
+    estimated_hit_rate: 0.08
+    example: "fairfaxwater.org"
+    priority: 7
+    notes: "Direct utility name. Common for water authorities and districts."
+    applies_to: "authority"
+
+  - pattern: "{city_slug}water.org"
+    estimated_hit_rate: 0.04
+    example: "roanokwater.org"
+    priority: 8
+    notes: "City name + 'water'"
+    applies_to: "municipal"
+
+  - pattern: "cityof{city_slug}.org"
+    estimated_hit_rate: 0.04
+    example: "cityofroanoke.org"
+    priority: 9
+    notes: "Municipality using .org instead of .gov"
+    applies_to: "municipal"
+
+  - pattern: "{city_slug}{state_lower}.org"
+    estimated_hit_rate: 0.03
+    example: "roanokeva.org"
+    priority: 10
+    notes: "City+state on .org"
+    applies_to: "municipal"
+
+  # --- .com patterns (IOUs and some municipalities) ---
+
+  - pattern: "{utility_slug}.com"
+    estimated_hit_rate: 0.05
+    example: "yorkwater.com"
+    priority: 11
+    notes: "Common for investor-owned utilities"
+    applies_to: "private"
+
+  - pattern: "{city_slug}water.com"
+    estimated_hit_rate: 0.02
+    example: null
+    priority: 12
+    notes: "Less common for munis but used by some"
+    applies_to: "any"
+
+  # --- .us patterns (legacy government domains) ---
+
+  - pattern: "{city_slug}.{state_lower}.us"
+    estimated_hit_rate: 0.03
+    example: "roanoke.va.us"
+    priority: 13
+    notes: "Legacy .us domain structure. Still active in some states."
+    applies_to: "municipal"
+
+  - pattern: "ci.{city_slug}.{state_lower}.us"
+    estimated_hit_rate: 0.02
+    example: "ci.roanoke.va.us"
+    priority: 14
+    notes: "City of X format on .us"
+    applies_to: "municipal"
+
+  - pattern: "co.{county_slug}.{state_lower}.us"
+    estimated_hit_rate: 0.02
+    example: "co.stafford.va.us"
+    priority: 15
+    notes: "County format on .us"
+    applies_to: "county"
+
+  - pattern: "www.{city_slug}{state_lower}.us"
+    estimated_hit_rate: 0.01
+    example: "www.roanokeva.us"
+    priority: 16
+    notes: "Less common variant"
+    applies_to: "municipal"
+
+# =============================================================================
+# Subdomain Patterns
+# =============================================================================
+# Some utilities exist as subdomains of their parent government site.
+# These are harder to discover via DNS alone but important for completeness.
+
+subdomain_patterns:
+  - pattern: "utilities.{base_domain}"
+    frequency: "common"
+    example: "utilities.fairfaxcounty.gov"
+    notes: "Utility department as subdomain of city/county site"
+
+  - pattern: "water.{base_domain}"
+    frequency: "common"
+    example: "water.seattle.gov"
+
+  - pattern: "publicworks.{base_domain}"
+    frequency: "moderate"
+    example: "publicworks.cityofroanoke.gov"
+
+  - pattern: "pw.{base_domain}"
+    frequency: "uncommon"
+    notes: "Abbreviation of public works"
+
+# =============================================================================
+# Rate Page Path Patterns — ordered by frequency
+# =============================================================================
+# Once a domain is discovered, try these paths to find rate schedules.
+# Ordered by estimated frequency across municipal utility websites.
+
+rate_page_paths:
+  # Direct rate pages
+  - "/water/rates"
+  - "/utilities/water-rates"
+  - "/utilities/rates"
+  - "/water/rates-fees"
+  - "/departments/utilities/water/rates"
+  - "/departments/public-works/water/rates"
+  - "/residents/utilities/water-rates"
+  - "/residents/water/rates"
+  - "/services/water/rates"
+  - "/customer-service/rates"
+
+  # Rate schedule / tariff pages
+  - "/water/rate-schedule"
+  - "/utilities/rate-schedule"
+  - "/water/fee-schedule"
+
+  # General utility pages (rates often linked from here)
+  - "/water"
+  - "/utilities"
+  - "/departments/utilities"
+  - "/departments/public-works"
+  - "/departments/water"
+  - "/public-works/water"
+
+  # Resident-facing pages
+  - "/residents/utilities"
+  - "/residents/water"
+  - "/residents/pay-bill"
+  - "/pay-my-bill"
+
+  # PDF direct links (common for smaller utilities)
+  - "/water/rates.pdf"
+  - "/documents/water-rates.pdf"
+  - "/uploads/water-rates.pdf"
+  - "/sites/default/files/water-rates.pdf"
+
+# =============================================================================
+# State-Specific Notes
+# =============================================================================
+
+state_notes:
+  VA:
+    notes: "Virginia has historically heavy use of .va.us domains. Many smaller localities still use this pattern."
+    common_patterns: ["{city_slug}.va.us", "ci.{city_slug}.va.us"]
+
+  CA:
+    notes: "California has many special water districts with .org domains. Cities tend to use .gov or .org."
+    common_patterns: ["{city_slug}.gov", "{utility_slug}.org"]
+
+  TX:
+    notes: "Texas municipalities commonly use .gov. Many Municipal Utility Districts (MUDs) use .com or .org."
+    common_patterns: ["{city_slug}tx.gov", "cityof{city_slug}.gov"]
+
+  PA:
+    notes: "Pennsylvania has many small water authorities that use .org or .com."
+    common_patterns: ["{utility_slug}.org", "{city_slug}borough.org"]
+
+  FL:
+    notes: "Florida cities commonly use .gov. Many utilities operated by county governments."
+    common_patterns: ["{city_slug}fl.gov", "{county_slug}county.gov"]
+
+  NY:
+    notes: "New York villages and towns often use .gov or .org."
+    common_patterns: ["{city_slug}ny.gov", "villageof{city_slug}.org"]
+
+# =============================================================================
+# DomainGuesser Configuration Recommendations
+# =============================================================================
+
+guesser_config:
+  # Maximum candidates to generate per system
+  max_candidates_per_system: 20
+
+  # DNS lookup timeout (seconds)
+  dns_timeout: 5
+
+  # After DNS confirms domain exists, try HTTP HEAD on rate_page_paths
+  verify_http: true
+  http_timeout: 10
+
+  # Priority order for candidate generation:
+  # 1. If system is IOU → use iou_subsidiaries.yaml mapping (exact URL)
+  # 2. If system name contains city name → try city-based .gov patterns first
+  # 3. If system is a county authority → try county patterns
+  # 4. If system is a special district / authority → try {utility_slug}.org
+  # 5. Fall back to exhaustive pattern list
+
+  # Skip DNS for these TLDs (always resolve):
+  always_try_tlds: [".gov", ".org"]
+
+  # Patterns to skip for very small systems (<100 connections):
+  # These systems rarely have websites
+  skip_small_systems: true
+  small_system_threshold: 100
