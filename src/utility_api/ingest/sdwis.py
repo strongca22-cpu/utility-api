@@ -85,15 +85,16 @@ def _download_echo_zip() -> Path:
     return zip_path
 
 
-def _load_water_systems(zip_path: Path, target_states: list[str]) -> pd.DataFrame:
+def _load_water_systems(zip_path: Path, target_states: list[str] | None) -> pd.DataFrame:
     """Extract and filter water system data from ECHO ZIP.
 
     Parameters
     ----------
     zip_path : Path
         Path to the ECHO SDWA ZIP file.
-    target_states : list[str]
+    target_states : list[str] or None
         State codes to filter to (e.g., ["VA", "CA"]).
+        If None, loads all states (50-state expansion).
 
     Returns
     -------
@@ -148,6 +149,11 @@ def _load_water_systems(zip_path: Path, target_states: list[str]) -> pd.DataFram
         # Extract state from PWSID (first 2 chars)
         df["_state"] = df["PWSID"].str[:2]
         state_col = "_state"
+
+    if target_states is None:
+        # ALL states — no filtering
+        logger.info(f"Loading all {len(df)} systems (no state filter)")
+        return df
 
     if state_col:
         df_filtered = df[df[state_col].isin(target_states)].copy()
@@ -451,16 +457,23 @@ def run_sdwis_ingest() -> None:
     logger.info("=== SDWIS Ingest Starting ===")
 
     # Get target states from config
+    # Sprint 10: supports "ALL" keyword for full 50-state expansion
     config = load_sources_config()
-    target_states = config.get("states", ["VA", "CA"])
-    logger.info(f"Target states: {target_states}")
+    sdwis_states = config.get("sdwis_states", config.get("states", ["VA", "CA"]))
+    if sdwis_states == "ALL" or sdwis_states == "all":
+        target_states = None  # Signal to load all states
+        logger.info("Target states: ALL (50-state expansion)")
+    else:
+        target_states = sdwis_states
+        logger.info(f"Target states: {target_states}")
 
     # Download
     zip_path = _download_echo_zip()
 
-    # Load water systems
+    # Load water systems (target_states=None means all states)
     systems = _load_water_systems(zip_path, target_states)
     pwsids = set(systems["PWSID"].dropna())
+    logger.info(f"Total water systems to process: {len(systems)} ({len(pwsids)} unique PWSIDs)")
 
     # Load violations
     violations = _load_violations(zip_path, pwsids)

@@ -1,0 +1,63 @@
+# Source Priority Configuration for Best-Estimate Rate Selection
+#
+# Purpose:
+#   Controls how build_best_estimate selects the "best" rate record
+#   when multiple sources exist for a single PWSID. Lower priority
+#   number = higher preference.
+#
+# Principle:
+#   Government bulk data > high-confidence LLM scraping > curated surveys
+#   > low-confidence scraping. Within government sources, newer vintage wins.
+#
+# Created: 2026-03-24
+# Modified: 2026-03-24
+
+# Default source priority (applies to all states unless overridden)
+# Each entry maps a source key (or pattern) to a base priority number.
+# Lower number = higher priority.
+default:
+  priority_order:
+    # Government bulk sources (highest trust)
+    - source: "swrcb_ear_2022"
+      priority: 1
+      confidence: high
+    - source: "efc_nc_2025"
+      priority: 1
+      confidence: high
+    - source: "swrcb_ear_2021"
+      priority: 2
+      confidence: high
+    - source: "swrcb_ear_2020"
+      priority: 5
+      confidence: medium
+      notes: "No pre-computed bills, tier-only. Lowest-priority government source."
+
+    # High-confidence LLM scraping (with anchor validation)
+    - source: "scraped_llm"
+      priority: 3
+      confidence_filter: "high"
+      notes: "Priority adjusted dynamically based on anchor agreement."
+
+    # Curated third-party surveys
+    - source: "owrs"
+      priority: 4
+      confidence: medium
+      notes: "Water-only, curated YAML, but often 5-8 years old."
+
+  # Fallback: any source not in the list gets this priority
+  fallback_priority: 99
+
+# State-specific overrides
+CA:
+  # CA has the richest multi-source landscape
+  anchor_sources:
+    - "swrcb_ear_2022"
+    - "swrcb_ear_2021"
+  anchor_tolerance: 0.25  # scraped rate must be within 25% of anchor to upgrade
+  notes: "eAR is the anchor truth for CA. Scraped rates upgrade only if high-confidence AND within tolerance."
+
+NC:
+  notes: "Single source (EFC). No anchor logic needed."
+
+VA:
+  notes: "Scraped-only. No government bulk source available yet."

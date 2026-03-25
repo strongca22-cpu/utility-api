@@ -36,7 +36,15 @@ def cws():
 
 @app.command()
 def sdwis():
-    """Download and load SDWIS system data for VA + CA."""
+    """Download and load SDWIS system data.
+
+    Loads from EPA ECHO bulk download (~200MB ZIP). State scope is
+    controlled by config/sources.yaml sdwis_states key. Set to "ALL"
+    for all 50 states, or a list of state codes for targeted loading.
+
+    Note: Full 50-state load produces ~44K records and takes several
+    minutes. Consider running in tmux for long operations.
+    """
     from utility_api.ingest.sdwis import run_sdwis_ingest
 
     run_sdwis_ingest()

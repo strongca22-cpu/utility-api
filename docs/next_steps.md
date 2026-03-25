@@ -538,21 +538,80 @@
 2. UNC EFC IA dashboard (IA is DC-relevant, 2023 data)
 3. OR League of Cities CSV (small but free, needs bill amount parsing)
 
+## Completed (Sprint 10 — Infrastructure Layers — Session 10)
+
+### Layer B — Data Operations Manager
+- [x] **source_catalog table** (migration 009): registry of all 6 known data sources with operational state (type, states, vintage, refresh cadence, last_ingested_at, next_check_date)
+- [x] **ORM models**: SourceCatalog, ScrapeRegistry, RateBestEstimate — proper Alembic-managed models
+- [x] **pwsid_coverage materialized view**: joins CWS + water_rates + SDWIS + best_estimate for coverage reporting. Indexes on pwsid, state_code, has_rate_data. Sprint 12 will migrate to a regular table when mutable columns needed.
+- [x] **Seed script** (`scripts/seed_source_catalog.py`): populates catalog with all 6 sources, updates pwsid_count from water_rates
+
+### Layer A — Scrape Registry (table only, Sprint 12 wires agents)
+- [x] **scrape_registry table** (migration 009): per-URL tracking with fetch/parse/retry state, composite unique on (pwsid, url)
+- [x] **YAML migration** (`scripts/migrate_urls_to_registry.py`): loaded 128 entries — 27 VA curated, 56 CA curated, 22 VA candidates, 101 backfilled from water_rates scraped_llm records
+
+### Best-Estimate Generalization
+- [x] **Generalized build_best_estimate** (`src/utility_api/ops/best_estimate.py`): all states, config-driven priority from `config/source_priority.yaml`
+- [x] **846 PWSIDs** with best estimates (up from 443 CA-only): CA=415, NC=403, VA=28
+- [x] **Source priority config** (`config/source_priority.yaml`): per-state anchor sources, tolerance thresholds, fallback priority
+- [x] Confidence: high=587 (69%), medium=252 (30%), none=7 (1%)
+
+### SDWIS 50-State Expansion
+- [x] **44,633 SDWIS records** loaded (up from 3,711 VA+CA)
+- [x] Config: `sdwis_states: ALL` in sources.yaml, sdwis.py handles None target_states
+- [x] `/resolve` endpoint now returns complete SDWIS records for all 50 states
+
+### ua-ops CLI (`ua-ops` entry point)
+- [x] `ua-ops status` — state-of-the-world: table sizes, source catalog, rate coverage, scrape registry, recent pipeline runs
+- [x] `ua-ops coverage-report` — detailed analysis: coverage by state, by source, freshness breakdown, top gaps
+- [x] `ua-ops refresh-coverage` — refreshes pwsid_coverage materialized view
+- [x] `ua-ops build-best-estimate [--state XX] [--dry-run] [--csv]` — generalized best-estimate builder
+
+### Database State (as of Sprint 10)
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `utility.cws_boundaries` | 44,643 | EPA CWS |
+| `utility.aqueduct_polygons` | 68,506 | WRI Aqueduct 4.0 |
+| `utility.sdwis_systems` | **44,633** | EPA ECHO (**all 50 states**) |
+| `utility.mdwd_financials` | 225 | Harvard Dataverse (VA + CA) |
+| `utility.county_boundaries` | 3,235 | Census TIGER |
+| `utility.permits` | 61,530 | VA DEQ + CA eWRIMS |
+| `utility.permit_facility_xref` | 41 | 30 matched + 11 candidates |
+| `utility.water_rates` | 1,472 | 6 sources across 3 states |
+| `utility.rate_best_estimate` | **846** | **All states** (CA + NC + VA) |
+| `utility.source_catalog` | **6** | Source registry |
+| `utility.scrape_registry` | **128** | URL tracking |
+| `utility.pipeline_runs` | 37 | Audit trail |
+
+---
+
 ## Remaining Work
 
-### UNC EFC Dashboard Ingest (NC + IA)
-- [ ] Access NC dashboard download, assess format and coverage
-- [ ] Map to water_rates schema if viable
-- [ ] Repeat for IA dashboard
+### Sprint 11 — rate_schedules + API Updates (per uapi_implementation_guide.md)
+- [ ] `rate_schedules` table with JSONB tier storage (replaces fixed 4-tier columns)
+- [ ] Migration transform: water_rates → rate_schedules
+- [ ] Update `/rates/best-estimate` to serve all states (currently CA-only in API)
+- [ ] Update `/resolve` to use generalized best_estimate (currently CA-only join)
 
-### OR League of Cities Rate Survey
-- [ ] Parse free-text bill amounts from 2023 survey CSV
-- [ ] Match city names to PWSIDs (fuzzy match against SDWIS)
-- [ ] Ingest as source='or_loc_2023'
+### Sprint 12 — Scrape Registry Wiring + Agents
+- [ ] Migrate pwsid_coverage mat view → regular table with mutable operational columns
+- [ ] BaseAgent ABC interface
+- [ ] BulkIngestAgent (wrapper on existing ingest modules)
+- [ ] BestEstimateAgent (wraps ops/best_estimate.py)
+- [ ] Wire scraping pipeline to read from scrape_registry
 
-### Infrastructure
-- [ ] Parser prompt refinement: water-only extraction, multi-year columns, seasonal structures
-- [ ] Claude Batch API integration (replace single calls once prompt is stable)
+### Sprint 13 — Orchestrator + Discovery + Parse Agents
+- [ ] OrchestratorAgent (Python + SQL, reads from source_catalog + pwsid_coverage + scrape_registry)
+- [ ] DiscoveryAgent (SearXNG + optional Haiku scoring)
+- [ ] ScrapeAgent (HTTP + Playwright)
+- [ ] ParseAgent (Claude API structured extraction)
+
+### State Expansion (after Sprint 12)
+- [ ] UNC EFC IA dashboard (690 utilities, per-utility HTML scrape)
+- [ ] OR League of Cities 2023 CSV
+- [ ] EFC states with CSV downloads
+- [ ] Targeted scraping for DC-adjacent utilities
 
 ### VA Remaining
 - [ ] 9 VA utilities need manual PDF curation
@@ -560,18 +619,29 @@
 
 ## Current API Surface
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /resolve?lat=X&lng=Y` | Water utility + SDWIS + MDWD + Aqueduct + **best-estimate rate** for a point |
-| `GET /permits?lat=X&lng=Y&radius_km=10` | All permits within radius |
-| `GET /facility/{id}/permits` | Linked + nearby permits for an SS facility |
-| `GET /rates/{pwsid}` | Full rate detail: tiers, bills, provenance for one utility |
-| `GET /rates?state=VA` | List all parsed rates for a state |
-| `GET /rates/best-estimate?state=CA` | **Best-estimate rates** with source priority + confidence |
-| `GET /health` | Data vintage for all pipeline steps |
+| Endpoint | Purpose | Coverage |
+|----------|---------|----------|
+| `GET /resolve?lat=X&lng=Y` | Spatial lookup → PWSID + CWS + SDWIS + MDWD + Aqueduct + best-estimate rate | CWS: all 50. SDWIS: **all 50**. Rates: CA best-estimate. |
+| `GET /permits?lat=X&lng=Y&radius_km=10` | All permits within radius | VA + CA |
+| `GET /facility/{id}/permits` | Linked + nearby permits for an SS facility | VA only |
+| `GET /rates/{pwsid}` | Full rate detail: tiers, bills, provenance | CA + NC + VA |
+| `GET /rates?state=XX` | All parsed rates for a state | CA, NC, VA |
+| `GET /rates/best-estimate?state=XX` | Best-estimate rates with confidence | CA (API), all states (CLI) |
+| `GET /health` | Data vintage for all pipeline steps | All tables |
+
+## CLI Commands
+
+| Command | Purpose |
+|---------|---------|
+| `ua-ingest <step>` | Data ingest pipeline steps |
+| `ua-api` | Launch FastAPI server |
+| **`ua-ops status`** | State-of-the-world dashboard |
+| **`ua-ops coverage-report`** | Detailed coverage analysis |
+| **`ua-ops refresh-coverage`** | Refresh pwsid_coverage mat view |
+| **`ua-ops build-best-estimate`** | Build best-estimate rates (all states) |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 9 — State expansion: ingest UNC EFC NC dashboard rate data (2024, free download). Then IA dashboard. OR League of Cities 2023 CSV if time permits. Start from docs/next_steps.md.
+UAPI Sprint 11 — rate_schedules table + API generalization. Migrate water_rates to JSONB tier storage (rate_schedules). Update /rates/best-estimate and /resolve endpoints to serve all states (currently CA-only). See docs/uapi_implementation_guide.md Sprint 11 spec.
 ```

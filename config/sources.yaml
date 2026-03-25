@@ -1,6 +1,13 @@
 # Data source URLs and configuration for utility enrichment pipeline
-# Sprint 1: VA + CA pilot
+# Sprint 1: VA + CA pilot → Sprint 10: expanded to all 50 states for SDWIS
+#
+# The 'sdwis_states' key controls which states are loaded by ua-ingest sdwis.
+# Set to "ALL" to load all states from the ECHO bulk download.
+# Rate data states are controlled per-source by their ingest modules.
 
+sdwis_states: ALL  # Sprint 10: expanded from [VA, CA] to all 50 states
+
+# Legacy key kept for backward compatibility with any scripts reading it
 states:
   - VA
   - CA
