@@ -362,21 +362,45 @@ class ScrapeAgent(BaseAgent):
             if kw in combined:
                 score += 20
 
-        # PDF links with rate keywords — highest value
+        # PDF links with rate keywords
         if href_lower.endswith(".pdf") and score > 0:
             score += 15
+
+        # Specificity boost — consumer-facing rate documents
+        for kw in ["tariff", "current rates", "rate table",
+                    "schedule of rates", "fee schedule", "rates effective"]:
+            if kw in combined:
+                score += 25
+
+        # PDF + tariff combo — strongest signal (tariff PDF is the target)
+        if href_lower.endswith(".pdf"):
+            if any(kw in combined for kw in ["tariff", "schedule of rates"]):
+                score += 30
 
         # Moderate positive
         for kw in ["water", "utility", "service", "customer", "residential"]:
             if kw in combined:
                 score += 5
 
-        # Negative signals
+        # Negative: non-content pages
         for kw in ["meeting", "agenda", "minute", "news", "press",
                     "job", "career", "bid", "contact", "report", "ccr",
                     "login", "signup", "register", "calendar"]:
             if kw in combined:
                 score -= 15
+
+        # Negative: regulatory filings (long documents, not consumer rate schedules)
+        for kw in ["petition", "case", "hearing", "testimony", "docket",
+                    "proceeding", "filing", "application", "order",
+                    "annual report", "rate case"]:
+            if kw in combined:
+                score -= 20
+
+        # Negative: generic link text with no information about destination
+        stripped = link_text.strip().lower()
+        if stripped in ("here", "click here", "learn more", "read more",
+                        "view more", "download", "see more", "details"):
+            score -= 15
 
         return max(0, score)
 
