@@ -646,12 +646,31 @@
 - [x] **ua-run-orchestrator** CLI: generates queue, optionally executes top N tasks. Pipeline: orchestrator → discovery → scrape → parse → best estimate. Sequential for-loop execution.
 - [x] **End-to-end test**: Fairfax County Water Authority (VA6059501) — discovered 3 URLs via SearXNG, scraped all 3 successfully (14-15K chars each). Parse requires ANTHROPIC_API_KEY in environment.
 
-### Sprint 14 — Cron + Change Detection + Batch API
-- [ ] Cron job calling ua-run-orchestrator on schedule
-- [ ] Batch API routing for parse agent (50% cost reduction at volume)
-- [ ] check_bulk_source implementation (HTTP GET → check for new vintage)
-- [ ] Health monitoring and alerting
-- [ ] Filesystem-based raw content storage (for decoupled scrape/parse)
+### Sprint 14 — Cron + Change Detection + Batch API ✅
+- [x] **Migration 012**: `batch_jobs` table + `source_url`/`last_content_hash`/`check_interval_days` on `source_catalog`
+- [x] **SourceChecker agent** (`agents/source_checker.py`): fetches source URLs, hashes content, detects new vintages. Source-specific checks for eAR (HydroShare year detection) and EFC (survey year). Updates hash + next_check_date.
+- [x] **check_bulk_source fully implemented**: was a stub since Sprint 13, now wired into orchestrator and `ua-ops check-sources` CLI command.
+- [x] **BatchAgent** (`agents/batch.py`): submits parse tasks to Anthropic Message Batches API (50% cost savings). Stores task details in JSONB for 24h gap survival. Downloads, validates, writes results.
+- [x] **`--batch` flag** on `ua-run-orchestrator`: discovery+scrape run live, parse tasks collected and submitted as batch.
+- [x] **ua-ops pipeline-health**: operational health report (agent runs, batch jobs, registry status, 7-day activity, errors, source check schedule).
+- [x] **ua-ops batch-status / process-batches**: check and process completed Batch API jobs.
+- [x] **ua-ops check-sources**: check all overdue bulk sources for new data.
+- [x] **Cron scheduling**: `scripts/setup_cron.sh` installs 4 cron jobs (orchestrator 2AM, coverage 5AM, batch 10AM, sources Sunday 6AM).
+- [x] **Change detection fix**: `INTERVAL ':days days'` → `MAKE_INTERVAL(days => :days)` — was matching all active URLs instead of only stale ones.
+- [x] **Config-driven thresholds**: `config/agent_config.yaml` for change detection, batch sizing, source checking.
+- [x] **Parse agent hardening**: `_parse_date()` handles varied LLM date formats, truncation for VARCHAR(30) columns.
+- [ ] **VA coverage push**: 1 new PWSID added (VA1191883). Low yield due to SearXNG rate limiting (0 results after ~13 queries) and keyword scoring threshold too strict for abbreviated VA utility names. Discovery agent tuning needed — see Sprint 14.5 notes.
+
+**Known issues from Sprint 14 push:**
+1. SearXNG rate-limits after ~13 rapid queries (2s delay insufficient). Need longer delay or query batching.
+2. Keyword scoring threshold (>50) filters out valid rate pages when utility names are abbreviated (PWCSA, ACSA, BVU).
+3. issuu.com links return 0 chars even with Playwright (embedded viewer, not extractable text).
+
+### Sprint 14.5 — Discovery Agent Tuning (before next coverage push)
+- [ ] Increase SearXNG search delay to 5-10s or implement adaptive backoff
+- [ ] Lower keyword scoring threshold to 30 (accept more candidates, let parse agent filter)
+- [ ] Add alternate search query patterns for abbreviated utility names
+- [ ] Handle issuu.com/similar embedded content hosts (detect and skip)
 
 ### State Expansion (after Sprint 13)
 - [ ] UNC EFC IA dashboard (690 utilities, per-utility HTML scrape)
@@ -687,10 +706,15 @@
 | **`ua-ops build-best-estimate`** | Build best-estimate rates (all states) |
 | **`ua-ops sync-rate-schedules`** | Sync water_rates → rate_schedules |
 | **`ua-ops scrape-status [--state]`** | Scrape registry status breakdown |
+| **`ua-ops check-sources`** | Bulk source freshness checking |
+| **`ua-ops pipeline-health`** | Pipeline health report |
+| **`ua-ops batch-status [batch_id]`** | Check Batch API job status |
+| **`ua-ops process-batches`** | Process completed batch jobs |
 | **`ua-run-orchestrator [--execute N]`** | Autonomous pipeline: discover → scrape → parse |
+| **`ua-run-orchestrator --batch`** | Same but uses Batch API for parse (async, 50% cheaper) |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 14 — Cron + Batch API + Production Hardening. Add cron scheduling for ua-run-orchestrator. Implement Batch API routing for parse agent at volume. Build check_bulk_source task (HTTP GET source URL, check for new vintage, trigger BulkIngestAgent). Add health monitoring. Test: run 20 VA utilities end-to-end with Batch API, then set up daily cron. See docs/uapi_implementation_guide.md Sprint 14 spec.
+UAPI Sprint 14.5 — Discovery Agent Tuning v1. Sprint 14 infrastructure is complete (cron, Batch API, source checker, health monitoring). The VA coverage push revealed that the DiscoveryAgent's keyword scoring threshold (>50) is too strict for abbreviated VA utility names, and SearXNG rate-limits after ~13 queries at 2s delay. This session tunes the discovery agent: increase search delay, lower scoring threshold, add alternate query patterns for abbreviated names, and re-run 25 VA utilities. Target: 15+ new VA PWSIDs with rate data. See docs/next_steps.md Sprint 14.5 section.
 ```
