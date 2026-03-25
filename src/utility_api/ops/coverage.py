@@ -58,26 +58,30 @@ def refresh_coverage_derived() -> dict:
             )
         """))
 
-        # Update rate coverage columns
+        # Update rate coverage columns (check both water_rates and rate_schedules)
         conn.execute(text(f"""
             UPDATE {schema}.pwsid_coverage pc SET
-                has_rate_data = (EXISTS (
-                    SELECT 1 FROM {schema}.water_rates wr WHERE wr.pwsid = pc.pwsid
-                )),
+                has_rate_data = (
+                    EXISTS (SELECT 1 FROM {schema}.water_rates wr WHERE wr.pwsid = pc.pwsid)
+                    OR EXISTS (SELECT 1 FROM {schema}.rate_schedules rs WHERE rs.pwsid = pc.pwsid)
+                ),
                 rate_source_count = COALESCE((
-                    SELECT COUNT(DISTINCT wr.source)
-                    FROM {schema}.water_rates wr
-                    WHERE wr.pwsid = pc.pwsid
+                    SELECT COUNT(DISTINCT src) FROM (
+                        SELECT source AS src FROM {schema}.water_rates WHERE pwsid = pc.pwsid
+                        UNION
+                        SELECT source_key AS src FROM {schema}.rate_schedules WHERE pwsid = pc.pwsid
+                    ) combined
                 ), 0),
                 rate_sources = (
-                    SELECT STRING_AGG(DISTINCT wr.source, ',' ORDER BY wr.source)
-                    FROM {schema}.water_rates wr
-                    WHERE wr.pwsid = pc.pwsid
+                    SELECT STRING_AGG(DISTINCT src, ',' ORDER BY src) FROM (
+                        SELECT source AS src FROM {schema}.water_rates WHERE pwsid = pc.pwsid
+                        UNION
+                        SELECT source_key AS src FROM {schema}.rate_schedules WHERE pwsid = pc.pwsid
+                    ) combined
                 ),
-                last_rate_loaded_at = (
-                    SELECT MAX(wr.loaded_at)
-                    FROM {schema}.water_rates wr
-                    WHERE wr.pwsid = pc.pwsid
+                last_rate_loaded_at = GREATEST(
+                    (SELECT MAX(wr.loaded_at) FROM {schema}.water_rates wr WHERE wr.pwsid = pc.pwsid),
+                    (SELECT MAX(rs.created_at) FROM {schema}.rate_schedules rs WHERE rs.pwsid = pc.pwsid)
                 )
         """))
 

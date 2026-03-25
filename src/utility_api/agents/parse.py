@@ -47,7 +47,7 @@ from utility_api.ingest.rate_parser import SYSTEM_PROMPT
 # Pricing (as of 2025)
 MODEL_PRICING = {
     "claude-haiku-4-5-20251001": {"input": 0.80 / 1_000_000, "output": 4.0 / 1_000_000},
-    "claude-sonnet-4-6-20250514": {"input": 3.0 / 1_000_000, "output": 15.0 / 1_000_000},
+    "claude-sonnet-4-20250514": {"input": 3.0 / 1_000_000, "output": 15.0 / 1_000_000},
 }
 
 # Gallon conversions
@@ -68,7 +68,7 @@ def route_model(text_content: str) -> str:
     ])
 
     if length > 10000 or tier_keywords > 6 or complex_signals:
-        return "claude-sonnet-4-6-20250514"
+        return "claude-sonnet-4-20250514"
     return "claude-haiku-4-5-20251001"
 
 
@@ -367,6 +367,8 @@ class ParseAgent(BaseAgent):
             return
         schema = settings.utility_schema
         try:
+            now = datetime.now(timezone.utc)
+            new_status = "active" if parse_result == "success" else None
             with engine.connect() as conn:
                 conn.execute(text(f"""
                     UPDATE {schema}.scrape_registry SET
@@ -374,16 +376,17 @@ class ParseAgent(BaseAgent):
                         last_parse_result = :result,
                         last_parse_confidence = :confidence,
                         last_parse_cost_usd = :cost,
-                        status = CASE WHEN :result::text = 'success' THEN 'active' ELSE status END,
                         updated_at = :now
                     WHERE id = :id
                 """), {
-                    "now": datetime.now(timezone.utc),
-                    "result": parse_result,
-                    "confidence": confidence,
-                    "cost": cost,
-                    "id": registry_id,
+                    "now": now, "result": parse_result,
+                    "confidence": confidence, "cost": cost, "id": registry_id,
                 })
+                if new_status:
+                    conn.execute(text(f"""
+                        UPDATE {schema}.scrape_registry
+                        SET status = :status WHERE id = :id
+                    """), {"status": new_status, "id": registry_id})
                 conn.commit()
         except Exception as e:
             logger.debug(f"Registry parse update failed: {e}")
