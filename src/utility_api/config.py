@@ -18,6 +18,7 @@ Usage:
     from utility_api.config import settings
 """
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,27 @@ from pydantic_settings import BaseSettings
 
 # Project root (two levels up from this file: src/utility_api/config.py)
 PROJECT_ROOT = Path(__file__).parents[2]
+
+
+# Load .env into os.environ so third-party SDKs (e.g. Anthropic) can find their keys.
+# Pydantic Settings reads .env for its own fields but does NOT export to os.environ.
+def _load_env_file() -> None:
+    """Parse .env and export key=value pairs to os.environ (no overwrite)."""
+    env_path = PROJECT_ROOT / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_env_file()
 
 
 class Settings(BaseSettings):
