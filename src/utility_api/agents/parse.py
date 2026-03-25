@@ -262,6 +262,60 @@ class ParseAgent(BaseAgent):
         confidence = result.get("parse_confidence", "failed")
         logger.info(f"  Confidence: {confidence}, valid: {valid}, issues: {issues}")
 
+        # Sprint 16: Retry with addendum when first attempt fails on substantive content
+        if not valid and "no_tier_1_rate" in issues and len(raw_text) > 2000:
+            logger.info(f"  Retrying with rate-search addendum (substantive content, {len(raw_text):,} chars)")
+            retry_user_message = (
+                f"Extract the water rate structure from this {content_type} text.\n\n"
+                f"IMPORTANT: A previous extraction attempt found no rate data. "
+                f"Look more carefully for:\n"
+                f"- Rates expressed as $/gallon, $/ccf, $/1000 gallons, per unit\n"
+                f"- Monthly service charges or base charges\n"
+                f"- Water charges listed in a fee schedule or budget document\n"
+                f"- Rates that may be embedded in a table or list format\n"
+                f"If you find ANY numeric water charge, extract it even if "
+                f"the full tier structure is unclear.\n\n"
+                f"Return a JSON object with these fields: rate_effective_date, "
+                f"rate_structure_type, billing_frequency, fixed_charge_monthly, "
+                f"meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, "
+                f"tier_2_rate, tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, "
+                f"tier_4_rate, parse_confidence, notes.\n\n"
+                f"Text:\n{raw_text[:15000]}"
+            )
+            try:
+                retry_response = client.messages.create(
+                    model=model,
+                    max_tokens=1024,
+                    system=[{
+                        "type": "text",
+                        "text": SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }],
+                    messages=[
+                        {"role": "user", "content": retry_user_message},
+                        {"role": "assistant", "content": "{"},
+                    ],
+                )
+                # Add retry cost
+                retry_usage = retry_response.usage
+                cost += (retry_usage.input_tokens * pricing["input"]
+                         + retry_usage.output_tokens * pricing["output"])
+
+                retry_json = "{" + retry_response.content[0].text
+                retry_result = json.loads(retry_json)
+                retry_valid, retry_issues = validate_parse_result(retry_result)
+
+                if retry_valid or retry_result.get("parse_confidence") in ("high", "medium"):
+                    logger.info(f"  Retry succeeded: {retry_result.get('parse_confidence')}")
+                    result = retry_result
+                    valid = retry_valid
+                    issues = retry_issues
+                    confidence = result.get("parse_confidence", "failed")
+                else:
+                    logger.info(f"  Retry also failed: {retry_issues}")
+            except Exception as e:
+                logger.debug(f"  Retry failed: {e}")
+
         # Build canonical JSONB structures
         tiers = _build_volumetric_tiers_from_parse(result)
         fixed_charge = result.get("fixed_charge_monthly", 0) or 0

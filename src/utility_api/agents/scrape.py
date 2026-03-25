@@ -7,15 +7,20 @@ Purpose:
     rate_scraper.py functionality with registry coordination — reads
     pending URLs, fetches content, updates registry with outcomes.
 
+    Sprint 16: Deep crawl capability — when initial page is thin (landing
+    page without rate data), extracts links, scores for rate-relevance,
+    and follows top candidates on the same domain.
+
     This agent does NOT use an LLM. No `anthropic` import.
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-24
+Modified: 2026-03-25
 
 Dependencies:
     - sqlalchemy
     - requests, playwright, pymupdf (via rate_scraper.py)
+    - beautifulsoup4 (for deep crawl link extraction)
 
 Usage:
     from utility_api.agents.scrape import ScrapeAgent
@@ -26,6 +31,7 @@ Notes:
     - Returns raw text in memory for ParseAgent to consume
     - Retry logic: 403 → exponential backoff, 404 → dead, 5xx → 6h retry
     - Reuses existing rate_scraper.py functions — does not rewrite them
+    - Deep crawl: follows 1-3 same-domain links when initial page is thin
 """
 
 from datetime import datetime, timedelta, timezone
@@ -147,17 +153,46 @@ class ScrapeAgent(BaseAgent):
                 })
                 conn.commit()
 
+            # Deep crawl: if content is thin (landing page), follow links
+            # to find the actual rate schedule page. Only for HTML pages.
+            final_url = url
+            final_text = scrape_result.text
+            final_is_pdf = getattr(scrape_result, "is_pdf", False)
+            deep_crawled = False
+
+            if (
+                not final_is_pdf
+                and self._is_thin_content(final_text)
+                and char_count > 100  # has some content (not empty)
+            ):
+                logger.info(f"  Thin content ({char_count} chars) — attempting deep crawl")
+                deeper = self._follow_best_links(
+                    base_url=url,
+                    page_html=scrape_result.text,
+                    pwsid=row.pwsid,
+                    max_links=3,
+                )
+                if deeper:
+                    final_url = deeper["url"]
+                    final_text = deeper["text"]
+                    final_is_pdf = deeper.get("is_pdf", False)
+                    deep_crawled = True
+                    char_count = len(final_text) if final_text else 0
+                    logger.info(f"  Deep crawl found: {final_url[:80]} ({char_count:,} chars)")
+
             raw_texts.append({
                 "registry_id": row.id,
                 "pwsid": row.pwsid,
-                "url": url,
-                "text": scrape_result.text,
-                "content_type": "pdf" if getattr(scrape_result, "is_pdf", False) else "html",
+                "url": final_url,
+                "text": final_text,
+                "content_type": "pdf" if final_is_pdf else "html",
                 "content_changed": content_changed,
                 "char_count": char_count,
+                "deep_crawled": deep_crawled,
             })
             succeeded += 1
-            logger.info(f"  ✓ {char_count:,} chars, changed={content_changed}")
+            logger.info(f"  ✓ {char_count:,} chars, changed={content_changed}"
+                        f"{' (deep crawl)' if deep_crawled else ''}")
 
         self.log_run(
             status="success" if succeeded > 0 else "failed",
@@ -171,6 +206,199 @@ class ScrapeAgent(BaseAgent):
             "failed": failed,
             "raw_texts": raw_texts,
         }
+
+    # --- Deep Crawl Methods (Sprint 16) ---
+
+    _RATE_INDICATORS = [
+        "per 1,000", "$/1000", "$/1,000", "ccf", "rate schedule",
+        "volumetric", "tier 1", "tier 2", "fixed charge", "base charge",
+        "gallons", "monthly bill", "service charge", "water rate",
+        "rate per", "per unit", "minimum bill", "usage charge",
+    ]
+
+    def _is_thin_content(self, text: str) -> bool:
+        """Heuristic: does this page likely contain actual rate data?
+
+        Returns True if the page is too short or lacks rate-specific keywords,
+        indicating it's a landing page rather than a rate schedule.
+        """
+        if not text:
+            return True
+        if len(text) < 2000:
+            return True  # Too short to contain a rate schedule
+
+        text_lower = text.lower()
+        matches = sum(1 for kw in self._RATE_INDICATORS if kw in text_lower)
+        if matches < 2:
+            return True  # Content doesn't look like a rate schedule
+
+        return False
+
+    def _follow_best_links(
+        self,
+        base_url: str,
+        page_html: str,
+        pwsid: str,
+        max_links: int = 3,
+    ) -> dict | None:
+        """Extract links from page, score for rate relevance, follow top candidates.
+
+        Only follows links on the same domain. Returns the first substantive
+        page found, or None if no deeper rate content is discovered.
+
+        When a deeper URL is found, inserts a NEW scrape_registry row for it
+        (the original landing page entry is preserved).
+        """
+        from urllib.parse import urljoin, urlparse
+
+        from bs4 import BeautifulSoup
+
+        from utility_api.ingest.rate_scraper import scrape_rate_page
+
+        base_domain = urlparse(base_url).hostname
+
+        try:
+            soup = BeautifulSoup(page_html, "html.parser")
+        except Exception:
+            return None
+
+        # Collect and score links
+        scored_links = []
+        seen_hrefs = set()
+
+        for a_tag in soup.find_all("a", href=True):
+            href = urljoin(base_url, a_tag["href"])
+            parsed = urlparse(href)
+
+            # Only same-domain links
+            if parsed.hostname != base_domain:
+                continue
+
+            # Skip non-page resources
+            path_lower = parsed.path.lower()
+            if any(path_lower.endswith(ext) for ext in
+                   (".jpg", ".png", ".gif", ".zip", ".doc", ".xlsx", ".mp4")):
+                continue
+
+            # Deduplicate
+            canonical = f"{parsed.scheme}://{parsed.hostname}{parsed.path}"
+            if canonical in seen_hrefs or canonical == base_url:
+                continue
+            seen_hrefs.add(canonical)
+
+            link_text = a_tag.get_text(strip=True).lower()
+            score = self._score_link(path_lower, link_text)
+            if score > 0:
+                scored_links.append((score, href, link_text))
+
+        # Sort by score descending, take top N
+        scored_links.sort(reverse=True)
+
+        for score, href, link_text in scored_links[:max_links]:
+            logger.debug(f"    Deep crawl trying: [{score}] {href[:80]} ({link_text[:40]})")
+
+            try:
+                result = scrape_rate_page(href)
+            except Exception as e:
+                logger.debug(f"    Deep crawl fetch failed: {e}")
+                continue
+
+            if result.error and not result.text:
+                continue
+
+            fetched_text = result.text or ""
+            if not self._is_thin_content(fetched_text):
+                # Found substantive content — register the deeper URL
+                self._register_deep_url(
+                    pwsid=pwsid,
+                    deep_url=href,
+                    original_url=base_url,
+                    result=result,
+                )
+                return {
+                    "url": href,
+                    "text": fetched_text,
+                    "is_pdf": getattr(result, "is_pdf", False),
+                    "char_count": len(fetched_text),
+                }
+
+        return None
+
+    @staticmethod
+    def _score_link(href_lower: str, link_text: str) -> int:
+        """Score a link's likelihood of leading to a rate schedule. No LLM."""
+        score = 0
+        combined = f"{href_lower} {link_text}"
+
+        # Strong positive signals
+        for kw in ["rate", "fee", "schedule", "tariff", "billing",
+                    "water cost", "water rate", "rate schedule"]:
+            if kw in combined:
+                score += 20
+
+        # PDF links with rate keywords — highest value
+        if href_lower.endswith(".pdf") and score > 0:
+            score += 15
+
+        # Moderate positive
+        for kw in ["water", "utility", "service", "customer", "residential"]:
+            if kw in combined:
+                score += 5
+
+        # Negative signals
+        for kw in ["meeting", "agenda", "minute", "news", "press",
+                    "job", "career", "bid", "contact", "report", "ccr",
+                    "login", "signup", "register", "calendar"]:
+            if kw in combined:
+                score -= 15
+
+        return max(0, score)
+
+    def _register_deep_url(
+        self,
+        pwsid: str,
+        deep_url: str,
+        original_url: str,
+        result,
+    ) -> None:
+        """Insert a new scrape_registry row for a deeper URL found via crawl."""
+        schema = settings.utility_schema
+        now = datetime.now(timezone.utc)
+        content_hash = getattr(result, "text_hash", None)
+        char_count = len(result.text) if result.text else 0
+        content_type = "pdf" if getattr(result, "is_pdf", False) else "html"
+
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(f"""
+                    INSERT INTO {schema}.scrape_registry
+                        (pwsid, url, url_source, content_type, status,
+                         last_fetch_at, last_http_status, last_content_hash,
+                         last_content_length, notes)
+                    VALUES
+                        (:pwsid, :url, 'deep_crawl', :ctype, 'active',
+                         :now, :http_status, :hash, :length,
+                         :notes)
+                    ON CONFLICT (pwsid, url) DO UPDATE SET
+                        last_fetch_at = EXCLUDED.last_fetch_at,
+                        last_http_status = EXCLUDED.last_http_status,
+                        last_content_hash = EXCLUDED.last_content_hash,
+                        last_content_length = EXCLUDED.last_content_length,
+                        status = 'active',
+                        updated_at = NOW()
+                """), {
+                    "pwsid": pwsid,
+                    "url": deep_url,
+                    "ctype": content_type,
+                    "now": now,
+                    "http_status": getattr(result, "status_code", 200),
+                    "hash": content_hash,
+                    "length": char_count,
+                    "notes": f"Deep crawl from {original_url[:120]}",
+                })
+                conn.commit()
+        except Exception as e:
+            logger.debug(f"Deep crawl registry write failed: {e}")
 
     def _update_registry_failure(
         self, registry_id: int, retry_count: int,
