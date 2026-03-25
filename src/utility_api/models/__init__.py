@@ -11,6 +11,7 @@ from utility_api.models.water_rate import WaterRate
 from utility_api.models.source_catalog import SourceCatalog
 from utility_api.models.scrape_registry import ScrapeRegistry
 from utility_api.models.rate_best_estimate import RateBestEstimate
+from utility_api.models.rate_schedule import RateSchedule
 
 __all__ = [
     "Base",
@@ -24,4 +25,5 @@ __all__ = [
     "SourceCatalog",
     "ScrapeRegistry",
     "RateBestEstimate",
+    "RateSchedule",
 ]

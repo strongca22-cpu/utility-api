@@ -117,6 +117,9 @@ def list_best_estimates(
 def get_rate(pwsid: str, db: Session = Depends(get_db)):
     """Get parsed water rate data for a specific utility.
 
+    Reads from rate_schedules (canonical JSONB schema) when available,
+    falls back to water_rates (legacy fixed columns).
+
     Parameters
     ----------
     pwsid : str
@@ -127,6 +130,66 @@ def get_rate(pwsid: str, db: Session = Depends(get_db)):
     dict
         Rate structure, tier data, computed bills, and provenance.
     """
+    pwsid_upper = pwsid.upper()
+
+    # Try rate_schedules first (canonical)
+    row = db.execute(text(f"""
+        SELECT
+            rs.pwsid, c.pws_name AS utility_name, c.state_code, c.county_served AS county,
+            rs.vintage_date AS rate_effective_date, rs.rate_structure_type,
+            rs.customer_class AS rate_class,
+            rs.billing_frequency,
+            rs.fixed_charges, rs.volumetric_tiers, rs.surcharges,
+            rs.bill_5ccf, rs.bill_10ccf, rs.bill_20ccf,
+            rs.conservation_signal, rs.tier_count,
+            rs.source_key, rs.source_url, rs.confidence AS parse_confidence,
+            rs.parse_model, rs.parse_notes, rs.scrape_timestamp,
+            rs.needs_review, rs.review_reason
+        FROM {SCHEMA}.rate_schedules rs
+        JOIN {SCHEMA}.cws_boundaries c ON c.pwsid = rs.pwsid
+        WHERE rs.pwsid = :pwsid
+        AND rs.confidence IN ('high', 'medium')
+        ORDER BY rs.vintage_date DESC NULLS LAST
+        LIMIT 1
+    """), {"pwsid": pwsid_upper}).mappings().first()
+
+    if row:
+        # Serve from canonical schema
+        fixed_charges = row["fixed_charges"] or []
+        volumetric_tiers = row["volumetric_tiers"] or []
+        fixed_monthly = sum(fc.get("amount", 0) for fc in fixed_charges) if fixed_charges else None
+
+        return {
+            "pwsid": row["pwsid"],
+            "utility_name": row["utility_name"],
+            "state_code": row["state_code"],
+            "county": row["county"],
+            "rate_effective_date": str(row["rate_effective_date"]) if row["rate_effective_date"] else None,
+            "rate_structure": row["rate_structure_type"],
+            "rate_class": row["rate_class"],
+            "billing_frequency": row["billing_frequency"],
+            "fixed_charge_monthly": fixed_monthly,
+            "fixed_charges": fixed_charges,
+            "tiers": volumetric_tiers,
+            "surcharges": row["surcharges"] or [],
+            "bill_5ccf": row["bill_5ccf"],
+            "bill_10ccf": row["bill_10ccf"],
+            "bill_20ccf": row["bill_20ccf"],
+            "conservation_signal": row["conservation_signal"],
+            "tier_count": row["tier_count"],
+            "needs_review": row["needs_review"],
+            "review_reason": row["review_reason"],
+            "provenance": {
+                "source_key": row["source_key"],
+                "source_url": row["source_url"],
+                "parse_confidence": row["parse_confidence"],
+                "parse_model": row["parse_model"],
+                "parse_notes": row["parse_notes"],
+                "scraped_at": row["scrape_timestamp"].isoformat() if row["scrape_timestamp"] else None,
+            },
+        }
+
+    # Fallback to water_rates (legacy)
     row = db.execute(text(f"""
         SELECT
             w.pwsid, w.utility_name, w.state_code, w.county,
@@ -144,7 +207,7 @@ def get_rate(pwsid: str, db: Session = Depends(get_db)):
         AND w.parse_confidence IN ('high', 'medium')
         ORDER BY w.rate_effective_date DESC NULLS LAST
         LIMIT 1
-    """), {"pwsid": pwsid.upper()}).mappings().first()
+    """), {"pwsid": pwsid_upper}).mappings().first()
 
     if not row:
         raise HTTPException(
@@ -152,7 +215,7 @@ def get_rate(pwsid: str, db: Session = Depends(get_db)):
             detail=f"No parsed rate data found for PWSID {pwsid}"
         )
 
-    # Build tier list (non-null tiers only)
+    # Build legacy tier list
     tiers = []
     for i in range(1, 5):
         rate = row[f"tier_{i}_rate"]

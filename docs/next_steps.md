@@ -588,11 +588,33 @@
 
 ## Remaining Work
 
-### Sprint 11 — rate_schedules + API Updates (per uapi_implementation_guide.md)
-- [ ] `rate_schedules` table with JSONB tier storage (replaces fixed 4-tier columns)
-- [ ] Migration transform: water_rates → rate_schedules
-- [ ] Update `/rates/best-estimate` to serve all states (currently CA-only in API)
-- [ ] Update `/resolve` to use generalized best_estimate (currently CA-only join)
+### Completed (Sprint 11 — Canonical Schema — Session 10 cont.)
+
+- [x] **rate_schedules table** (migration 010): canonical rate schema with JSONB tiers
+  - `volumetric_tiers` JSONB: `[{tier, min_gal, max_gal, rate_per_1000_gal}]` — any number of tiers
+  - `fixed_charges` JSONB: `[{name, amount, meter_size}]` — multiple fixed charges
+  - `surcharges` JSONB: `[{name, rate_per_1000_gal, condition}]` — drought/seasonal
+  - `conservation_signal`: highest/lowest tier ratio (>1 = conservation pricing)
+  - `bill_20ccf`: new bill snapshot at 20 CCF
+  - `needs_review` + `review_reason`: quality flags
+  - GIN index on volumetric_tiers for containment queries
+- [x] **Migration transform**: all 1,472 water_rates → rate_schedules
+  - 1,291 with volumetric tiers, 1,384 with fixed charges
+  - 716 with conservation signal, 1,397 with bill_20ccf
+  - Units: gallons + $/1000gal (canonical, not CCF)
+- [x] **Best-estimate reads from rate_schedules** when populated, falls back to water_rates
+- [x] **`/rates/{pwsid}` serves JSONB tiers** from rate_schedules with legacy fallback
+- [x] **`ua-ops sync-rate-schedules`** CLI: syncs any new water_rates records to rate_schedules
+- [x] Rate schedule helpers: `water_rate_to_schedule()`, `compute_bill_at_gallons()`, `compute_conservation_signal()`
+- [x] `/rates/best-estimate` and `/resolve` already serve all states (from Sprint 10 best-estimate generalization)
+
+### Database State (as of Sprint 11)
+
+| Table | Rows | Source |
+|-------|------|--------|
+| `utility.rate_schedules` | **1,472** | Canonical JSONB — migrated from water_rates |
+| `utility.water_rates` | 1,472 | Legacy fixed-tier — kept as audit table |
+| All other tables | (unchanged from Sprint 10) | |
 
 ### Sprint 12 — Scrape Registry Wiring + Agents
 - [ ] Migrate pwsid_coverage mat view → regular table with mutable operational columns
@@ -621,12 +643,12 @@
 
 | Endpoint | Purpose | Coverage |
 |----------|---------|----------|
-| `GET /resolve?lat=X&lng=Y` | Spatial lookup → PWSID + CWS + SDWIS + MDWD + Aqueduct + best-estimate rate | CWS: all 50. SDWIS: **all 50**. Rates: CA best-estimate. |
+| `GET /resolve?lat=X&lng=Y` | Spatial lookup → PWSID + CWS + SDWIS + MDWD + Aqueduct + best-estimate rate | CWS: all 50. SDWIS: **all 50**. Rates: **all states** (best-estimate). |
 | `GET /permits?lat=X&lng=Y&radius_km=10` | All permits within radius | VA + CA |
 | `GET /facility/{id}/permits` | Linked + nearby permits for an SS facility | VA only |
-| `GET /rates/{pwsid}` | Full rate detail: tiers, bills, provenance | CA + NC + VA |
+| `GET /rates/{pwsid}` | Full rate detail: **JSONB tiers**, bills, conservation signal, provenance | CA + NC + VA |
 | `GET /rates?state=XX` | All parsed rates for a state | CA, NC, VA |
-| `GET /rates/best-estimate?state=XX` | Best-estimate rates with confidence | CA (API), all states (CLI) |
+| `GET /rates/best-estimate?state=XX` | Best-estimate rates with confidence | **All states** |
 | `GET /health` | Data vintage for all pipeline steps | All tables |
 
 ## CLI Commands
@@ -639,9 +661,10 @@
 | **`ua-ops coverage-report`** | Detailed coverage analysis |
 | **`ua-ops refresh-coverage`** | Refresh pwsid_coverage mat view |
 | **`ua-ops build-best-estimate`** | Build best-estimate rates (all states) |
+| **`ua-ops sync-rate-schedules`** | Sync water_rates → rate_schedules |
 
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 11 — rate_schedules table + API generalization. Migrate water_rates to JSONB tier storage (rate_schedules). Update /rates/best-estimate and /resolve endpoints to serve all states (currently CA-only). See docs/uapi_implementation_guide.md Sprint 11 spec.
+UAPI Sprint 12 — Scrape registry wiring + agent skeleton. Migrate pwsid_coverage mat view to regular table with mutable columns (scrape_status, priority_tier). Build BaseAgent ABC, BulkIngestAgent, BestEstimateAgent. Wire scraping pipeline to write to scrape_registry. See docs/uapi_implementation_guide.md Sprint 12 spec.
 ```

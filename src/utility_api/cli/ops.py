@@ -378,5 +378,85 @@ def build_best_estimate(
         typer.echo("\nTip: Run 'ua-ops refresh-coverage' to update the coverage mat view.")
 
 
+@app.command("sync-rate-schedules")
+def sync_rate_schedules(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview without DB writes"),
+):
+    """Sync water_rates → rate_schedules.
+
+    Finds water_rates records not yet in rate_schedules and converts
+    them to the canonical JSONB schema. Run this after any ingest
+    to keep rate_schedules current.
+
+    This replaces inline dual-write in each ingest module — simpler
+    and less invasive. Sprint 12 agents will write directly to
+    rate_schedules, making this sync unnecessary for new data.
+    """
+    from utility_api.config import settings
+    from utility_api.db import engine
+    from utility_api.ops.rate_schedule_helpers import (
+        water_rate_to_schedule,
+        write_rate_schedule,
+    )
+
+    schema = settings.utility_schema
+
+    with engine.connect() as conn:
+        # Find water_rates records not yet in rate_schedules
+        rows = conn.execute(text(f"""
+            SELECT
+                wr.pwsid, wr.source, wr.utility_name, wr.state_code,
+                wr.rate_effective_date, wr.rate_structure_type, wr.rate_class,
+                wr.billing_frequency, wr.fixed_charge_monthly, wr.meter_size_inches,
+                wr.tier_1_limit_ccf, wr.tier_1_rate,
+                wr.tier_2_limit_ccf, wr.tier_2_rate,
+                wr.tier_3_limit_ccf, wr.tier_3_rate,
+                wr.tier_4_limit_ccf, wr.tier_4_rate,
+                wr.bill_5ccf, wr.bill_10ccf,
+                wr.bill_6ccf, wr.bill_9ccf, wr.bill_12ccf, wr.bill_24ccf,
+                wr.source_url, wr.raw_text_hash, wr.parse_confidence,
+                wr.parse_model, wr.parse_notes, wr.scraped_at, wr.parsed_at
+            FROM {schema}.water_rates wr
+            WHERE NOT EXISTS (
+                SELECT 1 FROM {schema}.rate_schedules rs
+                WHERE rs.pwsid = wr.pwsid
+                  AND rs.source_key = wr.source
+                  AND rs.vintage_date IS NOT DISTINCT FROM wr.rate_effective_date
+                  AND rs.customer_class = COALESCE(wr.rate_class, 'residential')
+            )
+        """)).mappings().all()
+
+    if not rows:
+        typer.echo("rate_schedules is in sync — no new records to convert.")
+        return
+
+    typer.echo(f"Found {len(rows)} water_rates records not yet in rate_schedules.")
+
+    if dry_run:
+        for r in list(rows)[:5]:
+            typer.echo(f"  {r['pwsid']} [{r['source']}] date={r['rate_effective_date']}")
+        if len(rows) > 5:
+            typer.echo(f"  ... and {len(rows) - 5} more")
+        return
+
+    inserted = 0
+    skipped = 0
+    with engine.connect() as conn:
+        for r in rows:
+            schedule = water_rate_to_schedule(dict(r))
+            try:
+                if write_rate_schedule(conn, schedule):
+                    inserted += 1
+                else:
+                    skipped += 1
+            except Exception as e:
+                typer.echo(f"  Error on {r['pwsid']}: {e}")
+                skipped += 1
+                conn.rollback()
+        conn.commit()
+
+    typer.echo(f"Synced {inserted} records to rate_schedules ({skipped} skipped).")
+
+
 if __name__ == "__main__":
     app()

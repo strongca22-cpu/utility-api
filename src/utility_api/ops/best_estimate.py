@@ -289,7 +289,7 @@ def run_best_estimate(
 
     schema = settings.utility_schema
 
-    # Load all rate data
+    # Load rate data — prefer rate_schedules (canonical), fall back to water_rates
     where_clause = ""
     params = {}
     if state_filter:
@@ -298,15 +298,77 @@ def run_best_estimate(
         logger.info(f"Filtering to state: {state_filter}")
 
     with engine.connect() as conn:
-        df = pd.read_sql(text(f"""
-            SELECT pwsid, source, utility_name, state_code,
-                   bill_5ccf, bill_6ccf, bill_9ccf, bill_10ccf, bill_12ccf, bill_24ccf,
-                   fixed_charge_monthly, rate_structure_type, rate_effective_date,
-                   billing_frequency, parse_confidence
-            FROM {schema}.water_rates
-            {where_clause}
-            ORDER BY pwsid, source
-        """), conn, params=params)
+        # Check if rate_schedules has data
+        rs_count = conn.execute(text(
+            f"SELECT COUNT(*) FROM {schema}.rate_schedules"
+        )).scalar()
+
+        if rs_count > 0:
+            logger.info(f"Reading from rate_schedules (canonical, {rs_count} records)")
+            # rate_schedules uses source_key and vintage_date
+            # We need to join to cws_boundaries for state_code
+            state_join = ""
+            if state_filter:
+                where_clause = "WHERE c.state_code = :state"
+                state_join = f"JOIN {schema}.cws_boundaries c ON rs.pwsid = c.pwsid"
+            else:
+                state_join = f"LEFT JOIN {schema}.cws_boundaries c ON rs.pwsid = c.pwsid"
+
+            df = pd.read_sql(text(f"""
+                SELECT rs.pwsid,
+                       rs.source_key AS source,
+                       c.pws_name AS utility_name,
+                       c.state_code,
+                       rs.bill_5ccf,
+                       NULL::float AS bill_6ccf,
+                       NULL::float AS bill_9ccf,
+                       rs.bill_10ccf,
+                       NULL::float AS bill_12ccf,
+                       NULL::float AS bill_24ccf,
+                       (rs.fixed_charges->0->>'amount')::float AS fixed_charge_monthly,
+                       rs.rate_structure_type,
+                       rs.vintage_date AS rate_effective_date,
+                       rs.billing_frequency,
+                       rs.confidence AS parse_confidence
+                FROM {schema}.rate_schedules rs
+                {state_join}
+                {where_clause}
+                ORDER BY rs.pwsid, rs.source_key
+            """), conn, params=params)
+
+            # Backfill bill_6ccf/9ccf/12ccf/24ccf from water_rates for eAR records
+            ear_bills = pd.read_sql(text(f"""
+                SELECT pwsid, source, bill_6ccf, bill_9ccf, bill_12ccf, bill_24ccf
+                FROM {schema}.water_rates
+                WHERE bill_6ccf IS NOT NULL OR bill_9ccf IS NOT NULL
+            """), conn)
+            if len(ear_bills) > 0:
+                ear_bills = ear_bills.rename(columns={"source": "source_merge"})
+                df = df.merge(
+                    ear_bills,
+                    left_on=["pwsid", "source"],
+                    right_on=["pwsid", "source_merge"],
+                    how="left",
+                    suffixes=("", "_ear"),
+                )
+                for col in ["bill_6ccf", "bill_9ccf", "bill_12ccf", "bill_24ccf"]:
+                    ear_col = f"{col}_ear"
+                    if ear_col in df.columns:
+                        df[col] = df[col].fillna(df[ear_col])
+                        df = df.drop(columns=[ear_col])
+                if "source_merge" in df.columns:
+                    df = df.drop(columns=["source_merge"])
+        else:
+            logger.info("rate_schedules empty — falling back to water_rates")
+            df = pd.read_sql(text(f"""
+                SELECT pwsid, source, utility_name, state_code,
+                       bill_5ccf, bill_6ccf, bill_9ccf, bill_10ccf, bill_12ccf, bill_24ccf,
+                       fixed_charge_monthly, rate_structure_type, rate_effective_date,
+                       billing_frequency, parse_confidence
+                FROM {schema}.water_rates
+                {where_clause}
+                ORDER BY pwsid, source
+            """), conn, params=params)
 
     if len(df) == 0:
         logger.warning("No rate records found")
