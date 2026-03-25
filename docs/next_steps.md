@@ -917,9 +917,19 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 
 ## Next (Sprint 18+)
 
-- [ ] Fix AmWater link scoring (boost tariff-specific text, penalize "here"/"click here")
-- [ ] Re-run IOU batch after link scoring fix — expect 60-80% success
-- [ ] Run domain guesser with city patterns on full 21K uncovered CWS (measure city vs county hit rate)
-- [ ] Automate EPA CCR APEX form scraping (currently manual CSV input)
+### Immediate: Multi-Company IOU Test (execution session)
+- [ ] Test 1-2 utilities from each non-AmWater IOU parent: Aqua/Essential (PA, NJ), CalWater (CA), SJW (CA, CT), Middlesex (NJ — already passed), Artesian (DE), Aquarion (CT), Liberty (NY, CA), Golden State (CA), CSWR (MO), Nexus (NC, TX)
+- [ ] For each parent: does the rate page have inline rate data OR a simpler tariff PDF?
+- [ ] Batch-process all IOUs that pass the test (expect 200-300 of the 321 non-AmWater URLs)
+- [ ] Hold AmWater URLs (110) for tariff parser development
+
+### Development: AmWater Tariff Parser
+- [ ] The 130-page NJ tariff PDF extracts correctly (72 rate pages, 45K chars, dollar amounts present) but the ParseAgent fails with `no_tier_1_rate` — the legal tariff format isn't handled
+- [ ] Options: tariff-specific parse prompt, pre-extraction of rate table sections, or structured PDF table extraction (pymupdf tables API)
+- [ ] Affects all AmWater state subsidiaries (~110 PWSIDs across 14 states)
+
+### Later
+- [ ] Run domain guesser with city patterns on full 21K uncovered CWS
+- [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
 - [ ] Self-hosted LLM for discovery scoring (Llama 3.1 8B)
