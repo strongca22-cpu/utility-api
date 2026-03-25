@@ -54,6 +54,7 @@ def main(
     search_delay: float = typer.Option(None, "--search-delay", help="Seconds between SearXNG queries (default: from config)"),
     scrape_delay: float = typer.Option(1.5, "--scrape-delay", help="Seconds between URL fetches"),
     no_llm: bool = typer.Option(False, "--no-llm", help="Disable LLM scoring in discovery"),
+    domain_guess_only: bool = typer.Option(False, "--domain-guess-only", help="Skip SearXNG, use domain guessing only"),
 ):
     """Generate task queue and optionally execute top N tasks."""
     from utility_api.agents.orchestrator import OrchestratorAgent
@@ -143,22 +144,23 @@ def main(
                     # URLs already exist — skip discovery, go straight to scrape
                     typer.echo(f"  {pending_count} pending URL(s) in registry — skipping discovery")
                 else:
-                    # No pending URLs — run discovery via SearXNG
-                    # Enforce discovery caps
-                    if discovery_count >= max_discoveries:
-                        typer.echo(f"  SKIPPED — discovery cap reached ({max_discoveries})")
-                        executed += 1
-                        continue
-                    est_queries = total_queries_sent + 5
-                    if est_queries > query_budget:
-                        typer.echo(f"  SKIPPED — query budget reached ({total_queries_sent}/{query_budget})")
-                        executed += 1
-                        continue
+                    # No pending URLs — run discovery
+                    if not domain_guess_only:
+                        # Enforce SearXNG discovery caps (not needed for domain guessing)
+                        if discovery_count >= max_discoveries:
+                            typer.echo(f"  SKIPPED — discovery cap reached ({max_discoveries})")
+                            executed += 1
+                            continue
+                        est_queries = total_queries_sent + 5
+                        if est_queries > query_budget:
+                            typer.echo(f"  SKIPPED — query budget reached ({total_queries_sent}/{query_budget})")
+                            executed += 1
+                            continue
 
-                    # Inter-utility delay (skip before first utility)
-                    if discovery_count > 0:
-                        typer.echo(f"  (waiting {utility_delay}s between utilities)")
-                        time.sleep(utility_delay)
+                        # Inter-utility delay (skip before first utility)
+                        if discovery_count > 0:
+                            typer.echo(f"  (waiting {utility_delay}s between utilities)")
+                            time.sleep(utility_delay)
 
                     # Step 1: Discover URLs
                     disc_result = discovery.run(
@@ -167,9 +169,11 @@ def main(
                         state=task.state_code,
                         use_llm=not no_llm,
                         search_delay=search_delay,
+                        domain_guess_only=domain_guess_only,
                     )
                     discovery_count += 1
-                    total_queries_sent += len(disc_result.get("queries_sent", [])) or 5
+                    if not domain_guess_only:
+                        total_queries_sent += len(disc_result.get("queries_sent", [])) or 5
 
                     if disc_result["urls_written"] == 0:
                         typer.echo(f"  No URLs found — skipping")

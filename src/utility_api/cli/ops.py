@@ -848,6 +848,40 @@ def create_api_key(
     typer.echo(f"  Usage: curl -H 'X-API-Key: {raw_key}' http://localhost:8000/resolve?lat=38.85&lng=-77.35")
 
 
+@app.command("domain-guess")
+def domain_guess(
+    state: str = typer.Option(None, "--state", "-s", help="Limit to a single state code"),
+    max_utilities: int = typer.Option(50, "--max", "-n", help="Max utilities to check"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview without writing"),
+):
+    """Guess utility website domains from SDWIS metadata via DNS lookup.
+
+    Generates domain candidates from county/utility names, checks DNS resolution,
+    and writes live domains to scrape_registry. No search engine needed.
+
+    Works best for local/state-owned utilities with predictable .gov domains.
+    Expected hit rate: 20-30% of municipal utilities.
+    """
+    from utility_api.ops.domain_guesser import run_domain_guessing
+
+    result = run_domain_guessing(
+        state_filter=state,
+        max_utilities=max_utilities,
+        dry_run=dry_run,
+    )
+
+    typer.echo(f"\nDomain Guessing Results")
+    typer.echo("=" * 50)
+    typer.echo(f"  Utilities checked:    {result['utilities_checked']:>6,}")
+    typer.echo(f"  Live domains found:   {result['domains_found']:>6,}")
+    typer.echo(f"  URLs written:         {result['urls_written']:>6,}")
+
+    if dry_run and result.get("candidates"):
+        typer.echo(f"\n  Sample candidates:")
+        for c in result["candidates"][:10]:
+            typer.echo(f"    {c['url'][:70]}")
+
+
 @app.command("iou-map")
 def iou_map(
     state: str = typer.Option(None, "--state", "-s", help="Limit to a single state code"),

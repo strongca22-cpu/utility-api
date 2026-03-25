@@ -363,6 +363,9 @@ class DiscoveryAgent(BaseAgent):
         county = meta.get("county")
         owner_type = meta.get("owner_type")
 
+        # Sprint 16: domain_guess_only flag skips SearXNG entirely
+        domain_guess_only = kwargs.get("domain_guess_only", False)
+
         # Log the expanded name for debugging
         expanded = expand_utility_name(utility_name, county)
         if expanded != utility_name:
@@ -370,7 +373,56 @@ class DiscoveryAgent(BaseAgent):
         else:
             logger.info(f"DiscoveryAgent: {utility_name} ({pwsid}, {state}, county={county})")
 
-        # Build and run search queries
+        # Sprint 16: Try domain guessing first (free, instant, no rate limit)
+        domain_guess_urls = 0
+        if county:
+            from utility_api.ops.domain_guesser import DomainGuesser
+            guesser = DomainGuesser()
+            guesses = guesser.guess_urls(pwsid, utility_name, county, state, owner_type)
+            # Write homepage candidates to registry
+            homepage_guesses = [g for g in guesses if g["method"] == "domain_guess_homepage"]
+            if homepage_guesses:
+                with engine.connect() as conn:
+                    for g in homepage_guesses:
+                        result = conn.execute(text(f"""
+                            INSERT INTO {schema}.scrape_registry
+                                (pwsid, url, url_source, content_type, status, notes)
+                            VALUES
+                                (:pwsid, :url, 'domain_guess', 'html', 'pending',
+                                 :notes)
+                            ON CONFLICT (pwsid, url) DO NOTHING
+                        """), {
+                            "pwsid": pwsid,
+                            "url": g["url"],
+                            "notes": f"Domain guess: {g['domain']}",
+                        })
+                        if result.rowcount > 0:
+                            domain_guess_urls += 1
+                            logger.info(f"  Domain guess → {g['url']}")
+                    if domain_guess_urls > 0:
+                        conn.execute(text(f"""
+                            UPDATE {schema}.pwsid_coverage
+                            SET scrape_status = 'url_discovered'
+                            WHERE pwsid = :pwsid AND scrape_status = 'not_attempted'
+                        """), {"pwsid": pwsid})
+                    conn.commit()
+
+        if domain_guess_only:
+            self.log_run(
+                status="success",
+                rows_affected=domain_guess_urls,
+                notes=f"{utility_name}: domain guess only, {domain_guess_urls} URLs",
+            )
+            return {
+                "pwsid": pwsid,
+                "urls_found": domain_guess_urls,
+                "urls_written": domain_guess_urls,
+                "top_candidates": [],
+                "queries_sent": [],
+                "method": "domain_guess_only",
+            }
+
+        # Build and run search queries (SearXNG)
         queries = build_search_queries(utility_name, state, county, owner_type)
         all_candidates = []
         seen_urls = set()
