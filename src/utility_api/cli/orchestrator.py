@@ -11,7 +11,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-25
+Modified: 2026-03-25 (Sprint 14.5: config-driven pacing, query budget, VPS discovery)
 
 Dependencies:
     - typer
@@ -25,11 +25,23 @@ Usage:
 """
 
 import time
+from pathlib import Path
 
 import typer
+import yaml
 from loguru import logger
 
 app = typer.Typer(help="Generate and execute the orchestrator task queue.")
+
+
+def _load_discovery_config() -> dict:
+    """Load discovery section from config/agent_config.yaml."""
+    config_path = Path(__file__).parents[3] / "config" / "agent_config.yaml"
+    if config_path.exists():
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f) or {}
+        return cfg.get("discovery", {})
+    return {}
 
 
 @app.callback(invoke_without_command=True)
@@ -39,7 +51,7 @@ def main(
     batch_size: int = typer.Option(15, "--batch-size", help="Max discovery tasks to generate"),
     batch: bool = typer.Option(False, "--batch", help="Use Batch API for parse tasks (cheaper, async)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print queue without executing"),
-    search_delay: float = typer.Option(5.0, "--search-delay", help="Seconds between SearXNG queries"),
+    search_delay: float = typer.Option(None, "--search-delay", help="Seconds between SearXNG queries (default: from config)"),
     scrape_delay: float = typer.Option(1.5, "--scrape-delay", help="Seconds between URL fetches"),
     no_llm: bool = typer.Option(False, "--no-llm", help="Disable LLM scoring in discovery"),
 ):
@@ -91,9 +103,19 @@ def main(
     scrape = ScrapeAgent()
     parse = ParseAgent()
 
+    # Load discovery pacing config
+    disc_config = _load_discovery_config()
+    if search_delay is None:
+        search_delay = disc_config.get("delay_between_queries", 8.0)
+    utility_delay = disc_config.get("delay_between_utilities", 15.0)
+    max_discoveries = disc_config.get("max_utilities_per_session", 10)
+    query_budget = disc_config.get("total_query_budget", 60)
+
     executed = 0
     succeeded = 0
     total_cost = 0.0
+    discovery_count = 0
+    total_queries_sent = 0  # rough tracker: ~5 queries per utility
 
     # In batch mode, collect parse tasks instead of running them immediately
     pending_parse_tasks = []
@@ -103,7 +125,23 @@ def main(
             typer.echo(f"\n── Task {executed + 1}: {task.task_type} ──")
 
             if task.task_type == "discover_and_scrape":
+                # Enforce discovery caps
+                if discovery_count >= max_discoveries:
+                    typer.echo(f"  SKIPPED — discovery cap reached ({max_discoveries})")
+                    executed += 1
+                    continue
+                est_queries = total_queries_sent + 5
+                if est_queries > query_budget:
+                    typer.echo(f"  SKIPPED — query budget reached ({total_queries_sent}/{query_budget})")
+                    executed += 1
+                    continue
+
                 typer.echo(f"  PWSID: {task.pwsid} — {task.utility_name}")
+
+                # Inter-utility delay (skip before first utility)
+                if discovery_count > 0:
+                    typer.echo(f"  (waiting {utility_delay}s between utilities)")
+                    time.sleep(utility_delay)
 
                 # Step 1: Discover URLs
                 disc_result = discovery.run(
@@ -113,6 +151,8 @@ def main(
                     use_llm=not no_llm,
                     search_delay=search_delay,
                 )
+                discovery_count += 1
+                total_queries_sent += len(disc_result.get("queries_sent", [])) or 5
 
                 if disc_result["urls_written"] == 0:
                     typer.echo(f"  No URLs found — skipping")

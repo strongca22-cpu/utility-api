@@ -36,6 +36,7 @@ import hashlib
 import re
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
@@ -149,7 +150,21 @@ def _extract_domain(url: str) -> str:
         return ""
 
 
-SEARXNG_URL = "http://localhost:8888/search"
+# Default SearXNG URL — overridden by config/agent_config.yaml discovery.searxng_url
+def _get_searxng_url() -> str:
+    """Read SearXNG URL from agent config, with fallback."""
+    try:
+        import yaml
+        config_path = Path(__file__).parents[3] / "config" / "agent_config.yaml"
+        if config_path.exists():
+            with open(config_path) as f:
+                cfg = yaml.safe_load(f) or {}
+            return cfg.get("discovery", {}).get("searxng_url", "http://localhost:8889/search")
+    except Exception:
+        pass
+    return "http://localhost:8889/search"
+
+SEARXNG_URL = _get_searxng_url()
 
 
 def _search_searxng(query: str, max_results: int = 10) -> list[RatePageCandidate]:

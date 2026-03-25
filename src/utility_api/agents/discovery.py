@@ -12,7 +12,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-25
+Modified: 2026-03-25 (Sprint 14.5: configurable SearXNG URL, VPS-based discovery)
 
 Dependencies:
     - requests (SearXNG API)
@@ -33,13 +33,30 @@ Notes:
 
 import re
 import time
+from pathlib import Path
 
+import yaml
 from loguru import logger
 from sqlalchemy import text
 
 from utility_api.agents.base import BaseAgent
-from utility_api.config import settings
+from utility_api.config import settings, PROJECT_ROOT
 from utility_api.db import engine
+
+
+# --- Discovery Config ---
+
+def _load_discovery_config() -> dict:
+    """Load discovery settings from config/agent_config.yaml."""
+    config_path = PROJECT_ROOT / "config" / "agent_config.yaml"
+    if config_path.exists():
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f) or {}
+        return cfg.get("discovery", {})
+    return {}
+
+
+_DISCOVERY_CONFIG = _load_discovery_config()
 
 
 # --- Utility Name Expansion ---
@@ -259,14 +276,21 @@ def score_with_llm_fallback(
 # --- SearXNG Search ---
 
 def _searxng_search(query: str, max_results: int = 10) -> list[dict]:
-    """Run a SearXNG search and return results."""
+    """Run a SearXNG search and return results.
+
+    Uses the searxng_url from config/agent_config.yaml (discovery section).
+    Defaults to http://localhost:8889/search (VPS via SSH tunnel).
+    """
     import requests
+
+    searxng_url = _DISCOVERY_CONFIG.get("searxng_url", "http://localhost:8889/search")
+    timeout = 15
 
     try:
         r = requests.get(
-            "http://localhost:8888/search",
+            searxng_url,
             params={"q": query, "format": "json", "categories": "general"},
-            timeout=15,
+            timeout=timeout,
         )
         r.raise_for_status()
         data = r.json()
@@ -289,7 +313,7 @@ class DiscoveryAgent(BaseAgent):
         utility_name: str | None = None,
         state: str | None = None,
         use_llm: bool = True,
-        search_delay: float = 5.0,
+        search_delay: float | None = None,
         **kwargs,
     ) -> dict:
         """Discover rate page URLs for a PWSID.
@@ -304,14 +328,16 @@ class DiscoveryAgent(BaseAgent):
             State code (derived from PWSID if not provided).
         use_llm : bool
             Whether to use Haiku for ambiguous URL scoring.
-        search_delay : float
-            Seconds between search queries.
+        search_delay : float, optional
+            Seconds between search queries. Defaults to config value (8s).
 
         Returns
         -------
         dict
             pwsid, urls_found, urls_written.
         """
+        if search_delay is None:
+            search_delay = _DISCOVERY_CONFIG.get("delay_between_queries", 8.0)
         schema = settings.utility_schema
 
         # Fetch full metadata from SDWIS + CWS
@@ -409,4 +435,5 @@ class DiscoveryAgent(BaseAgent):
             "urls_found": len(all_candidates),
             "urls_written": urls_written,
             "top_candidates": top_candidates,
+            "queries_sent": queries,
         }

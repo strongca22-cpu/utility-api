@@ -22,3 +22,16 @@ source_checking:
   default_interval_days: 90
   # HTTP request timeout for source checks (seconds)
   request_timeout: 30
+
+discovery:
+  # SearXNG instance URL — VPS via SSH tunnel or direct
+  # Desktop IP is burned; always use VPS SearXNG for discovery
+  searxng_url: "http://localhost:8889/search"
+  # Seconds between individual SearXNG queries (within one utility)
+  delay_between_queries: 8
+  # Seconds between utilities (between PWSID discovery runs)
+  delay_between_utilities: 15
+  # Max utilities per orchestrator discovery cycle
+  max_utilities_per_session: 10
+  # Hard cap on total SearXNG queries per session
+  total_query_budget: 60
