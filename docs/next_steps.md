@@ -716,5 +716,49 @@
 ## Recommended Next Chat Prompt
 
 ```
-UAPI Sprint 14.5 — Discovery Agent Tuning v1. Sprint 14 infrastructure is complete (cron, Batch API, source checker, health monitoring). The VA coverage push revealed that the DiscoveryAgent's keyword scoring threshold (>50) is too strict for abbreviated VA utility names, and SearXNG rate-limits after ~13 queries at 2s delay. This session tunes the discovery agent: increase search delay, lower scoring threshold, add alternate query patterns for abbreviated names, and re-run 25 VA utilities. Target: 15+ new VA PWSIDs with rate data. See docs/next_steps.md Sprint 14.5 section.
+UAPI Sprint 14.5 — URL Discovery Strategy + SearXNG Rate Limiting
+
+## Context
+Sprint 14 infrastructure is complete (cron, Batch API, source checker, health monitoring, change detection). All deliverables shipped. But the VA coverage push (25 utilities) yielded only 1 new PWSID.
+
+## Failure analysis (from Sprint 14 session)
+Exact breakdown of 25 VA utility attempts:
+- 12/25 (48%): SearXNG returned 0 URLs — upstream engines rate-limited after ~15-20 queries
+- 9/25 (36%): URLs found but keyword scorer filtered them all out (none scored >50)
+- 1/25: Scrape got 0 chars (issuu.com embedded viewer)
+- 2/25: Parse failed (1 DB truncation bug now fixed, 1 API overload)
+- 1/25: Success (VA1191883, Washington County SA, $98.73/mo)
+
+## What's already been fixed this session
+1. Search delay: 2s → 5s between SearXNG queries
+2. Batch cap: 50 → 15 utilities per orchestrator run
+3. Haiku LLM fallback band: 30-60 → 15-60. Validated: Stafford County's rate page scored 15 on keywords but 95 from Haiku. The wider band catches URLs with weak keyword signals.
+4. SearXNG config: Google disabled (most aggressive rate-limiter). All other engines at defaults for maximum redundancy.
+5. Parse agent: _parse_date() handles varied LLM date formats, VARCHAR(30) truncation fixed.
+
+## The open problem: SearXNG rate limiting
+Even with Google disabled and 5s delays, SearXNG returns 0 results after ~1 utility (15-20 queries). The defaults-minus-Google config was tested and rate limiting still occurs at the same threshold. This appears to be an IP-level rate limit from upstream engines, not a SearXNG config issue.
+
+## Strategic shift proposed
+The per-PWSID SearXNG discovery model (search → score → scrape → parse) doesn't scale. The alternative: bulk URL discovery from state utility directories, treating SearXNG as a gap-filler for the 20-30% not in any directory.
+
+The infrastructure already supports this — config/rate_urls_{state}.yaml files feed into scrape_registry via scripts/migrate_urls_to_registry.py. The ScrapeAgent reads pending URLs from the registry regardless of how they got there.
+
+## What this session should do
+1. Diagnose: is the SearXNG rate limit fixable (proxy rotation, engine tuning, delay increase) or a hard constraint?
+2. If hard constraint: identify VA state utility directories (DEQ waterworks, VDH drinking water) and build a directory-scrape ingest module
+3. If fixable: tune SearXNG + rerun VA push
+4. Either way: validate the Haiku scoring fix works at scale by running utilities where SearXNG does return results
+
+## Key files
+- agents/discovery.py — SearXNG search + scoring
+- agents/scrape.py — URL fetching from scrape_registry
+- agents/parse.py — Claude API extraction
+- config/rate_urls_va.yaml — curated VA URLs (31 entries)
+- scripts/migrate_urls_to_registry.py — YAML → scrape_registry loader
+- ops/registry_writer.py — direct scrape_registry writer
+- config/agent_config.yaml — thresholds
+- ~/searxng/searxng/settings.yml — SearXNG config (Google disabled, all others default)
+- docs/uapi_implementation_guide.md — Sprint 14 spec
+- docs/uapi_agent_cost_analysis.md — cost projections
 ```
