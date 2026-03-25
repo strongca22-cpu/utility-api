@@ -87,11 +87,11 @@ def score_with_llm_fallback(
     url: str, title: str, snippet: str,
     utility_name: str, state: str,
 ) -> int:
-    """Keyword score first. Haiku only for ambiguous cases (score 30-60)."""
+    """Keyword score first. Haiku for anything with even a weak signal (15-60)."""
     keyword_score = score_url_relevance(url, title, snippet)
 
-    if keyword_score > 60 or keyword_score < 30:
-        return keyword_score  # confident, no LLM needed
+    if keyword_score > 60 or keyword_score < 15:
+        return keyword_score  # confident high or clearly irrelevant
 
     # Ambiguous — ask Haiku
     try:
