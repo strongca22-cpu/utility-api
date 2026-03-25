@@ -36,10 +36,10 @@ app = typer.Typer(help="Generate and execute the orchestrator task queue.")
 def main(
     execute: int = typer.Option(0, "--execute", "-n", help="Execute top N tasks from the queue"),
     state: str = typer.Option(None, "--state", "-s", help="Limit to a single state code"),
-    batch_size: int = typer.Option(50, "--batch-size", help="Max discovery tasks to generate"),
+    batch_size: int = typer.Option(15, "--batch-size", help="Max discovery tasks to generate"),
     batch: bool = typer.Option(False, "--batch", help="Use Batch API for parse tasks (cheaper, async)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print queue without executing"),
-    search_delay: float = typer.Option(2.0, "--search-delay", help="Seconds between SearXNG queries"),
+    search_delay: float = typer.Option(5.0, "--search-delay", help="Seconds between SearXNG queries"),
     scrape_delay: float = typer.Option(1.5, "--scrape-delay", help="Seconds between URL fetches"),
     no_llm: bool = typer.Option(False, "--no-llm", help="Disable LLM scoring in discovery"),
 ):

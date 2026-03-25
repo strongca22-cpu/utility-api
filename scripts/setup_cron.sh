@@ -56,8 +56,8 @@ install_cron() {
     # Build the cron entries
     local cron_block
     cron_block=$(cat <<CRON
-${CRON_MARKER} — Daily orchestrator: discover + scrape + parse top 50 PWSIDs
-0 2 * * * cd ${PROJECT_DIR} && set -a && source ${ENV_FILE} && set +a && ${VENV_BIN}/ua-run-orchestrator --execute 50 >> ${LOG_DIR}/orchestrator.log 2>&1
+${CRON_MARKER} — Daily orchestrator: discover + scrape + parse top 15 PWSIDs
+0 2 * * * cd ${PROJECT_DIR} && set -a && source ${ENV_FILE} && set +a && ${VENV_BIN}/ua-run-orchestrator --execute 15 >> ${LOG_DIR}/orchestrator.log 2>&1
 
 ${CRON_MARKER} — Daily coverage refresh: update materialized views
 0 5 * * * cd ${PROJECT_DIR} && set -a && source ${ENV_FILE} && set +a && ${VENV_BIN}/ua-ops refresh-coverage >> ${LOG_DIR}/coverage.log 2>&1

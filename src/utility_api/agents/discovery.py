@@ -150,7 +150,7 @@ class DiscoveryAgent(BaseAgent):
         utility_name: str | None = None,
         state: str | None = None,
         use_llm: bool = True,
-        search_delay: float = 2.0,
+        search_delay: float = 5.0,
         **kwargs,
     ) -> dict:
         """Discover rate page URLs for a PWSID.
