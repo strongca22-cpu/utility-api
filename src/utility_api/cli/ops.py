@@ -701,5 +701,108 @@ def pipeline_health():
         typer.echo("\n" + "=" * 65)
 
 
+@app.command("batch-status")
+def batch_status(
+    batch_id: str = typer.Argument(None, help="Specific batch ID to check (default: all pending)"),
+):
+    """Check status of Batch API jobs.
+
+    Queries Anthropic for current processing status of pending batches
+    and updates the local batch_jobs table. Shows all batches if no
+    ID is given.
+    """
+    from utility_api.agents.batch import BatchAgent
+    from utility_api.config import settings
+    from utility_api.db import engine
+
+    schema = settings.utility_schema
+
+    if batch_id:
+        batch_agent = BatchAgent()
+        results = batch_agent.check_status(batch_id=batch_id)
+    else:
+        # Show all batches from DB
+        with engine.connect() as conn:
+            rows = conn.execute(text(f"""
+                SELECT batch_id, submitted_at, task_count, status,
+                       completed_at, processed_at, results_summary, state_filter
+                FROM {schema}.batch_jobs
+                ORDER BY submitted_at DESC
+                LIMIT 20
+            """)).fetchall()
+
+        if not rows:
+            typer.echo("No batch jobs found.")
+            return
+
+        typer.echo(f"\n{'=' * 70}")
+        typer.echo(f"  Batch Jobs")
+        typer.echo(f"{'=' * 70}\n")
+
+        for r in rows:
+            submitted = r.submitted_at.strftime("%Y-%m-%d %H:%M") if r.submitted_at else "?"
+            typer.echo(f"  {r.batch_id}")
+            typer.echo(f"    Status:    {r.status:12s}  Tasks: {r.task_count}")
+            typer.echo(f"    Submitted: {submitted}  State: {r.state_filter or 'all'}")
+            if r.completed_at:
+                typer.echo(f"    Completed: {r.completed_at.strftime('%Y-%m-%d %H:%M')}")
+            if r.processed_at:
+                typer.echo(f"    Processed: {r.processed_at.strftime('%Y-%m-%d %H:%M')}")
+            if r.results_summary:
+                s = r.results_summary
+                typer.echo(f"    Results:   {s.get('succeeded', 0)} succeeded, {s.get('failed', 0)} failed, ${s.get('total_cost', 0):.4f}")
+            typer.echo()
+
+        # Check pending batches against Anthropic
+        pending = [r for r in rows if r.status in ('pending', 'in_progress')]
+        if pending:
+            typer.echo("Checking pending batches against Anthropic API...")
+            batch_agent = BatchAgent()
+            results = batch_agent.check_status()
+            for r in results:
+                if "error" in r:
+                    typer.echo(f"  {r['batch_id']}: error — {r['error']}")
+                else:
+                    typer.echo(f"  {r['batch_id']}: {r['api_status']} ({r.get('succeeded', 0)} succeeded, {r.get('errored', 0)} errored)")
+
+        return
+
+    # Single batch status display
+    if not results:
+        typer.echo(f"Batch {batch_id} not found.")
+        return
+
+    for r in results:
+        if "error" in r:
+            typer.echo(f"  {r['batch_id']}: error — {r['error']}")
+        else:
+            typer.echo(f"  Batch:   {r['batch_id']}")
+            typer.echo(f"  Status:  {r['api_status']} (local: {r['local_status']})")
+            typer.echo(f"  Tasks:   {r['task_count']}")
+            typer.echo(f"  OK: {r.get('succeeded', 0)}  Errors: {r.get('errored', 0)}")
+
+
+@app.command("process-batches")
+def process_batches():
+    """Process all completed Batch API jobs.
+
+    Checks for completed batches, downloads results from Anthropic,
+    validates parse output, writes to rate_schedules, and updates
+    scrape_registry and best estimates.
+    """
+    from utility_api.agents.batch import BatchAgent
+
+    batch_agent = BatchAgent()
+    result = batch_agent.process_all_pending()
+
+    typer.echo(f"\nBatches checked:   {result['batches_checked']}")
+    typer.echo(f"Batches processed: {result['batches_processed']}")
+    typer.echo(f"Total succeeded:   {result['total_succeeded']}")
+    typer.echo(f"Total failed:      {result['total_failed']}")
+
+    if result['batches_processed'] > 0:
+        typer.echo("\nRun 'ua-ops refresh-coverage' to update coverage stats.")
+
+
 if __name__ == "__main__":
     app()

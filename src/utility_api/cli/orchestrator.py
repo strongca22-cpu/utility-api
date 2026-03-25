@@ -7,18 +7,21 @@ Purpose:
     tasks by dispatching to the appropriate agent. This is the entry
     point for autonomous rate data acquisition.
 
+    Sprint 14 adds --batch mode for Anthropic Batch API routing.
+
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-24
+Modified: 2026-03-25
 
 Dependencies:
     - typer
 
 Usage:
-    ua-run-orchestrator                       # print task queue
-    ua-run-orchestrator --execute 10          # execute top 10 tasks
-    ua-run-orchestrator --execute 5 --state VA  # VA only
-    ua-run-orchestrator --dry-run             # same as no flag
+    ua-run-orchestrator                           # print task queue
+    ua-run-orchestrator --execute 10              # execute top 10 tasks
+    ua-run-orchestrator --execute 5 --state VA    # VA only
+    ua-run-orchestrator --execute 25 --state VA --batch  # batch mode
+    ua-run-orchestrator --dry-run                 # same as no flag
 """
 
 import time
@@ -34,6 +37,7 @@ def main(
     execute: int = typer.Option(0, "--execute", "-n", help="Execute top N tasks from the queue"),
     state: str = typer.Option(None, "--state", "-s", help="Limit to a single state code"),
     batch_size: int = typer.Option(50, "--batch-size", help="Max discovery tasks to generate"),
+    batch: bool = typer.Option(False, "--batch", help="Use Batch API for parse tasks (cheaper, async)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print queue without executing"),
     search_delay: float = typer.Option(2.0, "--search-delay", help="Seconds between SearXNG queries"),
     scrape_delay: float = typer.Option(1.5, "--scrape-delay", help="Seconds between URL fetches"),
@@ -54,6 +58,8 @@ def main(
                f"Discoveries: {summary['new_discoveries']}  |  "
                f"Retries: {summary['retries']}  |  "
                f"Change detect: {summary['change_detections']}")
+    if batch:
+        typer.echo(f"  Mode: BATCH (parse tasks will be submitted async)")
     typer.echo(f"{'=' * 60}\n")
 
     # Print top tasks
@@ -74,7 +80,7 @@ def main(
 
     # Execute tasks
     typer.echo(f"\n{'─' * 60}")
-    typer.echo(f"  Executing top {execute} tasks")
+    typer.echo(f"  Executing top {execute} tasks{' (batch mode)' if batch else ''}")
     typer.echo(f"{'─' * 60}\n")
 
     from utility_api.agents.discovery import DiscoveryAgent
@@ -88,6 +94,9 @@ def main(
     executed = 0
     succeeded = 0
     total_cost = 0.0
+
+    # In batch mode, collect parse tasks instead of running them immediately
+    pending_parse_tasks = []
 
     for task in tasks[:execute]:
         try:
@@ -119,30 +128,19 @@ def main(
                     executed += 1
                     continue
 
-                # Step 3: Parse each scraped text
-                for text_entry in scrape_result["raw_texts"]:
-                    parse_result = parse.run(
-                        pwsid=task.pwsid,
-                        raw_text=text_entry["text"],
-                        content_type=text_entry["content_type"],
-                        source_url=text_entry["url"],
-                        registry_id=text_entry["registry_id"],
-                    )
-                    total_cost += parse_result.get("cost_usd", 0)
-                    if parse_result.get("success"):
-                        succeeded += 1
-                        typer.echo(
-                            f"  ✓ bill@10CCF=${parse_result.get('bill_10ccf', 0):.2f} "
-                            f"[{parse_result.get('confidence')}] "
-                            f"cost=${parse_result.get('cost_usd', 0):.4f}"
-                        )
-                        break  # One successful parse per PWSID is enough
-
-            elif task.task_type == "retry_scrape":
-                typer.echo(f"  Retry: registry_id={task.registry_id} — {task.notes}")
-                scrape_result = scrape.run(registry_id=task.registry_id)
-
-                if scrape_result.get("raw_texts"):
+                # Step 3: Parse (live or collect for batch)
+                if batch:
+                    # Take the first scraped text for batch parsing
+                    text_entry = scrape_result["raw_texts"][0]
+                    pending_parse_tasks.append({
+                        "pwsid": task.pwsid,
+                        "raw_text": text_entry["text"],
+                        "content_type": text_entry["content_type"],
+                        "source_url": text_entry["url"],
+                        "registry_id": text_entry["registry_id"],
+                    })
+                    typer.echo(f"  Scraped {text_entry['char_count']:,} chars — queued for batch parse")
+                else:
                     for text_entry in scrape_result["raw_texts"]:
                         parse_result = parse.run(
                             pwsid=task.pwsid,
@@ -154,6 +152,40 @@ def main(
                         total_cost += parse_result.get("cost_usd", 0)
                         if parse_result.get("success"):
                             succeeded += 1
+                            typer.echo(
+                                f"  ✓ bill@10CCF=${parse_result.get('bill_10ccf', 0):.2f} "
+                                f"[{parse_result.get('confidence')}] "
+                                f"cost=${parse_result.get('cost_usd', 0):.4f}"
+                            )
+                            break  # One successful parse per PWSID is enough
+
+            elif task.task_type == "retry_scrape":
+                typer.echo(f"  Retry: registry_id={task.registry_id} — {task.notes}")
+                scrape_result = scrape.run(registry_id=task.registry_id)
+
+                if scrape_result.get("raw_texts"):
+                    if batch:
+                        text_entry = scrape_result["raw_texts"][0]
+                        pending_parse_tasks.append({
+                            "pwsid": task.pwsid,
+                            "raw_text": text_entry["text"],
+                            "content_type": text_entry["content_type"],
+                            "source_url": text_entry["url"],
+                            "registry_id": text_entry["registry_id"],
+                        })
+                        typer.echo(f"  Scraped — queued for batch parse")
+                    else:
+                        for text_entry in scrape_result["raw_texts"]:
+                            parse_result = parse.run(
+                                pwsid=task.pwsid,
+                                raw_text=text_entry["text"],
+                                content_type=text_entry["content_type"],
+                                source_url=text_entry["url"],
+                                registry_id=text_entry["registry_id"],
+                            )
+                            total_cost += parse_result.get("cost_usd", 0)
+                            if parse_result.get("success"):
+                                succeeded += 1
 
             elif task.task_type == "change_detection":
                 typer.echo(f"  Change detection: registry_id={task.registry_id}")
@@ -161,14 +193,23 @@ def main(
                 for text_entry in scrape_result.get("raw_texts", []):
                     if text_entry.get("content_changed"):
                         typer.echo(f"  Content changed — re-parsing")
-                        parse_result = parse.run(
-                            pwsid=task.pwsid,
-                            raw_text=text_entry["text"],
-                            content_type=text_entry["content_type"],
-                            source_url=text_entry["url"],
-                            registry_id=text_entry["registry_id"],
-                        )
-                        total_cost += parse_result.get("cost_usd", 0)
+                        if batch:
+                            pending_parse_tasks.append({
+                                "pwsid": task.pwsid,
+                                "raw_text": text_entry["text"],
+                                "content_type": text_entry["content_type"],
+                                "source_url": text_entry["url"],
+                                "registry_id": text_entry["registry_id"],
+                            })
+                        else:
+                            parse_result = parse.run(
+                                pwsid=task.pwsid,
+                                raw_text=text_entry["text"],
+                                content_type=text_entry["content_type"],
+                                source_url=text_entry["url"],
+                                registry_id=text_entry["registry_id"],
+                            )
+                            total_cost += parse_result.get("cost_usd", 0)
                     else:
                         typer.echo(f"  No change detected")
 
@@ -188,10 +229,34 @@ def main(
             executed += 1
             continue
 
+    # If batch mode: submit all collected parse tasks
+    if batch and pending_parse_tasks:
+        typer.echo(f"\n{'─' * 60}")
+        typer.echo(f"  Submitting {len(pending_parse_tasks)} parse tasks to Batch API")
+        typer.echo(f"{'─' * 60}\n")
+
+        from utility_api.agents.batch import BatchAgent
+        batch_agent = BatchAgent()
+        batch_result = batch_agent.submit(
+            parse_tasks=pending_parse_tasks,
+            state_filter=state,
+        )
+
+        if batch_result.get("batch_id"):
+            typer.echo(f"  ✓ Batch submitted: {batch_result['batch_id']}")
+            typer.echo(f"    Tasks: {batch_result['task_count']}")
+            typer.echo(f"\n  Check results with: ua-ops batch-status {batch_result['batch_id']}")
+            typer.echo(f"  Process results with: ua-ops process-batches")
+        else:
+            typer.echo(f"  ✗ Batch submission failed: {batch_result.get('error', 'unknown')}")
+
     typer.echo(f"\n{'=' * 60}")
     typer.echo(f"  Executed: {executed}/{execute}")
-    typer.echo(f"  Succeeded: {succeeded}")
-    typer.echo(f"  Total API cost: ${total_cost:.4f}")
+    if not batch:
+        typer.echo(f"  Succeeded: {succeeded}")
+        typer.echo(f"  Total API cost: ${total_cost:.4f}")
+    else:
+        typer.echo(f"  Parse tasks queued: {len(pending_parse_tasks)}")
     typer.echo(f"{'=' * 60}")
     typer.echo(f"\nRun 'ua-ops refresh-coverage' to update coverage stats.")
 
