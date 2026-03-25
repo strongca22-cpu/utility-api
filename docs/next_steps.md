@@ -827,17 +827,50 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] Discovery query templates: added CCR search + .gov site operator to DiscoveryAgent (query budget 5→7)
 - [x] `log_discovery()` now accepts `notes` parameter for annotations
 
-## In Progress (Sprint 15 Half 2 — 2026-03-25)
+## Completed (Sprint 15 Half 2 — 2026-03-25)
 
-- [ ] Alembic migration 013 for api_keys table
-- [ ] FastAPI auth middleware + `ua-ops create-api-key` CLI
-- [ ] API docs improvements (better docstrings for OpenAPI spec)
-- [ ] `/bulk-download` endpoint (CSV + GeoJSON export)
-- [ ] MCP server wrapping `/resolve` and `/utility/{pwsid}`
+- [x] Alembic migration 013 for api_keys table
+- [x] FastAPI auth middleware + `ua-ops create-api-key` CLI
+- [x] API docs improvements (better docstrings for OpenAPI spec)
+- [x] `/bulk-download` endpoint (CSV + GeoJSON export)
+- [x] MCP server wrapping `/resolve` and `/utility/{pwsid}`
 
-## Next (Sprint 16+)
+## Completed (Sprint 16 — 2026-03-25)
 
-- [ ] Expand IOU mapper with subsidiary name database (not just regex) for 1,000+ coverage
+### Prerequisite: IOU URL Validation
+- [x] Fixed orchestrator to include `url_discovered` PWSIDs and check for pending URLs before SearXNG
+- [x] Validation run: ALL toolkit IOU URLs were 404 (American Water migrated to amwater.com/{state}aw/, Aqua uses single URL)
+- [x] Corrected all IOU URLs, marked old entries dead, re-ran mapper with 228 corrected entries
+
+### Deliverable 1: Deep Crawl
+- [x] `ScrapeAgent._is_thin_content()` — heuristic detecting landing pages
+- [x] `ScrapeAgent._follow_best_links()` — same-domain link scoring + following (max 3 links)
+- [x] `ScrapeAgent._register_deep_url()` — inserts new registry row for deeper URL (preserves original)
+- [x] No LLM, no search engine — pure HTTP + keyword heuristic
+
+### Deliverable 2: IOU Subsidiary Name Database
+- [x] `config/iou_subsidiaries.yaml` — maps local subsidiary names to parent company URLs
+- [x] `_match_subsidiary()` in iou_mapper.py — normalized name comparison
+- [x] 3 new matches found (Avon Water CT, Pinelands NJ, Beckley Water WV)
+- [x] YAML has TODO markers for entries needing verification from 10-K filings
+
+### Deliverable 3: Domain Guesser
+- [x] `ops/domain_guesser.py` — generates county/name-based domain candidates, DNS-checks them
+- [x] Integrated into DiscoveryAgent as first step before SearXNG
+- [x] `ua-ops domain-guess` CLI command
+- [x] `--domain-guess-only` orchestrator flag
+- [x] Tested: found live domains for 3/3 VA test utilities
+- [x] County-only patterns (no city column in SDWIS)
+
+### Deliverable 5: Parse Retry
+- [x] Retry with rate-search addendum when first attempt fails with `no_tier_1_rate` on substantive content
+- [x] Same system prompt (cache hit) with modified user message
+
+## Next (Sprint 17+)
+
+- [ ] Deliverable 4 execution: National coverage push (IOU batch + domain guess sweep + SearXNG gap fill)
+- [ ] Expand subsidiary YAML with SEC 10-K research (AWK has ~50+ subsidiaries not yet listed)
+- [ ] Add city column to SDWIS (from ECHO API) for better domain guessing
 - [ ] Automate EPA CCR APEX form scraping (currently manual CSV input)
 - [ ] Stripe/payment integration for API tiers
 - [ ] Self-hosted LLM for discovery scoring (Llama 3.1 8B)
