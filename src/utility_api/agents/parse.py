@@ -32,7 +32,8 @@ Notes:
 """
 
 import json
-from datetime import datetime, timezone
+import re
+from datetime import date, datetime, timezone
 
 from loguru import logger
 from sqlalchemy import text
@@ -52,6 +53,24 @@ MODEL_PRICING = {
 
 # Gallon conversions
 CCF_TO_GAL = 748.0
+
+
+def _parse_date(value: str | None) -> date | None:
+    """Parse various date formats returned by the LLM into a date object."""
+    if not value:
+        return None
+    value = str(value).strip()
+    # Try common formats
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%B %d, %Y", "%b %d, %Y", "%Y"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    # Try to extract year only
+    year_match = re.search(r"(20\d{2})", value)
+    if year_match:
+        return date(int(year_match.group(1)), 1, 1)
+    return None
 
 
 def route_model(text_content: str) -> str:
@@ -301,9 +320,9 @@ class ParseAgent(BaseAgent):
                             parse_notes = EXCLUDED.parse_notes
                     """), {
                         "pwsid": pwsid,
-                        "vintage": result.get("rate_effective_date"),
-                        "billing_freq": result.get("billing_frequency"),
-                        "rate_type": result.get("rate_structure_type"),
+                        "vintage": _parse_date(result.get("rate_effective_date")),
+                        "billing_freq": (result.get("billing_frequency") or "")[:30] or None,
+                        "rate_type": (result.get("rate_structure_type") or "")[:30] or None,
                         "fixed": fixed_charges_json,
                         "tiers": json.dumps(tiers) if tiers else None,
                         "bill5": bill_5,

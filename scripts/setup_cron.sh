@@ -57,16 +57,16 @@ install_cron() {
     local cron_block
     cron_block=$(cat <<CRON
 ${CRON_MARKER} — Daily orchestrator: discover + scrape + parse top 50 PWSIDs
-0 2 * * * cd ${PROJECT_DIR} && source ${ENV_FILE} && ${VENV_BIN}/ua-run-orchestrator --execute 50 >> ${LOG_DIR}/orchestrator.log 2>&1
+0 2 * * * cd ${PROJECT_DIR} && set -a && source ${ENV_FILE} && set +a && ${VENV_BIN}/ua-run-orchestrator --execute 50 >> ${LOG_DIR}/orchestrator.log 2>&1
 
 ${CRON_MARKER} — Daily coverage refresh: update materialized views
-0 5 * * * cd ${PROJECT_DIR} && source ${ENV_FILE} && ${VENV_BIN}/ua-ops refresh-coverage >> ${LOG_DIR}/coverage.log 2>&1
+0 5 * * * cd ${PROJECT_DIR} && set -a && source ${ENV_FILE} && set +a && ${VENV_BIN}/ua-ops refresh-coverage >> ${LOG_DIR}/coverage.log 2>&1
 
 ${CRON_MARKER} — Daily batch processing: check and process completed batches
-0 10 * * * cd ${PROJECT_DIR} && source ${ENV_FILE} && ${VENV_BIN}/ua-ops process-batches >> ${LOG_DIR}/batch.log 2>&1
+0 10 * * * cd ${PROJECT_DIR} && set -a && source ${ENV_FILE} && set +a && ${VENV_BIN}/ua-ops process-batches >> ${LOG_DIR}/batch.log 2>&1
 
 ${CRON_MARKER} — Weekly bulk source check: detect new data vintages (Sunday 6 AM)
-0 6 * * 0 cd ${PROJECT_DIR} && source ${ENV_FILE} && ${VENV_BIN}/ua-ops check-sources >> ${LOG_DIR}/sources.log 2>&1
+0 6 * * 0 cd ${PROJECT_DIR} && set -a && source ${ENV_FILE} && set +a && ${VENV_BIN}/ua-ops check-sources >> ${LOG_DIR}/sources.log 2>&1
 CRON
 )
 

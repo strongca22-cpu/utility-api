@@ -46,6 +46,7 @@ from utility_api.agents.parse import (
     ParseAgent,
     _build_volumetric_tiers_from_parse,
     _compute_bill,
+    _parse_date,
     route_model,
     validate_parse_result,
 )
@@ -416,9 +417,9 @@ class BatchAgent(BaseAgent):
                                 parse_notes = EXCLUDED.parse_notes
                         """), {
                             "pwsid": pwsid,
-                            "vintage": parsed.get("rate_effective_date"),
-                            "billing_freq": parsed.get("billing_frequency"),
-                            "rate_type": parsed.get("rate_structure_type"),
+                            "vintage": _parse_date(parsed.get("rate_effective_date")),
+                            "billing_freq": (parsed.get("billing_frequency") or "")[:30] or None,
+                            "rate_type": (parsed.get("rate_structure_type") or "")[:30] or None,
                             "fixed": fixed_charges_json,
                             "tiers": json.dumps(tiers) if tiers else None,
                             "bill5": bill_5,
