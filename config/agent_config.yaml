@@ -1,0 +1,24 @@
+# Agent Configuration
+# Sprint 14: Thresholds for change detection, batch sizing, and freshness checking.
+#
+# Used by: OrchestratorAgent, ParseAgent (batch mode), SourceChecker
+# Location: config/agent_config.yaml
+# Created: 2026-03-25
+
+change_detection:
+  # Re-check active URLs older than this many days
+  freshness_threshold_days: 90
+  # Max change detection tasks per orchestrator cycle
+  max_per_cycle: 20
+
+batch_api:
+  # Minimum parse tasks to justify batch submission (fewer = use live API)
+  min_batch_size: 5
+  # Max tasks per batch (Anthropic limit TBD, start conservative)
+  max_batch_size: 100
+
+source_checking:
+  # Default interval between source freshness checks (days)
+  default_interval_days: 90
+  # HTTP request timeout for source checks (seconds)
+  request_timeout: 30

@@ -11,10 +11,11 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-24
+Modified: 2026-03-25
 
 Dependencies:
     - sqlalchemy
+    - pyyaml
 
 Usage:
     from utility_api.agents.orchestrator import OrchestratorAgent
@@ -29,14 +30,25 @@ Notes:
 """
 
 from datetime import datetime, timezone
+from pathlib import Path
 
+import yaml
 from loguru import logger
 from sqlalchemy import text
 
 from utility_api.agents.base import BaseAgent
 from utility_api.agents.task import Task
-from utility_api.config import settings
+from utility_api.config import PROJECT_ROOT, settings
 from utility_api.db import engine
+
+
+def _load_agent_config() -> dict:
+    """Load agent config from config/agent_config.yaml."""
+    config_path = PROJECT_ROOT / "config" / "agent_config.yaml"
+    if config_path.exists():
+        with open(config_path) as f:
+            return yaml.safe_load(f) or {}
+    return {}
 
 
 class OrchestratorAgent(BaseAgent):
@@ -48,7 +60,7 @@ class OrchestratorAgent(BaseAgent):
         self,
         batch_size: int = 50,
         state_filter: str | None = None,
-        change_detection_days: int = 90,
+        change_detection_days: int | None = None,
         **kwargs,
     ) -> dict:
         """Generate a ranked task queue.
@@ -70,6 +82,13 @@ class OrchestratorAgent(BaseAgent):
         logger.info("=== OrchestratorAgent: generating task queue ===")
         schema = settings.utility_schema
         tasks: list[Task] = []
+
+        # Load config-driven defaults
+        agent_config = _load_agent_config()
+        cd_config = agent_config.get("change_detection", {})
+        if change_detection_days is None:
+            change_detection_days = cd_config.get("freshness_threshold_days", 90)
+        cd_max = cd_config.get("max_per_cycle", 20)
 
         with engine.connect() as conn:
             # 1. Bulk source freshness — highest priority
@@ -144,10 +163,10 @@ class OrchestratorAgent(BaseAgent):
                 SELECT sr.id, sr.pwsid, sr.url, sr.last_fetch_at
                 FROM {schema}.scrape_registry sr
                 WHERE sr.status = 'active'
-                  AND sr.last_fetch_at < NOW() - INTERVAL ':days days'
+                  AND sr.last_fetch_at < NOW() - MAKE_INTERVAL(days => :days)
                 ORDER BY sr.last_fetch_at ASC
-                LIMIT 20
-            """), {"days": change_detection_days}).fetchall()
+                LIMIT :cd_limit
+            """), {"days": change_detection_days, "cd_limit": cd_max}).fetchall()
             for r in rows:
                 tasks.append(Task(
                     task_type="change_detection",

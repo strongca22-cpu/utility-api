@@ -543,5 +543,163 @@ def sync_rate_schedules(
     typer.echo(f"Synced {inserted} records to rate_schedules ({skipped} skipped).")
 
 
+@app.command("check-sources")
+def check_sources():
+    """Check bulk data sources for new data availability.
+
+    Finds all sources in source_catalog with next_check_date <= today
+    and a configured source_url. Fetches the URL, checks for content
+    changes or new data vintages, and updates the catalog.
+
+    New data findings are logged to source_catalog.notes and ingest_log.
+    No auto-ingest — human decides whether to run.
+    """
+    from utility_api.agents.source_checker import SourceChecker
+
+    checker = SourceChecker()
+    result = checker.run_all_due()
+
+    typer.echo(f"\nSources checked: {result['sources_checked']}")
+
+    if result["new_data_found"]:
+        typer.echo(f"\n⚠ New data available for:")
+        for key in result["new_data_found"]:
+            typer.echo(f"  - {key}")
+        typer.echo("\nReview source_catalog notes and decide whether to re-ingest.")
+    else:
+        typer.echo("No new data detected.")
+
+    if result["no_change"]:
+        typer.echo(f"\nUnchanged: {', '.join(result['no_change'])}")
+
+
+@app.command("pipeline-health")
+def pipeline_health():
+    """Pipeline health report: last runs, registry status, recent activity, errors.
+
+    Summarizes operational state of the acquisition pipeline. Use this
+    to check that cron jobs are running, batches are processing, and
+    the scrape/parse pipeline is healthy.
+    """
+    from datetime import datetime, timezone
+
+    from utility_api.config import settings
+    from utility_api.db import engine
+
+    schema = settings.utility_schema
+    now = datetime.now(timezone.utc)
+
+    with engine.connect() as conn:
+        typer.echo(f"\nPipeline Health Report — {now.strftime('%Y-%m-%d %H:%M UTC')}")
+        typer.echo("=" * 65)
+
+        # --- Last Agent Runs ---
+        typer.echo("\n── Last Agent Runs ──")
+        rows = conn.execute(text(f"""
+            SELECT DISTINCT ON (agent_name)
+                agent_name, completed_at, status, notes
+            FROM {schema}.ingest_log
+            ORDER BY agent_name, completed_at DESC
+        """)).fetchall()
+        if rows:
+            for r in rows:
+                if r.completed_at:
+                    age = now - r.completed_at
+                    age_str = f"{age.days}d {age.seconds // 3600}h ago"
+                    status_icon = "✓" if r.status == "success" else "✗" if r.status == "failed" else "~"
+                else:
+                    age_str = "never"
+                    status_icon = "?"
+                typer.echo(
+                    f"  {r.agent_name:20s} {status_icon} {r.completed_at.strftime('%Y-%m-%d %H:%M') if r.completed_at else 'never':20s} ({age_str})"
+                )
+        else:
+            typer.echo("  No agent runs recorded yet.")
+
+        # --- Batch Jobs ---
+        typer.echo("\n── Batch Jobs ──")
+        rows = conn.execute(text(f"""
+            SELECT status, COUNT(*) AS cnt, MAX(submitted_at) AS latest
+            FROM {schema}.batch_jobs
+            GROUP BY status
+            ORDER BY status
+        """)).fetchall()
+        if rows:
+            for r in rows:
+                latest = r.latest.strftime("%Y-%m-%d %H:%M") if r.latest else "?"
+                typer.echo(f"  {r.status:15s} {r.cnt:>3} jobs  (latest: {latest})")
+        else:
+            typer.echo("  No batch jobs yet.")
+
+        # --- Scrape Registry ---
+        typer.echo("\n── Scrape Registry ──")
+        rows = conn.execute(text(f"""
+            SELECT status, COUNT(*) AS cnt
+            FROM {schema}.scrape_registry
+            GROUP BY status
+            ORDER BY cnt DESC
+        """)).fetchall()
+        total = 0
+        for r in rows:
+            total += r.cnt
+            typer.echo(f"  {r.status:20s} {r.cnt:>6,}")
+        typer.echo(f"  {'TOTAL':20s} {total:>6,}")
+
+        # --- Last 7 Days Activity ---
+        typer.echo("\n── Last 7 Days ──")
+        activity = conn.execute(text(f"""
+            SELECT
+                (SELECT COUNT(*) FROM {schema}.scrape_registry
+                 WHERE created_at >= NOW() - INTERVAL '7 days') AS urls_discovered,
+                (SELECT COUNT(*) FROM {schema}.scrape_registry
+                 WHERE last_fetch_at >= NOW() - INTERVAL '7 days') AS urls_fetched,
+                (SELECT COUNT(*) FROM {schema}.scrape_registry
+                 WHERE last_parse_at >= NOW() - INTERVAL '7 days'
+                   AND last_parse_result = 'success') AS parses_succeeded,
+                (SELECT COUNT(*) FROM {schema}.scrape_registry
+                 WHERE last_parse_at >= NOW() - INTERVAL '7 days'
+                   AND last_parse_result = 'failed') AS parses_failed,
+                (SELECT COALESCE(SUM(last_parse_cost_usd), 0) FROM {schema}.scrape_registry
+                 WHERE last_parse_at >= NOW() - INTERVAL '7 days') AS total_cost
+        """)).fetchone()
+        typer.echo(f"  URLs discovered:    {activity.urls_discovered:>6}")
+        typer.echo(f"  URLs fetched:       {activity.urls_fetched:>6}")
+        typer.echo(f"  Parses succeeded:   {activity.parses_succeeded:>6}")
+        typer.echo(f"  Parses failed:      {activity.parses_failed:>6}")
+        typer.echo(f"  Total API cost:     ${float(activity.total_cost):>.4f}")
+
+        # --- Recent Errors ---
+        typer.echo("\n── Recent Errors (last 7 days) ──")
+        rows = conn.execute(text(f"""
+            SELECT completed_at, agent_name, notes
+            FROM {schema}.ingest_log
+            WHERE status = 'failed'
+              AND completed_at >= NOW() - INTERVAL '7 days'
+            ORDER BY completed_at DESC
+            LIMIT 10
+        """)).fetchall()
+        if rows:
+            for r in rows:
+                ts = r.completed_at.strftime("%Y-%m-%d %H:%M") if r.completed_at else "?"
+                notes = (r.notes or "")[:80]
+                typer.echo(f"  {ts}  {r.agent_name:15s}  {notes}")
+        else:
+            typer.echo("  No errors in the last 7 days.")
+
+        # --- Source Catalog Freshness ---
+        typer.echo("\n── Source Catalog Check Schedule ──")
+        rows = conn.execute(text(f"""
+            SELECT source_key, next_check_date, last_content_hash IS NOT NULL AS has_hash
+            FROM {schema}.source_catalog
+            WHERE next_check_date IS NOT NULL
+            ORDER BY next_check_date ASC
+        """)).fetchall()
+        for r in rows:
+            overdue = "⚠ OVERDUE" if r.next_check_date and r.next_check_date <= now.date() else ""
+            typer.echo(f"  {r.source_key:25s} next={r.next_check_date}  {overdue}")
+
+        typer.echo("\n" + "=" * 65)
+
+
 if __name__ == "__main__":
     app()

@@ -173,7 +173,13 @@ def main(
                         typer.echo(f"  No change detected")
 
             elif task.task_type == "check_bulk_source":
-                typer.echo(f"  Bulk source check: {task.source_key} (stub — Sprint 14)")
+                from utility_api.agents.source_checker import SourceChecker
+                checker = SourceChecker()
+                check_result = checker.run(source_key=task.source_key)
+                if check_result.get("new_data_available"):
+                    typer.echo(f"  ⚠ NEW DATA: {check_result.get('details', '')}")
+                else:
+                    typer.echo(f"  No change: {check_result.get('details', '')}")
 
             executed += 1
 
