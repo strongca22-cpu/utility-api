@@ -269,10 +269,10 @@ def duke_reference(
     all_states: bool = typer.Option(False, "--all", help="Ingest all 10 Duke states"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
 ):
-    """Ingest Duke/Nicholas Institute rate data as INTERNAL REFERENCE.
+    """[LEGACY] Ingest Duke data as INTERNAL REFERENCE.
 
-    CC BY-NC-ND 4.0 license — NOT for commercial redistribution.
-    Stored in duke_reference_rates table (never exposed via API).
+    Superseded by 'duke-nieps' which writes to rate_schedules as free_attributed.
+    This command writes to the legacy duke_reference_rates table.
 
     Examples:
         ua-ingest duke-reference --state TX --dry-run
@@ -285,6 +285,46 @@ def duke_reference(
         raise typer.Exit(1)
 
     run_duke_reference_ingest(
+        states=state or None,
+        all_states=all_states,
+        dry_run=dry_run,
+    )
+
+
+@app.command("duke-nieps")
+def duke_nieps(
+    state: list[str] = typer.Option(None, "--state", "-s", help="State(s) to ingest (e.g., TX, NC)"),
+    all_states: bool = typer.Option(False, "--all", help="Ingest all 10 Duke states"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+    seed_catalog: bool = typer.Option(False, "--seed-catalog", help="Seed source_catalog provenance entry"),
+):
+    """Ingest Duke NIEPS 10-state rate data into rate_schedules.
+
+    CC BY-NC-ND 4.0 license — free_attributed tier (free with attribution,
+    never paywalled). Full rate structures: fixed charges + volumetric tier
+    breakpoints for 5,371 PWSIDs across 10 states.
+
+    Use --seed-catalog on first run to create the source_catalog entry
+    with full provenance metadata.
+
+    Examples:
+        ua-ingest duke-nieps --state TX --dry-run
+        ua-ingest duke-nieps --all --seed-catalog --dry-run
+        ua-ingest duke-nieps --all --seed-catalog
+    """
+    from utility_api.ingest.duke_nieps_ingest import (
+        run_duke_nieps_ingest,
+        seed_source_catalog,
+    )
+
+    if seed_catalog:
+        seed_source_catalog(dry_run=dry_run)
+
+    if not state and not all_states:
+        typer.echo("Specify --state or --all")
+        raise typer.Exit(1)
+
+    run_duke_nieps_ingest(
         states=state or None,
         all_states=all_states,
         dry_run=dry_run,

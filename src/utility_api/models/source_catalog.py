@@ -4,14 +4,23 @@ Source Catalog Model
 
 Purpose:
     Registry of all known bulk data sources, their state coverage,
-    vintage, refresh cadence, and ingest status. This is the operational
-    complement to config/sources.yaml (which holds static metadata like
-    URLs and DOIs). The DB table tracks mutable operational state:
-    when we last ingested, how many PWSIDs it covers, when to check next.
+    vintage, refresh cadence, ingest status, AND source provenance
+    (licensing, distribution tier, attribution requirements).
+
+    This is the single source of truth for "where did this data come
+    from and what can we do with it?" Every rate record FK's to this
+    table via source_key. The API uses the tier field to decide access
+    control and the attribution fields for display.
+
+    Tier definitions:
+    - free_open:       No restrictions (EPA, Census)
+    - free_attributed: Free with attribution, never paywalled (CC BY-NC-ND)
+    - premium:         Commercial redistribution, subscription required
+    - internal_only:   Reference/validation, never redistributed
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-24
+Modified: 2026-03-26
 
 Dependencies:
     - sqlalchemy
@@ -30,6 +39,7 @@ Data Sources:
 """
 
 from sqlalchemy import (
+    Boolean,
     Date,
     DateTime,
     Integer,
@@ -98,6 +108,78 @@ class SourceCatalog(Base):
         comment="CLI command to run (e.g., ua-ingest ear --year 2022)",
     )
     notes: Mapped[str | None] = mapped_column(Text)
+
+    # --- Source Provenance (migration 016) ---
+
+    # Licensing
+    license_spdx: Mapped[str | None] = mapped_column(
+        String(80),
+        comment="SPDX identifier (e.g., CC-BY-NC-ND-4.0) or LicenseRef-*",
+    )
+    license_url: Mapped[str | None] = mapped_column(
+        Text, comment="URL to license text",
+    )
+    license_summary: Mapped[str | None] = mapped_column(
+        Text, comment="Human-readable license summary",
+    )
+
+    # Redistribution flags
+    commercial_redistribution: Mapped[bool | None] = mapped_column(
+        Boolean,
+        comment="Can records from this source appear in a paid product?",
+    )
+    attribution_required: Mapped[bool | None] = mapped_column(
+        Boolean,
+        comment="Must we credit the source when serving records?",
+    )
+    attribution_text: Mapped[str | None] = mapped_column(
+        Text, comment="Required attribution string for display",
+    )
+    share_alike: Mapped[bool | None] = mapped_column(
+        Boolean,
+        comment="Does redistribution require the same license?",
+    )
+    modifications_allowed: Mapped[bool | None] = mapped_column(
+        Boolean,
+        comment="Can we compute derived values from this data?",
+    )
+
+    # Distribution tier
+    tier: Mapped[str | None] = mapped_column(
+        String(20),
+        comment="free_open | free_attributed | premium | internal_only",
+    )
+    tier_rationale: Mapped[str | None] = mapped_column(
+        Text, comment="Why this source is assigned to this tier",
+    )
+
+    # Temporal provenance
+    data_vintage: Mapped[str | None] = mapped_column(
+        String(30),
+        comment="When the rates were effective (e.g., 2019-2021)",
+    )
+    collection_date: Mapped[str | None] = mapped_column(
+        String(30),
+        comment="When the source collected/published the data",
+    )
+
+    # Provenance chain
+    upstream_sources: Mapped[str | None] = mapped_column(
+        Text,
+        comment="Comma-separated source_keys this was derived from",
+    )
+    transformation: Mapped[str | None] = mapped_column(
+        String(30),
+        comment="direct_ingest | geospatial_join | rate_computation | fuzzy_match | llm_extraction",
+    )
+
+    # Academic citation
+    citation_doi: Mapped[str | None] = mapped_column(
+        String(100), comment="DOI for citation",
+    )
+    source_url: Mapped[str | None] = mapped_column(
+        Text, comment="Primary URL for the source",
+    )
 
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
