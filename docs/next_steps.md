@@ -1140,6 +1140,21 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] URL selection fix applied: water-specific domains now prioritized over generic .gov
 - [ ] ~29 states still running on VPS. Will auto-import as each completes.
 
+### UAPI Rate Explorer Dashboard
+- [x] Session 1 complete (2026-03-26): export pipeline + interactive map
+  - `scripts/export_dashboard_data.py` — PostGIS → simplified GeoJSON (52 MB, 44,643 features)
+  - React + Vite + MapLibre GL + Tailwind dashboard in `dashboard/`
+  - Coverage choropleth (blue/amber/gray) + bill-at-10CCF color ramp
+  - Click-to-inspect detail panel with tier breakdown + source info
+  - Bottom coverage bar: 3,190/44,643 PWSIDs (7.1%), 31.9% pop coverage
+  - Run: `python scripts/export_dashboard_data.py && cd dashboard && npm run dev`
+  - Node 22 via nvm required (system Node v12 too old for Vite)
+- [ ] Session 2: polish detail panel, hover states, responsive panel sizing
+- [ ] Session 2: settings gear (opacity, reference visibility, state boundaries)
+- [ ] Session 3: PMTiles optimization if GeoJSON performance is poor at scale
+- [ ] Session 3: state summary view at national zoom
+- [ ] Integration with existing dashboard at 100.103.211.71:9090
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
