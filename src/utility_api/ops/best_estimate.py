@@ -358,6 +358,26 @@ def run_best_estimate(
                         df = df.drop(columns=[ear_col])
                 if "source_merge" in df.columns:
                     df = df.drop(columns=["source_merge"])
+
+            # Backfill PWSIDs that exist in water_rates but NOT rate_schedules.
+            # Many EFC bulk ingests landed in water_rates before rate_schedules existed.
+            # These records participate in the same priority logic below.
+            rs_pwsids = set(df["pwsid"].unique())
+            wr_where = where_clause.replace("c.state_code", "state_code") if state_filter else ""
+            wr_df = pd.read_sql(text(f"""
+                SELECT pwsid, source, utility_name, state_code,
+                       bill_5ccf, bill_6ccf, bill_9ccf, bill_10ccf, bill_12ccf, bill_24ccf,
+                       fixed_charge_monthly, rate_structure_type, rate_effective_date,
+                       billing_frequency, parse_confidence
+                FROM {schema}.water_rates
+                {wr_where}
+                ORDER BY pwsid, source
+            """), conn, params=params)
+            wr_only = wr_df[~wr_df["pwsid"].isin(rs_pwsids)]
+            if len(wr_only) > 0:
+                logger.info(f"Backfilling {wr_only.pwsid.nunique()} PWSIDs from water_rates "
+                            f"(not in rate_schedules, {len(wr_only)} records)")
+                df = pd.concat([df, wr_only], ignore_index=True)
         else:
             logger.info("rate_schedules empty — falling back to water_rates")
             df = pd.read_sql(text(f"""

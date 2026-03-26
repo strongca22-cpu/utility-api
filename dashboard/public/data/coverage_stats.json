@@ -1,14 +1,94 @@
 {
-  "generated_at": "2026-03-26T22:44:29.870530+00:00",
+  "generated_at": "2026-03-26T23:05:09.826600+00:00",
   "total_cws": 44643,
-  "with_rate_data": 3190,
-  "with_reference_only": 440,
-  "no_data": 41013,
-  "pct_covered": 7.1,
+  "with_rate_data": 9273,
+  "with_reference_only": 1,
+  "no_data": 35369,
+  "pct_covered": 20.8,
   "population_total": 323012075,
-  "population_covered": 103029672,
-  "pct_population": 31.9,
+  "population_covered": 189748718,
+  "pct_population": 58.7,
   "by_state": [
+    {
+      "state": "ME",
+      "total": 292,
+      "covered": 145,
+      "reference_only": 0,
+      "pct": 49.7,
+      "pop_total": 683711,
+      "pop_covered": 659292,
+      "pop_pct": 96.4
+    },
+    {
+      "state": "WI",
+      "total": 903,
+      "covered": 569,
+      "reference_only": 0,
+      "pct": 63.0,
+      "pop_total": 4218369,
+      "pop_covered": 4061418,
+      "pop_pct": 96.3
+    },
+    {
+      "state": "CA",
+      "total": 2801,
+      "covered": 715,
+      "reference_only": 0,
+      "pct": 25.5,
+      "pop_total": 40197069,
+      "pop_covered": 38363546,
+      "pop_pct": 95.4
+    },
+    {
+      "state": "AR",
+      "total": 668,
+      "covered": 599,
+      "reference_only": 0,
+      "pct": 89.7,
+      "pop_total": 3020064,
+      "pop_covered": 2869130,
+      "pop_pct": 95.0
+    },
+    {
+      "state": "CT",
+      "total": 467,
+      "covered": 163,
+      "reference_only": 0,
+      "pct": 34.9,
+      "pop_total": 2724509,
+      "pop_covered": 2584075,
+      "pop_pct": 94.8
+    },
+    {
+      "state": "NC",
+      "total": 1842,
+      "covered": 493,
+      "reference_only": 0,
+      "pct": 26.8,
+      "pop_total": 9497615,
+      "pop_covered": 8892548,
+      "pop_pct": 93.6
+    },
+    {
+      "state": "MA",
+      "total": 494,
+      "covered": 272,
+      "reference_only": 0,
+      "pct": 55.1,
+      "pop_total": 7148780,
+      "pop_covered": 6464207,
+      "pop_pct": 90.4
+    },
+    {
+      "state": "IA",
+      "total": 980,
+      "covered": 570,
+      "reference_only": 0,
+      "pct": 58.2,
+      "pop_total": 2884441,
+      "pop_covered": 2605245,
+      "pop_pct": 90.3
+    },
     {
       "state": "WA",
       "total": 2125,
@@ -18,6 +98,16 @@
       "pop_total": 9175362,
       "pop_covered": 8164736,
       "pop_pct": 89.0
+    },
+    {
+      "state": "NH",
+      "total": 719,
+      "covered": 167,
+      "reference_only": 0,
+      "pct": 23.2,
+      "pop_total": 922498,
+      "pop_covered": 812768,
+      "pop_pct": 88.1
     },
     {
       "state": "KS",
@@ -30,6 +120,16 @@
       "pop_pct": 87.5
     },
     {
+      "state": "VT",
+      "total": 394,
+      "covered": 170,
+      "reference_only": 0,
+      "pct": 43.1,
+      "pop_total": 463753,
+      "pop_covered": 401965,
+      "pop_pct": 86.7
+    },
+    {
       "state": "PA",
       "total": 1854,
       "covered": 325,
@@ -40,24 +140,54 @@
       "pop_pct": 86.0
     },
     {
-      "state": "CA",
-      "total": 2801,
-      "covered": 431,
-      "reference_only": 284,
-      "pct": 15.4,
-      "pop_total": 40197069,
-      "pop_covered": 33795283,
-      "pop_pct": 84.1
+      "state": "FL",
+      "total": 1386,
+      "covered": 281,
+      "reference_only": 0,
+      "pct": 20.3,
+      "pop_total": 21830957,
+      "pop_covered": 18614725,
+      "pop_pct": 85.3
     },
     {
-      "state": "NC",
-      "total": 1842,
-      "covered": 403,
-      "reference_only": 90,
-      "pct": 21.9,
-      "pop_total": 9497615,
-      "pop_covered": 7891434,
-      "pop_pct": 83.1
+      "state": "GA",
+      "total": 1396,
+      "covered": 488,
+      "reference_only": 0,
+      "pct": 35.0,
+      "pop_total": 10552807,
+      "pop_covered": 8777494,
+      "pop_pct": 83.2
+    },
+    {
+      "state": "NM",
+      "total": 557,
+      "covered": 207,
+      "reference_only": 0,
+      "pct": 37.2,
+      "pop_total": 1917519,
+      "pop_covered": 1595016,
+      "pop_pct": 83.2
+    },
+    {
+      "state": "AL",
+      "total": 488,
+      "covered": 325,
+      "reference_only": 0,
+      "pct": 66.6,
+      "pop_total": 6161863,
+      "pop_covered": 4918284,
+      "pop_pct": 79.8
+    },
+    {
+      "state": "AZ",
+      "total": 724,
+      "covered": 329,
+      "reference_only": 0,
+      "pct": 45.4,
+      "pop_total": 7084204,
+      "pop_covered": 5547049,
+      "pop_pct": 78.3
     },
     {
       "state": "NJ",
@@ -68,16 +198,6 @@
       "pop_total": 8923117,
       "pop_covered": 6929943,
       "pop_pct": 77.7
-    },
-    {
-      "state": "NM",
-      "total": 557,
-      "covered": 55,
-      "reference_only": 0,
-      "pct": 9.9,
-      "pop_total": 1917519,
-      "pop_covered": 1469266,
-      "pop_pct": 76.6
     },
     {
       "state": "TX",
@@ -100,44 +220,124 @@
       "pop_pct": 67.5
     },
     {
-      "state": "ME",
-      "total": 292,
-      "covered": 15,
+      "state": "IL",
+      "total": 1632,
+      "covered": 243,
       "reference_only": 0,
-      "pct": 5.1,
-      "pop_total": 683711,
-      "pop_covered": 248837,
-      "pop_pct": 36.4
+      "pct": 14.9,
+      "pop_total": 12024613,
+      "pop_covered": 7893153,
+      "pop_pct": 65.6
+    },
+    {
+      "state": "OH",
+      "total": 1078,
+      "covered": 367,
+      "reference_only": 0,
+      "pct": 34.0,
+      "pop_total": 10393213,
+      "pop_covered": 6651234,
+      "pop_pct": 64.0
+    },
+    {
+      "state": "DE",
+      "total": 176,
+      "covered": 25,
+      "reference_only": 0,
+      "pct": 14.2,
+      "pop_total": 1016264,
+      "pop_covered": 641097,
+      "pop_pct": 63.1
+    },
+    {
+      "state": "WV",
+      "total": 388,
+      "covered": 241,
+      "reference_only": 0,
+      "pct": 62.1,
+      "pop_total": 1534121,
+      "pop_covered": 892397,
+      "pop_pct": 58.2
+    },
+    {
+      "state": "MS",
+      "total": 974,
+      "covered": 359,
+      "reference_only": 0,
+      "pct": 36.9,
+      "pop_total": 3171133,
+      "pop_covered": 1833646,
+      "pop_pct": 57.8
     },
     {
       "state": "KY",
       "total": 374,
-      "covered": 17,
+      "covered": 93,
       "reference_only": 0,
-      "pct": 4.5,
+      "pct": 24.9,
       "pop_total": 4556638,
-      "pop_covered": 982312,
-      "pop_pct": 21.6
+      "pop_covered": 2288431,
+      "pop_pct": 50.2
     },
     {
-      "state": "AZ",
-      "total": 724,
-      "covered": 5,
+      "state": "OR",
+      "total": 747,
+      "covered": 9,
       "reference_only": 0,
-      "pct": 0.7,
-      "pop_total": 7084204,
-      "pop_covered": 504004,
-      "pop_pct": 7.1
+      "pct": 1.2,
+      "pop_total": 3699463,
+      "pop_covered": 1059804,
+      "pop_pct": 28.6
     },
     {
-      "state": "AR",
-      "total": 668,
+      "state": "HI",
+      "total": 100,
+      "covered": 69,
+      "reference_only": 0,
+      "pct": 69.0,
+      "pop_total": 1488742,
+      "pop_covered": 387617,
+      "pop_pct": 26.0
+    },
+    {
+      "state": "IN",
+      "total": 742,
+      "covered": 62,
+      "reference_only": 0,
+      "pct": 8.4,
+      "pop_total": 5217850,
+      "pop_covered": 1340213,
+      "pop_pct": 25.7
+    },
+    {
+      "state": "MO",
+      "total": 1273,
+      "covered": 73,
+      "reference_only": 0,
+      "pct": 5.7,
+      "pop_total": 5641340,
+      "pop_covered": 1437953,
+      "pop_pct": 25.5
+    },
+    {
+      "state": "SC",
+      "total": 502,
       "covered": 6,
       "reference_only": 0,
-      "pct": 0.9,
-      "pop_total": 3020064,
-      "pop_covered": 103991,
-      "pop_pct": 3.4
+      "pct": 1.2,
+      "pop_total": 4623147,
+      "pop_covered": 800167,
+      "pop_pct": 17.3
+    },
+    {
+      "state": "AK",
+      "total": 317,
+      "covered": 1,
+      "reference_only": 0,
+      "pct": 0.3,
+      "pop_total": 663940,
+      "pop_covered": 38526,
+      "pop_pct": 5.8
     },
     {
       "state": "CO",
@@ -150,26 +350,6 @@
       "pop_pct": 3.2
     },
     {
-      "state": "MA",
-      "total": 494,
-      "covered": 1,
-      "reference_only": 0,
-      "pct": 0.2,
-      "pop_total": 7148780,
-      "pop_covered": 206518,
-      "pop_pct": 2.9
-    },
-    {
-      "state": "AL",
-      "total": 488,
-      "covered": 9,
-      "reference_only": 0,
-      "pct": 1.8,
-      "pop_total": 6161863,
-      "pop_covered": 123372,
-      "pop_pct": 2.0
-    },
-    {
       "state": "LA",
       "total": 807,
       "covered": 10,
@@ -178,26 +358,6 @@
       "pop_total": 5131340,
       "pop_covered": 102711,
       "pop_pct": 2.0
-    },
-    {
-      "state": "GA",
-      "total": 1396,
-      "covered": 2,
-      "reference_only": 0,
-      "pct": 0.1,
-      "pop_total": 10552807,
-      "pop_covered": 188685,
-      "pop_pct": 1.8
-    },
-    {
-      "state": "DE",
-      "total": 176,
-      "covered": 2,
-      "reference_only": 0,
-      "pct": 1.1,
-      "pop_total": 1016264,
-      "pop_covered": 13423,
-      "pop_pct": 1.3
     },
     {
       "state": "MD",
@@ -210,36 +370,6 @@
       "pop_pct": 1.3
     },
     {
-      "state": "IN",
-      "total": 742,
-      "covered": 5,
-      "reference_only": 0,
-      "pct": 0.7,
-      "pop_total": 5217850,
-      "pop_covered": 60418,
-      "pop_pct": 1.2
-    },
-    {
-      "state": "IA",
-      "total": 980,
-      "covered": 2,
-      "reference_only": 0,
-      "pct": 0.2,
-      "pop_total": 2884441,
-      "pop_covered": 28042,
-      "pop_pct": 1.0
-    },
-    {
-      "state": "OR",
-      "total": 747,
-      "covered": 2,
-      "reference_only": 7,
-      "pct": 0.3,
-      "pop_total": 3699463,
-      "pop_covered": 34465,
-      "pop_pct": 0.9
-    },
-    {
       "state": "ID",
       "total": 591,
       "covered": 2,
@@ -248,36 +378,6 @@
       "pop_total": 1544772,
       "pop_covered": 12726,
       "pop_pct": 0.8
-    },
-    {
-      "state": "CT",
-      "total": 467,
-      "covered": 1,
-      "reference_only": 58,
-      "pct": 0.2,
-      "pop_total": 2724509,
-      "pop_covered": 18544,
-      "pop_pct": 0.7
-    },
-    {
-      "state": "IL",
-      "total": 1632,
-      "covered": 1,
-      "reference_only": 0,
-      "pct": 0.1,
-      "pop_total": 12024613,
-      "pop_covered": 42000,
-      "pop_pct": 0.3
-    },
-    {
-      "state": "HI",
-      "total": 100,
-      "covered": 1,
-      "reference_only": 0,
-      "pct": 1.0,
-      "pop_total": 1488742,
-      "pop_covered": 1360,
-      "pop_pct": 0.1
     },
     {
       "state": "01",
@@ -350,32 +450,12 @@
       "pop_pct": 0.0
     },
     {
-      "state": "AK",
-      "total": 317,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 663940,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
       "state": "DC",
       "total": 2,
       "covered": 0,
       "reference_only": 0,
       "pct": 0.0,
       "pop_total": 651635,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
-      "state": "FL",
-      "total": 1386,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 21830957,
       "pop_covered": 0,
       "pop_pct": 0.0
     },
@@ -410,32 +490,12 @@
       "pop_pct": 0.0
     },
     {
-      "state": "MO",
-      "total": 1273,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 5641340,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
       "state": "MP",
       "total": 13,
       "covered": 0,
       "reference_only": 0,
       "pct": 0.0,
       "pop_total": 56463,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
-      "state": "MS",
-      "total": 974,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 3171133,
       "pop_covered": 0,
       "pop_pct": 0.0
     },
@@ -470,16 +530,6 @@
       "pop_pct": 0.0
     },
     {
-      "state": "NH",
-      "total": 719,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 922498,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
       "state": "NV",
       "total": 157,
       "covered": 0,
@@ -496,16 +546,6 @@
       "reference_only": 0,
       "pct": 0.0,
       "pop_total": 18097858,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
-      "state": "OH",
-      "total": 1078,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 10393213,
       "pop_covered": 0,
       "pop_pct": 0.0
     },
@@ -550,16 +590,6 @@
       "pop_pct": 0.0
     },
     {
-      "state": "SC",
-      "total": 502,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 4623147,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
       "state": "SD",
       "total": 448,
       "covered": 0,
@@ -590,36 +620,6 @@
       "pop_pct": 0.0
     },
     {
-      "state": "VT",
-      "total": 394,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 463753,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
-      "state": "WI",
-      "total": 903,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 4218369,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
-      "state": "WV",
-      "total": 388,
-      "covered": 0,
-      "reference_only": 0,
-      "pct": 0.0,
-      "pop_total": 1534121,
-      "pop_covered": 0,
-      "pop_pct": 0.0
-    },
-    {
       "state": "WY",
       "total": 309,
       "covered": 0,
@@ -633,15 +633,63 @@
   "by_source": [
     {
       "source": "Duke NIEPS Water Affordability Data Repository (10-State)",
-      "pwsids": 1571
+      "pwsids": 2009
+    },
+    {
+      "source": "efc_ar_2020",
+      "pwsids": 593
     },
     {
       "source": "LLM-Scraped Water Rates (Claude API)",
-      "pwsids": 577
+      "pwsids": 581
+    },
+    {
+      "source": "efc_wi_2016",
+      "pwsids": 569
+    },
+    {
+      "source": "efc_ia_2023",
+      "pwsids": 568
+    },
+    {
+      "source": "efc_ga_2019",
+      "pwsids": 486
     },
     {
       "source": "UNC EFC NC Water Rate Dashboard 2025",
       "pwsids": 403
+    },
+    {
+      "source": "efc_oh_2019",
+      "pwsids": 367
+    },
+    {
+      "source": "efc_ms_2022",
+      "pwsids": 359
+    },
+    {
+      "source": "efc_az_2014",
+      "pwsids": 324
+    },
+    {
+      "source": "efc_al_2018",
+      "pwsids": 316
+    },
+    {
+      "source": "efc_fl_2020",
+      "pwsids": 281
+    },
+    {
+      "source": "efc_ma_2017",
+      "pwsids": 271
+    },
+    {
+      "source": "efc_il_2018",
+      "pwsids": 242
+    },
+    {
+      "source": "wv_psc_2026",
+      "pwsids": 241
     },
     {
       "source": "Open Water Rate Specification (CA Data Collaborative)",
@@ -656,8 +704,52 @@
       "pwsids": 179
     },
     {
+      "source": "efc_vt_2021",
+      "pwsids": 170
+    },
+    {
+      "source": "efc_nh_2016",
+      "pwsids": 167
+    },
+    {
+      "source": "nm_nmed_rate_survey_2025",
+      "pwsids": 151
+    },
+    {
+      "source": "efc_me_2018",
+      "pwsids": 130
+    },
+    {
+      "source": "efc_ct_2018",
+      "pwsids": 104
+    },
+    {
+      "source": "ky_psc_water_tariffs_2025",
+      "pwsids": 77
+    },
+    {
+      "source": "efc_mo_2015",
+      "pwsids": 73
+    },
+    {
+      "source": "efc_hi_2020",
+      "pwsids": 68
+    },
+    {
+      "source": "in_iurc_water_billing_2024",
+      "pwsids": 57
+    },
+    {
+      "source": "efc_de_2018",
+      "pwsids": 23
+    },
+    {
       "source": "NaN",
-      "pwsids": 19
+      "pwsids": 17
+    },
+    {
+      "source": "efc_sc_2014",
+      "pwsids": 6
     }
   ]
 }
