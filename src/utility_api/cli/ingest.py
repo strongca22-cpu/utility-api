@@ -291,6 +291,46 @@ def duke_reference(
     )
 
 
+@app.command("ky-psc")
+def ky_psc(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+    refresh: bool = typer.Option(False, "--refresh", help="Force re-download PDFs"),
+    limit: int = typer.Option(None, "--limit", "-n", help="Process at most N utilities"),
+):
+    """Ingest Kentucky PSC water tariff directory.
+
+    Crawls IIS directory (~136 utilities), downloads Tariff.pdf for each,
+    extracts rate structures via Claude API, fuzzy-matches to SDWIS PWSIDs.
+
+    Examples:
+        ua-ingest ky-psc --dry-run --limit 5
+        ua-ingest ky-psc --dry-run
+        ua-ingest ky-psc
+    """
+    from utility_api.ingest.ky_psc_ingest import run_ky_psc_ingest
+
+    run_ky_psc_ingest(dry_run=dry_run, refresh=refresh, limit=limit)
+
+
+@app.command("in-iurc")
+def in_iurc(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+    refresh: bool = typer.Option(False, "--refresh", help="Force re-download PDF"),
+):
+    """Ingest Indiana IURC water billing survey (2024).
+
+    Parses PDF with monthly bills at 4,000 gal for ~78 IURC-regulated
+    utilities. Fuzzy-matches utility names to SDWIS PWSIDs.
+
+    Examples:
+        ua-ingest in-iurc --dry-run
+        ua-ingest in-iurc
+    """
+    from utility_api.ingest.in_iurc_ingest import run_in_iurc_ingest
+
+    run_in_iurc_ingest(dry_run=dry_run, refresh=refresh)
+
+
 @app.command("duke-nieps")
 def duke_nieps(
     state: list[str] = typer.Option(None, "--state", "-s", help="State(s) to ingest (e.g., TX, NC)"),

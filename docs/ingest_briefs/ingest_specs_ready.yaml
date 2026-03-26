@@ -1,0 +1,85 @@
+- source_key: "in_iurc_water_billing_2024"
+  name: "Indiana IURC Annual Water Bill Analysis (2024)"
+  tier: "premium"
+  commercial_use: true
+  license: "none stated — Indiana state government"
+  states_covered: [IN]
+  estimated_incremental_pwsids: 65
+  has_pwsid: false
+  matching_strategy: "utility_name_fuzzy"
+  data_vintage: "2024-01-01"
+
+  access:
+    url: "https://www.in.gov/iurc/water-and-wastewater-division/"
+    download_url: "https://www.in.gov/iurc/files/2024-Water-Billing-Survey-Final.pdf"
+    format: "pdf_table"
+    authentication: "none"
+
+  schema:
+    columns:
+      - name: "Utility Name"
+        maps_to: "utility_name"
+        notes: "Strip trailing * for matching; * means fire protection surcharge is included in bill"
+      - name: "Ownership"
+        maps_to: "ownership_type"
+        values: [IOU, Municipal, NFP, "C.D."]
+      - name: "Order Date"
+        maps_to: "last_rate_order_date"
+        type: "date"
+      - name: "Average Monthly Bill for 4,000 gal."
+        maps_to: "monthly_bill_usd"
+        type: "float"
+        notes: "Strip $ sign; store as bill_amount_per_month at consumption_gallons=4000"
+
+  target_table: "water_rates"
+  rate_type: "bill_at_consumption"
+  consumption_gallons: 4000
+
+  parsing_notes:
+    - "PDF is 4 pages, text-selectable, repeated header each page"
+    - "Skip blank rows between sections"
+    - "Multi-row entries: Indiana American Water lists sub-areas (West Lafayette*, Seymour*, etc.) as child rows under a parent header row — treat each child as a separate record, concatenate parent + child name"
+    - "~78 total rows after blank-row removal"
+
+  annual_refresh_url_pattern: "https://www.in.gov/iurc/files/{YEAR}-Water-Billing-Survey-Final.pdf"
+
+
+- source_key: "ky_psc_water_tariffs_2025"
+  name: "Kentucky PSC Water Utility Tariff Directory"
+  tier: "premium"
+  commercial_use: true
+  license: "none stated — Kentucky state government"
+  states_covered: [KY]
+  estimated_incremental_pwsids: 110
+  has_pwsid: false
+  matching_strategy: "utility_name_fuzzy"
+  data_vintage: "2023-2025"  # each PDF has its own effective date
+
+  access:
+    directory_url: "https://psc.ky.gov/tariffs/water/Districts,%20Associations,%20%26%20Privately%20Owned/"
+    per_utility_pattern: "https://psc.ky.gov/tariffs/water/Districts,%20Associations,%20%26%20Privately%20Owned/{utility_name_url_encoded}/Tariff.pdf"
+    format: "pdf_per_utility"
+    authentication: "none"
+    notes: "IIS auto-directory listing — parse <dir> entries from HTML; & in path = %26"
+
+  schema:
+    source_of_utility_name: "IIS directory subdirectory label"
+    extracted_from_pdf:
+      - field: "fixed_charge_usd"
+        description: "Monthly minimum bill / base charge for 5/8\" residential meter"
+      - field: "volumetric_tiers"
+        description: "Array of {min_gal, max_gal, rate_per_gal} for residential service"
+        notes: "Convert CCF/HCF to gallons if needed (1 CCF = 748 gal)"
+
+  target_table: "rate_schedules"
+  rate_type: "tiered_volumetric"
+
+  parsing_notes:
+    - "Same IIS directory structure as wv_psc_2026 — clone that pipeline"
+    - "Target section in each PDF: 'Monthly Rates' or 'Monthly Service Rate' for 5/8\" meter"
+    - "Ignore: fire protection rates, wholesale rates, tap-on fees, purchased water rates"
+    - "Some PDFs use HCF as billing unit — convert all to gallons before storing"
+    - "~127 subdirectories total; some may have Cancelled Tariff Pages subdir — ignore those"
+    - "City-owned utilities (Louisville, Lexington, Bowling Green) NOT present — expected gap"
+
+  similar_to: "wv_psc_2026"

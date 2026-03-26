@@ -1,0 +1,17 @@
+Two new water rate sources are ready for ingest. Read `ingest_brief.md` and `ingest_specs_ready.yaml` from this directory, then implement and run both ingest modules.
+
+**Source 1 — Indiana IURC (`in_iurc_water_billing_2024`)**
+Single PDF download → extract table → fuzzy PWSID match → write to `water_rates`.
+Clone the pattern from an existing bill-at-consumption ingest module. The consumption standard is 4,000 gallons.
+
+**Source 2 — Kentucky PSC (`ky_psc_water_tariffs_2025`)**
+IIS directory crawl → download one Tariff.pdf per utility → LLM-parse tier structure → fuzzy PWSID match → write to `rate_schedules`.
+This is a direct clone of `wv_psc_2026`. Start from that module and change the directory URL and state filter.
+
+For both sources:
+- PWSID matching: fuzzy match utility name against EPA SDWIS for the relevant state (IN or KY)
+- Log match rate and any unmatched utilities to a summary at the end
+- Do not ingest records with no PWSID match
+- Source key and tier are in the YAML
+
+Start with Source 1 (simpler), confirm row count and match rate, then proceed to Source 2.
