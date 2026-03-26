@@ -1070,6 +1070,24 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] Domain guesser automation running unattended: 21 states processed, 99 successes
 - [x] Coverage: 6,170 → 6,780 PWSIDs, 38.7% → 44.6% population. 9 new states with data.
 
+## Completed (Sprint 19a — IN IURC + KY PSC State Ingest)
+
+- [x] **Indiana IURC** (`in_iurc_water_billing_2024`) → `water_rates`:
+  - PDF table: 80 utilities parsed, 58 matched to SDWIS PWSIDs, 14 unmatched (small NFPs, IOU sub-areas)
+  - Bill at 4,000 gal consumption. Avg bill @10CCF: $67.00 (range $11–$128)
+  - 8 duplicate PWSIDs resolved (inside/outside city variants)
+  - CLI: `ua-ingest in-iurc [--dry-run]`
+- [x] **Kentucky PSC** (`ky_psc_water_tariffs_2025`) → `rate_schedules`:
+  - IIS directory crawl: 136 directories, 134 PDFs downloaded, 98 parsed via Claude Haiku
+  - 84 matched to SDWIS PWSIDs, 12 unmatched. 36 parse failures (wholesale-only, unusual formats)
+  - Full JSONB tier structures. Median bill @10CCF: $76.66 (range $5–$333)
+  - API cost: ~$0.10 (Haiku). 15.5 min total runtime.
+  - CLI: `ua-ingest ky-psc [--dry-run] [--limit N]`
+- [x] **Database state after both ingests:**
+  - `rate_schedules`: 5,679 rows, 3,687 unique PWSIDs
+  - `water_rates`: 6,804 rows, 6,178 unique PWSIDs
+  - Two new states with coverage: IN (58 PWSIDs), KY (84 PWSIDs)
+
 ## Next (Sprint 19+)
 
 ### Duke 404 URLs → Domain Guesser Seeding (after Duke batch completes)
