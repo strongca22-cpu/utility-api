@@ -1036,6 +1036,27 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
   - Commercial: 6,120 PWSIDs (13.7%)
   - Duke reference: +2,372 PWSIDs (internal only)
 
+## Completed (Sprint 18d — Source Provenance + Duke NIEPS Production Ingest)
+
+- [x] **Source provenance schema** (migration 016): Added 16 columns to `source_catalog`:
+  - Licensing: `license_spdx`, `license_url`, `license_summary`
+  - Redistribution: `commercial_redistribution`, `attribution_required`, `attribution_text`, `share_alike`, `modifications_allowed`
+  - Distribution tier: `tier` (free_open | free_attributed | premium | internal_only), `tier_rationale`
+  - Temporal: `data_vintage`, `collection_date`
+  - Provenance chain: `upstream_sources`, `transformation`
+  - Citation: `citation_doi`, `source_url`
+- [x] **Duke NIEPS production ingest** (`duke_nieps_ingest.py`) — writes to canonical `rate_schedules`:
+  - 3,177 records across 10 states (TX:722, CA:667, NC:479, KS:411, PA:324, WA:244, NJ:213, CT:58, NM:50, OR:9)
+  - Full rate structures: fixed charges (JSONB) + volumetric tiers (JSONB) + bill snapshots at 5/10/20 CCF
+  - Unit normalization: handles both gallons and cubic feet (PA 18%, NJ 17%, CT 42% cubic feet)
+  - `source_key = "duke_nieps_10state"`, `tier = "free_attributed"`, `confidence = "high"`
+  - 114 PWSIDs skipped (not in CWS boundaries), 1 skipped (no extractable structure)
+  - Conservation signal computed for multi-tier utilities
+  - CLI: `ua-ingest duke-nieps --all [--seed-catalog] [--dry-run]`
+- [x] **Legacy artifact:** `duke_reference_rates` table + `duke_reference_ingest.py` retained but superseded
+- [x] **Source catalog seeding:** `--seed-catalog` flag populates `source_catalog` with full Duke provenance (SPDX, DOI, attribution text, tier rationale)
+- [x] **SourceCatalog ORM model** updated with all 16 provenance fields
+
 ## Next (Sprint 19+)
 
 ### Duke URL Scraping (Highest Priority — Commercially Clean)
