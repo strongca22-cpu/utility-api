@@ -1,0 +1,252 @@
+# =============================================================================
+# MDWD (Municipal Drinking Water Database) — Ingest Specification
+# =============================================================================
+# Generated: 2026-03-26
+# Research session: MDWD Harvard Dataverse + Hughes 2025 rate extension
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Spec A: MDWD Base Dataset (Institutional/Financial Metadata)
+# ---------------------------------------------------------------------------
+spec_a:
+  source_key: "mdwd_base"
+  source_name: "Municipal Drinking Water Database (MDWD)"
+  source_url: "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DFB6NG"
+  source_type: "academic_research"
+  citation: |
+    Hughes, Sara; Kirchhoff, Christine; Conedera, Katelynn; Friedman, Mirit, 2023,
+    "The Municipal Drinking Water Database, 2000-2018 [United States]",
+    https://doi.org/10.7910/DVN/DFB6NG, Harvard Dataverse.
+  citation_doi: "10.7910/DVN/DFB6NG"
+  funding: "NSF Grant #2048505"
+
+  # License
+  license_spdx: "CC0-1.0"
+  license_url: "https://creativecommons.org/publicdomain/zero/1.0/"
+  license_summary: "Public domain — no restrictions on use, modification, or redistribution"
+  commercial_redistribution: true
+  attribution_required: false  # CC0 = no attribution required (but we attribute anyway)
+  share_alike: false
+  modifications_allowed: true
+  tier: "free_open"
+  tier_rationale: "CC0 public domain. No restrictions."
+
+  # Temporal
+  data_vintage: "1997-2018"
+  dataverse_version: "3.0 (2023-08-02)"
+  collection_date: "2022-2023"
+
+  # Files
+  download:
+    main_data:
+      file: "MDWD.tab"
+      format: "TSV (tab-delimited)"
+      size_mb: 12.3
+      rows: 48818  # excluding header
+      local_path: "data/raw/mdwd/MDWD.tab"
+    codebook:
+      file: "MDWD_Codebook.pdf"
+      local_path: "data/raw/mdwd/MDWD_Codebook.pdf"
+    census_guide_pdf:
+      file: "Census_Guide_Final.pdf"
+      local_path: "data/raw/mdwd/Census_Guide_Final.pdf"
+    census_guide_xlsx:
+      file: "Census_Guide_Final.xlsx"
+      local_path: "data/raw/mdwd/Census_Guide_Final.xlsx"
+
+  # Schema
+  structure: "Panel dataset — one row per PWSID per year (22 years, 2,219 systems)"
+  unique_pwsids: 2219
+  states: 48  # continental US, excludes AK/HI
+  year_range: "1997-2018"
+
+  # RATE DATA: NONE
+  contains_rate_data: false
+  rate_columns: null
+  rate_data_note: |
+    The MDWD contains ZERO rate/bill/tariff/pricing columns. It is purely
+    institutional, financial, and demographic metadata for municipal water
+    systems. The "Water_Utility_Revenue" and "Water_Util_Total_Exp" columns
+    are aggregate Census of Governments enterprise-fund financials, NOT
+    customer-facing rate data.
+
+  # Column schema (66 columns grouped by category)
+  columns:
+    identifiers:
+      PWSID: {type: string, sample: "AL0000017", desc: "EPA SDWIS system identifier"}
+      YEAR: {type: integer, sample: 2017, desc: "Year of record"}
+      FIPS: {type: integer, sample: 162328, desc: "Census place FIPS (2020)"}
+      FIPS_2000: {type: integer, desc: "Census place FIPS (2000)"}
+      FIPS_2010: {type: integer, desc: "Census place FIPS (2010)"}
+      State: {type: string, sample: "AL", desc: "State abbreviation"}
+      Census.Name: {type: string, sample: "Prattville city", desc: "Census place name"}
+      PWS.Name: {type: string, sample: "PRATTVILLE (WATER WORKS BOARD OF)", desc: "EPA system name"}
+      GOVSid: {type: integer, desc: "Census of Governments ID"}
+      FIPS_Code_State: {type: integer, desc: "State FIPS code"}
+      FIPS_County: {type: integer, desc: "County FIPS code"}
+      FIPS_Place: {type: integer, desc: "Place FIPS code"}
+      FIPS_Combined: {type: integer, desc: "Combined state+county FIPS"}
+      Name: {type: string, sample: "PRATTVILLE CITY", desc: "City name (Gov Finance DB)"}
+
+    municipal_finance_cpi_adjusted:
+      Population: {type: integer, sample: 24269, desc: "Population from Gov Finance DB"}
+      Total_Revenue: {type: float, desc: "Total municipal revenue (CPI-adjusted)"}
+      Total_Expenditure: {type: float, desc: "Total municipal expenditure (CPI-adjusted)"}
+      Total_Taxes: {type: float, desc: "Total taxes (CPI-adjusted)"}
+      Water_Utility_Revenue: {type: float, desc: "Water utility revenue (CPI-adjusted)", coverage: "~21% of rows"}
+      Water_Util_Total_Exp: {type: float, desc: "Water utility total expenditure (CPI-adjusted)"}
+      Water_Util_Inter_Exp: {type: float, desc: "Water utility intergovernmental expenditure"}
+      Water_Util_Cap_Outlay: {type: float, desc: "Water utility capital outlay"}
+      Water_Util_Current_Exp: {type: float, desc: "Water utility current expenditure"}
+      Water_Util_Construct: {type: float, desc: "Water utility construction"}
+      Health_Total_Expend: {type: float, desc: "Health total expenditure"}
+      Parks___Rec_Total_Exp: {type: float, desc: "Parks & rec total expenditure"}
+      Police_Prot_Total_Exp: {type: float, desc: "Police protection total expenditure"}
+      Total_Debt_Outstanding: {type: float, desc: "Total debt outstanding"}
+      Total_IG_Revenue: {type: float, desc: "Total intergovernmental revenue"}
+      Total_Rev_Own_Sources: {type: float, desc: "Total revenue from own sources"}
+
+    demographics:
+      TOT_POP: {type: integer, desc: "Total population (Census/ACS)"}
+      PCT_White: {type: float, desc: "Percent white"}
+      PCT_Black: {type: float, desc: "Percent Black"}
+      PCT_Hispanic: {type: float, desc: "Percent Hispanic"}
+      PCT_25Plus_LessThanDiploma: {type: float, desc: "Pct 25+ without HS diploma"}
+      PCT_25Plus_Bachelors: {type: float, desc: "Pct 25+ with bachelor's"}
+      Median_Income: {type: integer, sample: 58773, desc: "Median household income"}
+      Median_Housing_Age: {type: integer, desc: "Median housing age"}
+      Below18_Poverty: {type: integer, desc: "Under 18 in poverty"}
+      X18_64_Poverty: {type: integer, desc: "18-64 in poverty"}
+      X65Plus_Poverty: {type: integer, desc: "65+ in poverty"}
+      POV_POP: {type: integer, desc: "Total population in poverty"}
+      POV_PCT: {type: float, sample: 9.34, desc: "Poverty rate (%)"}
+
+    system_environmental:
+      vio_count: {type: integer, desc: "Health violations in year (EPA SDWIS)"}
+      month_moisture: {type: float, desc: "Annual avg moisture index (Willmott & Feddema)"}
+      Full_Time_Equivalent_Employees: {type: integer, desc: "Municipal FTE employees"}
+      merged_FOG: {type: integer, desc: "Form of government (1=mayor, 0=council)"}
+
+    inflation_nonadjusted:
+      CPI: {type: float, desc: "Consumer Price Index (BLS)"}
+      # Columns 49-63 mirror the CPI-adjusted finance columns in nominal dollars (*1000)
+
+    water_source_political:
+      GW_SW_CODE: {type: string, sample: "GW", desc: "Water source: Ground/Surface"}
+      PRIMARY_SOURCE_CODE: {type: string, sample: "GWP", desc: "Detailed source code"}
+      demshare_pres_2016: {type: float, desc: "Democratic vote share, 2016 presidential"}
+
+  # Value assessment
+  value_for_project:
+    primary: |
+      PWSID-to-municipality matching for 2,219 systems nationally. The Census.Name
+      and Name columns provide standardized city/place names linked to PWSIDs — useful
+      for fuzzy-matching city-based rate data (TX TML, WV PSC) to SDWIS PWSIDs.
+    secondary: |
+      Demographic and financial context (median income, poverty rate, water utility
+      financials) for affordability analysis overlay. 1,552 of 2,219 PWSIDs currently
+      have NO rate data in our system — these represent the largest municipally-owned
+      utilities in uncovered states (NY:86, MI:125, MN:77, IN:41).
+    not_useful: |
+      Zero rate data. Cannot replace or supplement any rate source.
+
+  # Overlap with existing data
+  overlap:
+    total_pwsids: 2219
+    in_cws_boundaries: 2216
+    already_have_rate_data: 664
+    gap_fill_potential: 1552  # PWSIDs in CWS but no rate data
+    top_gap_states:
+      IL: 177
+      MA: 131
+      MI: 125
+      FL: 108
+      OH: 105
+      NY: 86
+      MN: 77
+      WI: 75
+
+  # Ingest approach
+  ingest_plan: |
+    The MDWD base is already partially ingested into utility.mdwd_financials (migration 001).
+    That existing ingest loads 225 records (VA + CA only, Sprint 1 scope).
+
+    A full 50-state re-ingest would load all 2,219 PWSIDs with their most recent
+    financial year (2017 Census of Governments). This is a straightforward extension
+    of the existing mdwd.py ingest module — just widen the state filter.
+
+    Priority: LOW. The matching metadata value is real but secondary to rate acquisition.
+    Consider when a name-matching campaign is planned (e.g., TX TML city expansion).
+
+# ---------------------------------------------------------------------------
+# Spec B: Hughes 2025 Rate Extension
+# ---------------------------------------------------------------------------
+spec_b:
+  source_key: "mdwd_hughes_2025_rates"
+  source_name: "Hughes et al. 2025 — Cost of Basic Drinking Water Services"
+  paper_url: "https://awwa.onlinelibrary.wiley.com/doi/full/10.1002/aws2.70014"
+  paper_pdf: "https://par.nsf.gov/servlets/purl/10574381"  # Free full text via NSF PAGES
+  source_type: "academic_research"
+  citation: |
+    Hughes, S., Conedera, K., Kirchhoff, C. (2025). Understanding the cost of
+    basic drinking water services in the United States. AWWA Water Science,
+    7(1), e70014. https://doi.org/10.1002/aws2.70014
+
+  # DATA AVAILABILITY: NOT PUBLIC
+  data_available: false
+  data_availability_statement: |
+    "The data that support the findings of this study are available from the
+    corresponding author upon reasonable request." — Paper, page 10.
+
+    The 2,161-municipality rate dataset was NEVER deposited in any public repository.
+    The Harvard Dataverse MDWD has NOT been updated since August 2023.
+    No supplementary data files exist on the Wiley page.
+
+  # What the data contains (from paper methodology)
+  data_description:
+    n_municipalities: 2161  # 2,119 in final analysis after missing covariates
+    dependent_variable: "Monthly cost of using 6,000 gallons of water (USD)"
+    bill_range: "$5.00 to $163.40"
+    bill_mean: "$38.60"
+    collection_period: "November 2021 to May 2022"
+    collection_method: "Fixed charges + volumetric rates from city websites, municipal codes, or direct utility contact"
+    seasonal_handling: "Defaulted to most expensive scenario"
+    rate_components_available: false  # Only computed bill, NOT underlying rate structure
+    tier_breakpoints_available: false
+    note: |
+      The paper reports only the computed monthly bill at 6,000 gal. It does NOT
+      break out fixed charge amounts, volumetric tier structures, or per-unit rates.
+      Even if obtained, this would provide one bill amount per utility — inferior
+      to Duke's full tier structures.
+
+  # License
+  license_spdx: "CC-BY-NC-ND-4.0"  # Paper license; data license not stated
+  license_note: |
+    The paper is CC BY-NC-ND (Open Access via Wiley). The data itself has no
+    stated license since it was not publicly deposited. Terms would need to be
+    negotiated with the corresponding author.
+  tier: "internal_only"
+  tier_rationale: |
+    Data not publicly available. If obtained via author request, license terms
+    unknown — default to internal_only until clarified.
+
+  # Contact
+  corresponding_author:
+    name: "Sara Hughes"
+    affiliation: "RAND Corporation, Santa Monica, CA"
+    email: "shughes@rand.org"
+    note: "Formerly University of Michigan. Moved to RAND."
+
+  # Value assessment
+  value_for_project:
+    if_obtained: |
+      2,161 municipal CWS with computed bill at 6,000 gal/month. National scope
+      with PWSID identifiers. Would add ~1,500 bill estimates for utilities
+      currently without rate data. However: only ONE consumption point, no tier
+      structure — strictly inferior to Duke's full rate decomposition for the
+      ~660 overlapping utilities.
+    action: |
+      LOW PRIORITY. Contact Hughes (shughes@rand.org) if a name-matching or
+      bill-validation campaign is planned. Frame as "validation dataset" rather
+      than primary rate source. The data's main value would be as a check on
+      our computed bills and to fill coverage in gap states (NY, MI, MN, IN).

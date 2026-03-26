@@ -1,0 +1,187 @@
+# =============================================================================
+# Academic Water Rate Sources: Investigated and Skipped
+# =============================================================================
+# Generated: 2026-03-26
+# Updated: 2026-03-26 (MDWD + NJ Van Abs research session)
+# Purpose: Prevent future research sessions from re-investigating dead ends.
+# =============================================================================
+
+skipped_sources:
+  - name: "Zenodo Archive DOI 10.5281/zenodo.5156654"
+    url: "https://zenodo.org/records/5156654"
+    verified: "2026-03-26"
+    reason: |
+      VERIFIED: Mirror of Duke GitHub repo. Zenodo version tag says "3,038 utilities"
+      but the GitHub main branch (cloned and inspected) contains 5,371 unique PWSIDs
+      across 10 states in data/rates_data/*.xlsx files. Zenodo may lag behind GitHub.
+      Last GitHub commit: 2022-03-15 (Update README.md). CC BY-NC-ND 4.0.
+      The GitHub repo is the canonical source and is already being ingested as
+      source_key "duke_nieps_10state" in the free_attributed tier.
+      No reason to use Zenodo instead of or in addition to GitHub.
+
+  - name: "Duke PLOS Water 787-Community Dataset (S1 Data — Supplementary)"
+    url: "https://journals.plos.org/water/article?id=10.1371/journal.pwat.0000123"
+    verified: "2026-03-26"
+    reason: |
+      VERIFIED ANONYMIZED. The PLOS paper's supplementary file is described as
+      "S1 Data. Anonymized dataset of utilities used to create Figs 3–5."
+      This means NO PWSIDs and NO utility names — just computed affordability
+      metrics for reproducing the paper's figures. Cannot be joined to anything.
+
+      The un-anonymized 787-community rate database powers the Duke interactive
+      dashboard (nicholasinstitute.duke.edu/water-affordability/water-affordability-united-states)
+      but was NEVER published as a bulk download. The GitHub repo was never updated
+      beyond its original 10 states (last commit 2022-03-15). The 40 additional
+      states' data exists only as the dashboard backend.
+
+      IMPORTANT CLARIFICATION: The 10-state GitHub repo (5,371 PWSIDs, deep coverage
+      including small utilities) and the 787-community national dataset (~16 per state,
+      only large utilities) are COMPLEMENTARY, NOT a subset relationship:
+        - GitHub 10-state: deep in 10 states (TX:1078, KS:952, CA:789, NM:697,
+          NC:510, WA:456, PA:418, NJ:327, CT:134, OR:10)
+        - 787 national: broad across all 50 states, only utilities serving 50,000+
+          (expanded to 25,000+ or 10,000+ in smaller states)
+
+      To obtain the identified 787-community data: email Lauren Patterson
+      (lauren.patterson@duke.edu). See investigate_further section below.
+
+  - name: "Internet of Water Data Catalog"
+    url: "https://internetofwater.org"
+    reason: "Coordination initiative and metadata catalog, not a primary data source. Points back to Duke and USGS work already investigated. No downloadable rate data."
+
+  - name: "USGS Water Use Data"
+    url: "https://www.usgs.gov/mission-areas/water-resources/science/water-use"
+    reason: "Collects water USE VOLUMES (gallons pumped/consumed), not water RATES or bills. Not applicable for rate database."
+
+  - name: "EPA SDWIS Published Data"
+    url: "https://www.epa.gov/ground-water-and-drinking-water/safe-drinking-water-information-system-sdwis-federal-reporting"
+    reason: "Contains system metadata (PWSID, name, population, source type, violations) but NO rate or billing data."
+
+  - name: "UNC EFC Brown et al. 2023 (PLOS Water)"
+    url: "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/8DUDLS"
+    reason: "Bill data for 1,720 systems in AZ, GA, NH, WI — all states already covered by EFC dashboards. No incremental PWSIDs."
+
+  - name: "UNC EFC 'Keep your head above water' paper"
+    url: "https://journals.plos.org/water/article?id=10.1371/journal.pwat.0000190"
+    reason: "Analysis paper using EFC data for 4 states we already cover. No new data source."
+
+  - name: "AWWA Water & Wastewater Rate Survey"
+    url: "https://www.awwa.org/data-products/rate-survey/"
+    reason: "Paywalled ($$$). 500 utilities nationally (20-40 per state). Detailed rate data but behind AWWA membership/purchase. Not accessible for bulk ingest."
+
+  - name: "Teodoro Affordability Metrics Papers"
+    url: "https://doi.org/10.1002/awwa.1063"
+    reason: "Methodology papers, not data sources. Define affordability metrics (4.5% threshold, days of labor) used by other studies. No downloadable rate data."
+
+  - name: "Brookings Institution Water Affordability Reports"
+    url: "https://www.brookings.edu/articles/striking-a-better-balance-between-water-investment-and-affordability/"
+    reason: "Policy analysis, not a data source. References other datasets (EPA, Census) for affordability analysis. No original rate data."
+
+  - name: "US Water Alliance reports"
+    url: "https://uswateralliance.org/"
+    reason: "Advocacy/policy organization. Publishes reports using data from others (EFC, Duke). No original rate data."
+
+  - name: "Disparities in drinking water quality (Bardot et al. 2025)"
+    url: "https://journals.plos.org/water/article?id=10.1371/journal.pwat.0000362"
+    reason: "Focuses on water QUALITY disparities (contaminant levels, violations), not rates. Uses EPA service area boundaries but no rate data."
+
+  - name: "Hughes et al. 2025 rate extension (AWWA Water Science)"
+    url: "https://awwa.onlinelibrary.wiley.com/doi/full/10.1002/aws2.70014"
+    verified: "2026-03-26"
+    reason: |
+      INVESTIGATED. Paper adds water cost data for 2,161 municipalities — monthly
+      bill at 6,000 gal computed from fixed charges + volumetric rates (Nov 2021–May 2022).
+
+      DATA NOT PUBLIC. Data Availability Statement: "available from the corresponding
+      author upon reasonable request." Not deposited on Dataverse or any repository.
+      No supplementary data files on Wiley. Dataverse MDWD not updated since Aug 2023.
+
+      Even if obtained: provides only computed bills at ONE consumption point (6,000 gal),
+      NOT underlying rate structures or tier breakpoints. Strictly inferior to Duke's
+      full tier decomposition for overlapping utilities.
+
+      Free full text: https://par.nsf.gov/servlets/purl/10574381 (NSF PAGES)
+      Contact: Sara Hughes, shughes@rand.org (now at RAND, formerly U Michigan)
+      Spec: config/mdwd_ingest_spec.yaml (Spec B)
+
+  - name: "Jersey Water Works / Van Abs NJ affordability study (Phase 3)"
+    url: "https://cms.jerseywaterworks.org/wp-content/uploads/2021/09/Van-Abs-2021.08-NJ-Affordability-Assessment-Smaller-file-size-2-compressed.pdf"
+    verified: "2026-03-26"
+    reason: |
+      INVESTIGATED. PDF Appendix B (pages 51-59) contains ~275 NJ PWSIDs with:
+      - Base charge (quarterly)
+      - Volume charge at 11,250 gal/quarter
+      - Total annual cost at 45,000 gal/year
+      NO tier breakpoints, NO per-unit rate, NO rate structure type.
+      Cannot reconstruct rate schedules or compute bills at other consumption levels.
+
+      Duke already covers 327 NJ PWSIDs with FULL tier structures (breakpoints,
+      per-unit rates, multiple meter sizes). Van Abs adds ~50 incremental PWSIDs
+      at most, with strictly inferior data (one bill amount only). 2020 vintage.
+
+      No structured data (CSV/Excel) exists anywhere — PDF only.
+      No supplementary data from AWWA companion paper (doi:10.1002/aws2.1287).
+      No license stated; standard copyright applies.
+
+      SECONDARY VALUE: Sewer cost table (Appendix C, ~500 municipalities) is
+      unique — Duke does not cover sewer. Defer to if/when sewer becomes relevant.
+      Downloaded to: data/raw/nj_jwe/Van-Abs-2021-NJ-Affordability-Assessment.pdf
+
+# =============================================================================
+# Sources assessed but retained for potential future use (not rate sources)
+# =============================================================================
+assessed_non_rate_sources:
+  - name: "MDWD base dataset (Harvard Dataverse — matching metadata)"
+    url: "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DFB6NG"
+    verified: "2026-03-26"
+    license: "CC0 1.0 (public domain)"
+    tier: "free_open"
+    status: |
+      DOWNLOADED AND ASSESSED. 2,219 unique PWSIDs, 48 states, 66 columns.
+      ZERO rate/bill/cost columns — purely institutional, financial, and demographic.
+      Already partially ingested (225 records, VA+CA) in utility.mdwd_financials.
+      Full spec: config/mdwd_ingest_spec.yaml (Spec A)
+    value: |
+      PWSID-to-municipality matching (Census.Name, PWS.Name, GOVSid columns).
+      1,552 PWSIDs in CWS boundaries but without rate data — these represent
+      the largest municipally-owned systems in gap states (IL:177, MA:131, MI:125,
+      FL:108, OH:105, NY:86, MN:77). Useful for name-matching campaigns.
+      50-state expansion of existing mdwd.py ingest is trivial when needed.
+    local_path: "data/raw/mdwd/MDWD.tab"
+
+# =============================================================================
+# Sources worth investigating further (not skipped, but not ready for ingest)
+# =============================================================================
+investigate_further:
+  - name: "Duke 787-community identified dataset (via author contact)"
+    contact: "Lauren Patterson, lauren.patterson@duke.edu"
+    paper_url: "https://journals.plos.org/water/article?id=10.1371/journal.pwat.0000123"
+    dashboard_url: "https://nicholasinstitute.duke.edu/water-affordability/water-affordability-united-states/"
+    status: "NOT AVAILABLE as bulk download. PLOS S1 Data is anonymized. GitHub not updated."
+    action: |
+      Email Patterson with free-tier distribution proposal:
+      "We're building a public geospatial water rate database. We'd like to include
+      your 787-community national dataset as a free, publicly accessible layer with
+      full attribution — formatted for GIS use but always available without charge.
+      Our premium product covers 6,000+ additional utilities from EFC dashboards and
+      state sources, but the Duke layer would be separate and free."
+
+      This approach satisfies CC BY-NC-ND: the data is distributed for free (NC satisfied),
+      original values preserved (ND satisfied), with full attribution (BY satisfied).
+      Premium product explicitly excludes Duke data from behind paywall.
+    license_concern: "Underlying data is CC BY-NC-ND 4.0 per Duke's standard terms."
+    potential_value: |
+      ~787 utilities across ALL 50 states. Covers ~16 utilities per state on average.
+      For the 10 states already in the GitHub repo, adds nothing (GitHub has more utilities).
+      For ~40 other states, this would be the ONLY Duke source.
+      Highest value for gap states: NY, MI, IN, CO, MN, VA, KY, TN, LA, OK, MD, etc.
+
+  - name: "Duke OTC licensing for commercial use"
+    contact: "otcquestions@duke.edu (reference OTC File No. 8047)"
+    status: "Not yet contacted."
+    action: |
+      If the free-tier distribution model is adopted (Duke data served free with
+      attribution, premium product excludes Duke behind paywall), formal OTC
+      licensing may not be needed. The free-tier model satisfies CC BY-NC-ND.
+      Contact OTC only if a tighter integration (Duke data in premium bundle) is desired.
+    potential_value: "Could unlock 787+ utilities across all 50 states for any distribution model."
