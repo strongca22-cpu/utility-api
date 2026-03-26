@@ -1019,7 +1019,30 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] AZ has outlier max ($9,315) — likely EFC source data error
 - [x] SC low yield (6 records) — 223/257 utilities lack PWSIDs in API
 
+## Completed (Sprint 18c — Duke Reference Ingest + URL Extraction)
+
+- [x] Duke/Nicholas Institute Water Affordability Dataset integrated (CC BY-NC-ND 4.0)
+  - Git clone from GitHub: 10 states, 3,297 PWSIDs, 43,595 rate rows
+  - **Track A (reference):** 3,178 records in `duke_reference_rates` (internal only)
+    - Full tier structure with JSONB, bill calculations at 5/10/20 CCF
+    - Handles NC non-standard PWSID format (dashed → EPA)
+  - **Track B (URLs):** 6,384 utility URLs extracted, 3,718 gap-fill imported to scrape_registry
+    - These point directly to rate pages — much higher quality than domain guesser
+  - CLI: `ua-ingest duke-reference --state TX [--dry-run]`
+- [x] Gap analysis: 2,372 PWSIDs have Duke data but no commercial source
+  - TX: 723, KS: 411, PA: 324, WA: 244, NJ: 213, NM: 50, OR: 9 (100% gap-fill)
+  - CA: 296 new, NC: 90 new, CT: 12 new (overlap states)
+- [x] Combined coverage: 8,492 PWSIDs with any rate data (19.0% of 44,643 CWS)
+  - Commercial: 6,120 PWSIDs (13.7%)
+  - Duke reference: +2,372 PWSIDs (internal only)
+
 ## Next (Sprint 19+)
+
+### Duke URL Scraping (Highest Priority — Commercially Clean)
+- [ ] Validate 5 TX Duke URLs through scrape → parse pipeline
+- [ ] If URLs work: batch-process all gap-fill states (3,718 pending URLs)
+- [ ] Expected: 30-50% URL validity (4-5 year old URLs) → 500-1,200 new commercial PWSIDs
+- [ ] Converts Duke reference data into commercially clean scraped data
 
 ### Data Quality
 - [ ] AZ outlier review: $9,315 max bill @10CCF — investigate and flag
@@ -1029,11 +1052,6 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 ### WV PSC Name Matching Improvements
 - [ ] 42 unmatched WV PSC utilities — manual PWSID mapping file
 - [ ] Consider scraping tariff detail pages (325 URLs) for richer rate data
-
-### Duke/Nicholas Institute Dashboard
-- [ ] Check if data downloadable at internetofwater.org
-- [ ] 2,349 utilities across 7 states (NC, NJ, NM, GA, AZ, CA, WI)
-- [ ] May have overlap with EFC but covers NJ and NM (not in EFC)
 
 ### TX TML Survey
 - [ ] 168-237 Texas cities, annual survey, no PWSIDs (name matching needed)
