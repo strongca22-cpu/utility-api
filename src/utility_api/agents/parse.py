@@ -128,8 +128,16 @@ def _build_volumetric_tiers_from_parse(result: dict) -> list[dict]:
         rate_ccf = result.get(f"tier_{i}_rate")
         if rate_ccf is None:
             break
+        try:
+            rate_ccf = float(rate_ccf)
+        except (ValueError, TypeError):
+            break
 
         limit_ccf = result.get(f"tier_{i}_limit_ccf")
+        try:
+            limit_ccf = float(limit_ccf) if limit_ccf else None
+        except (ValueError, TypeError):
+            limit_ccf = None
         max_gal = int(round(limit_ccf * CCF_TO_GAL)) if limit_ccf else None
         rate_per_1000 = round(rate_ccf * 1000.0 / CCF_TO_GAL, 4)
 
