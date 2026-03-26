@@ -1,23 +1,32 @@
 #!/usr/bin/env python3
 """
-Water Rate Model
+Water Rate Model — LEGACY TABLE
 
 Purpose:
-    Stores parsed water rate schedules for community water systems.
-    Each record represents a single rate schedule vintage for one utility,
-    including the full tier structure and computed bill amounts.
+    DEPRECATED — New ingests should use rate_schedules (Sprint 11+).
 
-    Multiple records per utility are allowed when from different sources
-    (e.g., scraped_llm vs swrcb_ear). Conflict resolution is deferred.
+    This table is retained for EFC bulk data (18 states) and early
+    scraped_llm / eAR / OWRS records that predate rate_schedules.
+    The best_estimate pipeline queries BOTH tables, so existing data
+    here is still active in coverage calculations.
 
-    Sources:
-    - scraped_llm: LLM rate parsing pipeline (Sprint 3)
-    - swrcb_ear_YYYY: CA SWRCB Electronic Annual Report bulk data (Sprint 4)
-    - owrs: Open Water Rate Specification (future)
+    DO NOT write new ingest data to this table. Use rate_schedules instead.
+
+    Migration plan: Re-ingest EFC state data into rate_schedules in a
+    future sprint, then drop this table. EFC data is flat (bill estimates
+    only, no tier structures), so migration is a schema-reshape, not a
+    data-enrichment task.
+
+    Sources (legacy):
+    - efc_*: Environmental Finance Center state surveys (18 states, 5,436 PWSIDs)
+    - swrcb_ear_YYYY: CA SWRCB Electronic Annual Report (also in rate_schedules)
+    - owrs: Open Water Rate Specification (also in rate_schedules)
+    - wv_psc_2026: WV Public Service Commission tariffs
+    - scraped_llm: Early LLM parses (Sprint 3, pre-agent pipeline)
 
 Author: AI-Generated
 Created: 2026-03-23
-Modified: 2026-03-24
+Modified: 2026-03-26
 
 Dependencies:
     - sqlalchemy
@@ -52,7 +61,12 @@ from utility_api.models.base import SCHEMA, Base
 
 
 class WaterRate(Base):
-    """Parsed water rate schedule for a community water system."""
+    """LEGACY TABLE — new ingests should use rate_schedules.
+
+    Retained for EFC bulk data (18 states) pending re-ingest.
+    best_estimate queries both tables. See rate_schedule.py for
+    the canonical model.
+    """
 
     __tablename__ = "water_rates"
     __table_args__ = (
