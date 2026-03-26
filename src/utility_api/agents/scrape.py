@@ -16,11 +16,16 @@ Purpose:
     that discuss rates but link to tariff PDFs are now correctly classified
     as thin. Deep crawl now uses raw HTML for link extraction.
 
+    Sprint 17b: Multi-level deep crawl — configurable depth (default 3).
+    Level 1 uses broad navigation scoring (water/utility/departments).
+    Level 2+ uses rate-focused scoring. Replaces single-level crawl to
+    handle government homepages where rates are 2-4 clicks deep.
+
     This agent does NOT use an LLM. No `anthropic` import.
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-25 (Sprint 17: lower thin threshold to 1+$, return best deep crawl page)
+Modified: 2026-03-25 (Sprint 17b: multi-level deep crawl, configurable depth)
 
 Dependencies:
     - sqlalchemy
@@ -30,23 +35,39 @@ Dependencies:
 Usage:
     from utility_api.agents.scrape import ScrapeAgent
     result = ScrapeAgent().run(pwsid='VA4760100')
+    result = ScrapeAgent().run(pwsid='VA4760100', max_depth=5)  # deeper diagnostic
 
 Notes:
     - Reads from scrape_registry (Sprint 13 change — Sprint 12 only wrote)
     - Returns raw text in memory for ParseAgent to consume
     - Retry logic: 403 → exponential backoff, 404 → dead, 5xx → 6h retry
     - Reuses existing rate_scraper.py functions — does not rewrite them
-    - Deep crawl: follows 1-3 same-domain links when initial page is thin
+    - Deep crawl: multi-level, follows 1-3 same-domain links per level
+    - Max depth configurable via config/agent_config.yaml or run() kwarg
 """
 
 from datetime import datetime, timedelta, timezone
 
+import yaml
 from loguru import logger
 from sqlalchemy import text
 
 from utility_api.agents.base import BaseAgent
-from utility_api.config import settings
+from utility_api.config import PROJECT_ROOT, settings
 from utility_api.db import engine
+
+# Hard cap on total HTTP requests per utility — prevents runaway crawling
+MAX_FETCHES_PER_UTILITY = 15
+
+
+def _load_scrape_config() -> dict:
+    """Load scrape section from config/agent_config.yaml."""
+    config_path = PROJECT_ROOT / "config" / "agent_config.yaml"
+    if config_path.exists():
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f) or {}
+        return cfg.get("scrape", {})
+    return {}
 
 
 class ScrapeAgent(BaseAgent):
@@ -58,6 +79,7 @@ class ScrapeAgent(BaseAgent):
         self,
         registry_id: int | None = None,
         pwsid: str | None = None,
+        max_depth: int | None = None,
         **kwargs,
     ) -> dict:
         """Fetch content from URLs in scrape_registry.
@@ -68,6 +90,8 @@ class ScrapeAgent(BaseAgent):
             Fetch a specific registry entry by ID.
         pwsid : str, optional
             Fetch all pending URLs for this PWSID.
+        max_depth : int, optional
+            Max deep crawl depth. Default from config (3).
 
         Returns
         -------
@@ -77,6 +101,11 @@ class ScrapeAgent(BaseAgent):
         from utility_api.ingest.rate_scraper import scrape_rate_page
 
         schema = settings.utility_schema
+
+        # Load config-driven defaults
+        scrape_config = _load_scrape_config()
+        if max_depth is None:
+            max_depth = scrape_config.get("deep_crawl_max_depth", 3)
 
         # Get URLs to fetch
         with engine.connect() as conn:
@@ -102,7 +131,7 @@ class ScrapeAgent(BaseAgent):
             logger.info("ScrapeAgent: no pending URLs to fetch")
             return {"urls_fetched": 0, "succeeded": 0, "failed": 0, "raw_texts": []}
 
-        logger.info(f"ScrapeAgent: {len(rows)} URLs to fetch")
+        logger.info(f"ScrapeAgent: {len(rows)} URLs to fetch (max_depth={max_depth})")
 
         succeeded = 0
         failed = 0
@@ -158,41 +187,73 @@ class ScrapeAgent(BaseAgent):
                 })
                 conn.commit()
 
-            # Deep crawl: if content is thin (landing page), follow links
-            # to find the actual rate schedule page. Only for HTML pages.
-            final_url = url
-            final_text = scrape_result.text
-            final_is_pdf = getattr(scrape_result, "is_pdf", False)
+            # --- Multi-level deep crawl ---
+            # Start with the initial page. If thin, crawl deeper up to max_depth.
+            current_url = url
+            current_text = scrape_result.text
+            current_html = getattr(scrape_result, "raw_html", None) or scrape_result.text
+            current_is_pdf = getattr(scrape_result, "is_pdf", False)
             deep_crawled = False
+            fetch_count = 1  # count initial fetch
 
-            if (
-                not final_is_pdf
-                and self._is_thin_content(final_text)
-                and char_count > 100  # has some content (not empty)
-            ):
-                logger.info(f"  Thin content ({char_count} chars) — attempting deep crawl")
-                # Use raw HTML for link extraction (plain text strips href attributes)
-                crawl_html = getattr(scrape_result, "raw_html", None) or scrape_result.text
-                deeper = self._follow_best_links(
-                    base_url=url,
-                    page_html=crawl_html,
-                    pwsid=row.pwsid,
-                    max_links=3,
-                )
-                if deeper:
-                    final_url = deeper["url"]
-                    final_text = deeper["text"]
-                    final_is_pdf = deeper.get("is_pdf", False)
+            if not current_is_pdf and char_count > 100:
+                for depth in range(1, max_depth + 1):
+                    if fetch_count >= MAX_FETCHES_PER_UTILITY:
+                        logger.warning(f"  Depth {depth}: hit fetch limit ({MAX_FETCHES_PER_UTILITY}) — stopping")
+                        break
+
+                    if not self._is_thin_content(current_text):
+                        logger.info(f"  Depth {depth - 1}: found rate content ({len(current_text):,} chars) — stopping")
+                        break
+
+                    logger.info(f"  Depth {depth}: thin content ({len(current_text):,} chars) — crawling deeper")
+
+                    deeper = self._follow_best_links(
+                        base_url=current_url,
+                        page_html=current_html,
+                        pwsid=row.pwsid,
+                        max_links=3,
+                        level=depth,
+                        fetch_count=fetch_count,
+                    )
+
+                    if not deeper:
+                        logger.info(f"  Depth {depth}: no followable links found — stopping")
+                        break
+
+                    fetch_count += deeper.get("_fetches", 1)
+                    current_url = deeper["url"]
+                    current_text = deeper["text"]
+                    current_html = deeper.get("raw_html") or deeper["text"]
+                    current_is_pdf = deeper.get("is_pdf", False)
                     deep_crawled = True
-                    char_count = len(final_text) if final_text else 0
-                    logger.info(f"  Deep crawl found: {final_url[:80]} ({char_count:,} chars)")
+
+                    logger.info(
+                        f"  Depth {depth}: followed → {current_url[:70]} "
+                        f"({len(current_text):,} chars)"
+                    )
+
+                    # If we found a PDF, stop — PDFs don't have followable links
+                    if current_is_pdf:
+                        logger.info(f"  Depth {depth}: found PDF — stopping")
+                        break
+
+                # Log final state
+                final_thin = self._is_thin_content(current_text)
+                logger.info(
+                    f"  Final: url={current_url[:70]}, "
+                    f"chars={len(current_text):,}, "
+                    f"thin={final_thin}, fetches={fetch_count}"
+                )
+
+            char_count = len(current_text) if current_text else 0
 
             raw_texts.append({
                 "registry_id": row.id,
                 "pwsid": row.pwsid,
-                "url": final_url,
-                "text": final_text,
-                "content_type": "pdf" if final_is_pdf else "html",
+                "url": current_url,
+                "text": current_text,
+                "content_type": "pdf" if current_is_pdf else "html",
                 "content_changed": content_changed,
                 "char_count": char_count,
                 "deep_crawled": deep_crawled,
@@ -214,7 +275,7 @@ class ScrapeAgent(BaseAgent):
             "raw_texts": raw_texts,
         }
 
-    # --- Deep Crawl Methods (Sprint 16) ---
+    # --- Deep Crawl Methods ---
 
     _RATE_INDICATORS = [
         "per 1,000", "$/1000", "$/1,000", "ccf", "rate schedule",
@@ -266,6 +327,8 @@ class ScrapeAgent(BaseAgent):
         page_html: str,
         pwsid: str,
         max_links: int = 3,
+        level: int = 2,
+        fetch_count: int = 0,
     ) -> dict | None:
         """Extract links from page, score for rate relevance, follow top candidates.
 
@@ -277,6 +340,14 @@ class ScrapeAgent(BaseAgent):
 
         When a deeper URL is found, inserts a NEW scrape_registry row for it
         (the original landing page entry is preserved).
+
+        Parameters
+        ----------
+        level : int
+            Crawl depth level (1 = from homepage, 2+ = from intermediate pages).
+            Controls link scoring strategy.
+        fetch_count : int
+            Running count of HTTP requests made so far for this utility.
         """
         from urllib.parse import urljoin, urlparse
 
@@ -316,37 +387,49 @@ class ScrapeAgent(BaseAgent):
             seen_hrefs.add(canonical)
 
             link_text = a_tag.get_text(strip=True).lower()
-            score = self._score_link(path_lower, link_text)
+            score = self._score_link(path_lower, link_text, level=level)
             if score > 0:
                 scored_links.append((score, href, link_text))
 
         # Sort by score descending, take top N
         scored_links.sort(reverse=True)
 
+        if not scored_links:
+            return None
+
         # Track the best candidate even if still "thin" — a rate-adjacent
         # page is better than the original homepage for parsing.
         best_candidate = None
+        fetches_this_level = 0
 
         for score, href, link_text in scored_links[:max_links]:
-            logger.debug(f"    Deep crawl trying: [{score}] {href[:80]} ({link_text[:40]})")
+            if fetch_count + fetches_this_level >= MAX_FETCHES_PER_UTILITY:
+                break
+
+            logger.debug(f"    L{level} crawl trying: [{score}] {href[:80]} ({link_text[:40]})")
 
             try:
                 result = scrape_rate_page(href)
+                fetches_this_level += 1
             except Exception as e:
-                logger.debug(f"    Deep crawl fetch failed: {e}")
+                logger.debug(f"    L{level} crawl fetch failed: {e}")
+                fetches_this_level += 1
                 continue
 
             if result.error and not result.text:
                 continue
 
             fetched_text = result.text or ""
+            raw_html = getattr(result, "raw_html", None) or fetched_text
             candidate = {
                 "url": href,
                 "text": fetched_text,
+                "raw_html": raw_html,
                 "is_pdf": getattr(result, "is_pdf", False),
                 "char_count": len(fetched_text),
                 "_result": result,  # keep for registration
                 "_link_score": score,
+                "_fetches": fetches_this_level,
             }
 
             if not self._is_thin_content(fetched_text):
@@ -358,7 +441,6 @@ class ScrapeAgent(BaseAgent):
                     result=result,
                 )
                 del candidate["_result"]
-                del candidate["_link_score"]
                 return candidate
 
             # Track best fallback: prefer higher link score, then more content
@@ -373,7 +455,7 @@ class ScrapeAgent(BaseAgent):
         # improvement over the original (more content or rate-relevant URL)
         if best_candidate and best_candidate["char_count"] > 200:
             logger.info(
-                f"  Deep crawl: no substantive page, using best candidate "
+                f"  L{level} crawl: no substantive page, using best candidate "
                 f"({best_candidate['char_count']:,} chars): "
                 f"{best_candidate['url'][:80]}"
             )
@@ -384,62 +466,167 @@ class ScrapeAgent(BaseAgent):
                 result=best_candidate["_result"],
             )
             del best_candidate["_result"]
-            del best_candidate["_link_score"]
+            best_candidate["_fetches"] = fetches_this_level
             return best_candidate
 
         return None
 
     @staticmethod
-    def _score_link(href_lower: str, link_text: str) -> int:
-        """Score a link's likelihood of leading to a rate schedule. No LLM."""
+    def _score_link(href_lower: str, link_text: str, level: int = 2) -> int:
+        """Score a link's likelihood of leading to rate content.
+
+        Parameters
+        ----------
+        level : int
+            Crawl depth level.
+            Level 1: broad navigation — find water/utility department from homepage.
+            Level 2+: rate-focused — find the actual rate/fee schedule page.
+        """
         score = 0
         combined = f"{href_lower} {link_text}"
 
-        # Strong positive signals
-        for kw in ["rate", "fee", "schedule", "tariff", "billing",
-                    "water cost", "water rate", "rate schedule"]:
-            if kw in combined:
-                score += 20
+        if level == 1:
+            # ==============================================================
+            # LEVEL 1: BROAD NAVIGATION
+            # Goal: find the water/utility department page from a homepage
+            # Be VERY generous — overscraping is preferred to missing pages
+            # ==============================================================
 
-        # PDF links with rate keywords
-        if href_lower.endswith(".pdf") and score > 0:
-            score += 15
+            # Direct water/utility signals (strong)
+            for kw in ["water", "utility", "utilities", "public works",
+                        "public utilities", "sewer", "wastewater",
+                        "stormwater", "drinking water"]:
+                if kw in combined:
+                    score += 25
 
-        # Specificity boost — consumer-facing rate documents
-        for kw in ["tariff", "current rates", "rate table",
-                    "schedule of rates", "fee schedule", "rates effective"]:
-            if kw in combined:
-                score += 25
+            # Department/organizational navigation (moderate)
+            for kw in ["departments", "department", "divisions", "division",
+                        "services", "resident", "residents", "customer",
+                        "infrastructure", "operations", "public services",
+                        "environmental", "environment", "resources",
+                        "community", "government", "about", "our services"]:
+                if kw in combined:
+                    score += 10
 
-        # PDF + tariff combo — strongest signal (tariff PDF is the target)
-        if href_lower.endswith(".pdf"):
-            if any(kw in combined for kw in ["tariff", "schedule of rates"]):
-                score += 30
+            # Path-based signals (strong — URL structure reveals site hierarchy)
+            for kw in ["/water", "/utility", "/utilities", "/public-works",
+                        "/departments", "/divisions", "/services",
+                        "/residents", "/customer", "/public-utilities",
+                        "/infrastructure", "/environmental", "/dpw",
+                        "/pw", "/dpu", "/dwu"]:
+                if kw in href_lower:
+                    score += 15
 
-        # Moderate positive
-        for kw in ["water", "utility", "service", "customer", "residential"]:
-            if kw in combined:
-                score += 5
+            # Rate-adjacent signals (if rates are directly linked from homepage)
+            for kw in ["rate", "fee", "billing", "tariff", "charges",
+                        "schedule of", "pay bill", "pay my bill",
+                        "account", "payment"]:
+                if kw in combined:
+                    score += 20
 
-        # Negative: non-content pages
-        for kw in ["meeting", "agenda", "minute", "news", "press",
-                    "job", "career", "bid", "contact", "report", "ccr",
-                    "login", "signup", "register", "calendar"]:
-            if kw in combined:
+            # Penalties — clearly wrong departments
+            for kw in ["police", "fire", "court", "courts", "clerk",
+                        "election", "elections", "voter", "voting",
+                        "parks", "recreation", "library", "museum",
+                        "planning", "zoning", "building permits",
+                        "human resources", "hr", "careers", "jobs",
+                        "employment", "job openings",
+                        "animal", "animal control", "shelter",
+                        "tax", "taxes", "assessor", "property tax",
+                        "sheriff", "jail", "corrections",
+                        "health department", "social services",
+                        "school", "schools", "education",
+                        "transit", "transportation", "bus",
+                        "cemetery", "golf", "pool",
+                        "news", "press", "press release", "blog",
+                        "calendar", "events", "meeting", "agenda",
+                        "minutes", "video", "photo", "gallery",
+                        "sitemap", "accessibility", "privacy",
+                        "login", "sign in", "register",
+                        "facebook", "twitter", "instagram", "youtube",
+                        "linkedin", "mailto:"]:
+                if kw in combined:
+                    score -= 20
+
+        else:
+            # ==============================================================
+            # LEVEL 2+: RATE-FOCUSED
+            # Goal: find the actual rate/fee schedule page
+            # Still broad — we want to find rates even if oddly labeled
+            # ==============================================================
+
+            # Direct rate signals (strong)
+            for kw in ["rate", "rates", "fee", "fees", "tariff", "tariffs",
+                        "schedule", "billing", "charges", "pricing",
+                        "cost of water", "water cost", "how much",
+                        "what does water cost", "rate schedule",
+                        "fee schedule", "rate structure",
+                        "current rates", "rate table",
+                        "schedule of rates", "rates effective",
+                        "residential rates", "commercial rates",
+                        "water charges", "sewer charges",
+                        "monthly charge", "service charge",
+                        "base charge", "usage charge",
+                        "volumetric", "tiered", "tier"]:
+                if kw in combined:
+                    score += 20
+
+            # Specificity boost (very strong)
+            for kw in ["tariff", "current rates", "rate table",
+                        "schedule of rates", "fee schedule", "rates effective",
+                        "water rate schedule", "sewer rate schedule",
+                        "rate ordinance", "rate resolution"]:
+                if kw in combined:
+                    score += 25
+
+            # PDF links with rate keywords (strongest signal)
+            if href_lower.endswith(".pdf"):
+                if any(kw in combined for kw in ["tariff", "rate", "schedule",
+                                                  "fee", "charge"]):
+                    score += 30
+                elif score > 0:
+                    score += 15  # Any PDF on a rate-adjacent page
+
+            # Water/utility context (moderate — confirms we're in the right section)
+            for kw in ["water", "utility", "utilities", "service",
+                        "customer", "residential", "commercial",
+                        "account", "billing", "payment",
+                        "consumption", "usage", "meter",
+                        "connection", "hookup", "tap"]:
+                if kw in combined:
+                    score += 5
+
+            # Navigation deeper into rate section (moderate)
+            for kw in ["details", "more information", "view rates",
+                        "see rates", "rate information", "learn about rates",
+                        "rate details", "full schedule"]:
+                if kw in combined:
+                    score += 15
+
+            # Penalties — wrong content
+            for kw in ["meeting", "agenda", "minutes", "news", "press",
+                        "press release", "blog", "announcement",
+                        "job", "career", "bid", "rfp", "procurement",
+                        "contact", "contact us", "staff directory",
+                        "ccr", "water quality report", "consumer confidence",
+                        "petition", "case", "hearing", "testimony",
+                        "docket", "proceeding", "filing",
+                        "annual report", "rate case",
+                        "conservation", "rebate", "incentive",
+                        "assistance", "hardship", "low income",
+                        "start service", "stop service", "transfer",
+                        "outage", "emergency", "boil water",
+                        "construction", "project", "capital improvement",
+                        "faq", "frequently asked"]:
+                if kw in combined:
+                    score -= 15
+
+            # Generic link text penalty (only if it's the ENTIRE link text)
+            stripped = link_text.strip().lower()
+            if stripped in ("here", "click here", "learn more", "read more",
+                            "view more", "download", "see more", "details",
+                            "more", "continue", "next"):
                 score -= 15
-
-        # Negative: regulatory filings (long documents, not consumer rate schedules)
-        for kw in ["petition", "case", "hearing", "testimony", "docket",
-                    "proceeding", "filing", "application", "order",
-                    "annual report", "rate case"]:
-            if kw in combined:
-                score -= 20
-
-        # Negative: generic link text with no information about destination
-        stripped = link_text.strip().lower()
-        if stripped in ("here", "click here", "learn more", "read more",
-                        "view more", "download", "see more", "details"):
-            score -= 15
 
         return max(0, score)
 

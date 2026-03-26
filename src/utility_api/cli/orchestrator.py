@@ -55,6 +55,7 @@ def main(
     scrape_delay: float = typer.Option(1.5, "--scrape-delay", help="Seconds between URL fetches"),
     no_llm: bool = typer.Option(False, "--no-llm", help="Disable LLM scoring in discovery"),
     domain_guess_only: bool = typer.Option(False, "--domain-guess-only", help="Skip SearXNG, use domain guessing only"),
+    max_depth: int = typer.Option(None, "--max-depth", help="Max deep crawl depth (default: from config, typically 3)"),
 ):
     """Generate task queue and optionally execute top N tasks."""
     from utility_api.agents.orchestrator import OrchestratorAgent
@@ -182,7 +183,7 @@ def main(
 
                 # Step 2: Scrape pending URLs
                 time.sleep(scrape_delay)
-                scrape_result = scrape.run(pwsid=task.pwsid)
+                scrape_result = scrape.run(pwsid=task.pwsid, max_depth=max_depth)
 
                 if not scrape_result.get("raw_texts"):
                     typer.echo(f"  Scrape failed — no content")
@@ -222,7 +223,7 @@ def main(
 
             elif task.task_type == "retry_scrape":
                 typer.echo(f"  Retry: registry_id={task.registry_id} — {task.notes}")
-                scrape_result = scrape.run(registry_id=task.registry_id)
+                scrape_result = scrape.run(registry_id=task.registry_id, max_depth=max_depth)
 
                 if scrape_result.get("raw_texts"):
                     if batch:
@@ -250,7 +251,7 @@ def main(
 
             elif task.task_type == "change_detection":
                 typer.echo(f"  Change detection: registry_id={task.registry_id}")
-                scrape_result = scrape.run(registry_id=task.registry_id)
+                scrape_result = scrape.run(registry_id=task.registry_id, max_depth=max_depth)
                 for text_entry in scrape_result.get("raw_texts", []):
                     if text_entry.get("content_changed"):
                         typer.echo(f"  Content changed — re-parsing")

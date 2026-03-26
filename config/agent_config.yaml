@@ -23,6 +23,12 @@ source_checking:
   # HTTP request timeout for source checks (seconds)
   request_timeout: 30
 
+scrape:
+  # Max depth for multi-level deep crawl (1 = old behavior, 3 = default)
+  # Level 1: broad navigation (water/utility/departments from homepage)
+  # Level 2+: rate-focused (actual rate/fee schedule pages)
+  deep_crawl_max_depth: 3
+
 discovery:
   # SearXNG instance URL — VPS via SSH tunnel or direct
   # Desktop IP is burned; always use VPS SearXNG for discovery
