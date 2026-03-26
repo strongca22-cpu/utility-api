@@ -961,7 +961,43 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] Coverage: 862 → 866 PWSIDs (+4: 1 Juneau + 3 from VA batch)
 - [x] Total session API cost: ~$0.85
 
+## Completed (Sprint 18 — EFC FL API + WV PSC Ingest)
+
+- [x] FL EFC API ingest: 281 records from 227 utilities via Topsail JSON API
+  - Prototype for generic EFC API client (all 24 state dashboards use same platform)
+  - API endpoint: `/dashboards/15/chart_data.json` — one call per utility, 1 req/sec
+  - Bill curves at 500-gal increments → NC tier extraction logic reused directly
+  - 10 utilities had no PWSID in API data, 1 PWSID not in CWS boundaries
+  - Source key: `efc_fl_2020`, vintage: Raftelis 2020 survey
+  - Avg bill @10CCF: $36.95 (range $13.91–$86.02)
+- [x] WV PSC HTML scrape ingest: 241 records from 325 PSC-listed utilities
+  - Scraped cost rankings at 3,400 and 4,000 gallon levels
+  - 2-point bill curve → derived volumetric rate + base charge
+  - Fuzzy name matching against SDWIS: 241/325 matched (74%), 42 unmatched, 42 duplicate PWSIDs
+  - Source key: `wv_psc_2026`, vintage: March 2026 (current PSC rates)
+  - Avg bill @10CCF: $100.84 (range $3.00–$251.07)
+- [x] Key architectural finding: all 24 EFC dashboards use same Rails/Topsail platform with same JSON API
+  - "Download Data" button returns 500 error on all dashboards (broken server-side)
+  - JSON API is unauthenticated, returns full bill curves + PWSID + metadata per utility
+  - Generic EFC module (Track B) can cover all 24 states with one API client + per-state config
+- [x] CLI commands: `ua-ingest efc-fl [--dry-run] [--refresh]`, `ua-ingest wv-psc [--dry-run] [--refresh]`
+- [x] WV PSC requires browser User-Agent header (blocks default httpx UA with 404)
+
 ## Next (Sprint 18+)
+
+### Generic EFC API Module (Track B — High Priority)
+- [ ] Generalize FL API pattern: one module, 24 states
+- [ ] Extract utility IDs from each state's dashboard HTML (option elements)
+- [ ] Per-state config: dashboard_id, source_key, vintage_date
+- [ ] Estimated yield: 4,000–5,000 PWSIDs from one engineering session
+- [ ] States with dashboards: NC, FL, WV, and ~21 others at efc.sog.unc.edu
+
+### WV PSC Name Matching Improvements
+- [ ] 42 unmatched WV PSC utilities — manual PWSID mapping file
+- [ ] 42 duplicate PWSIDs — many are the same utility appearing under different tariff IDs (e.g., Beckley Water Company ×5)
+- [ ] Consider scraping tariff detail pages (325 URLs) for richer rate data (3 consumption levels + customer charge)
+
+
 
 ### IOU Parser Tuning (deferred companies)
 - [ ] AmWater tariff parser: 130-page legal format needs tariff-specific parse prompt or structured PDF table extraction
