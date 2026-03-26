@@ -1,8 +1,8 @@
 # Session Summary — Sprint 17b: Multi-Level Deep Crawl + Domain Guesser
 
 **Date:** 2026-03-25
-**Coverage:** 862 → 866 PWSIDs (+4)
-**API Cost:** ~$0.85 (session total, $0.25 for 7-day total)
+**Coverage:** 851 → 869 PWSIDs (+18 total session)
+**API Cost:** ~$1.20 (session total)
 
 ## What Happened
 
@@ -44,5 +44,15 @@ Replaced single-level deep crawl with configurable-depth loop (default 3 levels)
 - 4 new rate records (1 Juneau + 3 VA batch)
 - Deep crawl registry entries for navigated pages
 
+### URL Selection Fix (Sprint 17b addendum)
+- Original `pick_best_url()` had a blanket `.gov` preference that overrode the guesser's confidence tiers
+- Loudoun Water: guesser found `loudounwater.org` (confidence 80) but selection picked `loudoun.gov` (confidence 40)
+- **15 PWSIDs** had water-specific domains discarded for .gov; **172 PWSIDs** had higher-confidence non-.gov options ignored
+- Fix: respect confidence tiers, prioritize water-keyword domains, use .gov only as tiebreaker
+- Re-imported 431 URLs with corrected logic (28 water-specific, 14 .gov, 300 other for VA)
+- **Loudoun Water now parses:** `loudounwater.org` → L1 `/rates-billing` → L2 `/rates-fees-charges-penalties` → $109.02/month, high confidence
+- **Frederick Water also parses:** `frederickwater.com` → L1 `/water-wastewater-rates` → high confidence
+- Coverage: 866 → 869 (+3 from corrected URLs + batch)
+
 ## Key Insight
-The multi-level crawl is mechanically correct — it navigates government site hierarchies successfully. The bottleneck is now **URL quality**, not crawl depth. Domain-guessed URLs point to general city/county sites that may not even serve water. The highest-leverage next step is better URL targeting (water authority domains specifically) rather than deeper crawling.
+The multi-level crawl works correctly — Juneau, Loudoun Water, and Frederick Water all navigated 1-2 levels to find rate pages. The initial ~6% success rate was caused by a URL selection bug, not a crawl depth problem. With corrected selection, water-specific domains parse well. The remaining ~300 non-water-specific domain-guessed URLs (generic city/county sites) are a lower-yield population but may still produce results as they process through the pipeline.
