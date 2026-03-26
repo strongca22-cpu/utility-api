@@ -159,11 +159,7 @@ def upgrade():
         sa.Column("citation_doi", sa.String(100), nullable=True, comment="DOI for citation"),
         schema=SCHEMA,
     )
-    op.add_column(
-        "source_catalog",
-        sa.Column("source_url", sa.Text, nullable=True, comment="Primary URL for the source"),
-        schema=SCHEMA,
-    )
+    # NOTE: source_url already exists from migration 012 — skip adding it
 
 
 def downgrade():
@@ -174,7 +170,7 @@ def downgrade():
         "tier", "tier_rationale",
         "data_vintage", "collection_date",
         "upstream_sources", "transformation",
-        "citation_doi", "source_url",
+        "citation_doi",  # source_url NOT dropped — pre-existed from migration 012
     ]
     for col in cols:
         op.drop_column("source_catalog", col, schema=SCHEMA)

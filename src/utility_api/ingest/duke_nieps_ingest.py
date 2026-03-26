@@ -689,7 +689,7 @@ def run_duke_nieps_ingest(
                         ) VALUES (
                             :pwsid, :source_key, :vintage_date, :customer_class,
                             :billing_frequency, :rate_structure_type,
-                            :fixed_charges::jsonb, :volumetric_tiers::jsonb, :surcharges::jsonb,
+                            CAST(:fixed_charges AS jsonb), CAST(:volumetric_tiers AS jsonb), CAST(:surcharges AS jsonb),
                             :bill_5ccf, :bill_10ccf, :bill_20ccf,
                             :conservation_signal, :tier_count,
                             :source_url, :confidence, :parse_notes,
