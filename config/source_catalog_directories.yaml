@@ -1,0 +1,370 @@
+# Source Catalog: Water Utility Directory Sources
+# Generated: 2026-03-25
+# Purpose: Documents all investigated federal/state/aggregator directory sources
+# Key finding: NO source contains utility website URLs - all are compliance/contact focused
+
+# =============================================================================
+# TIER 1: FEDERAL SOURCES
+# =============================================================================
+
+- source_key: epa_echo_sdwa_download
+  display_name: "EPA ECHO SDWA Bulk Data Download"
+  source_type: federal_bulk_download
+  states_covered: [ALL]
+  url: "https://echo.epa.gov/tools/data-downloads"
+  format: csv_download  # Weekly-refreshed ZIP with multiple CSV files
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true  # admin name, phone, fax, address
+  has_email: false  # not in bulk download
+  estimated_cws_count: 50000
+  last_checked: "2026-03-25"
+  notes: >
+    Primary federal data source. SDWA_PUB_WATER_SYSTEMS.csv contains all PWS.
+    Filter PWS_TYPE_CODE='CWS' and PWS_ACTIVITY_CODE='A' for active community systems.
+    Includes: PWSID, PWS_NAME, ADDRESS_LINE1/2, CITY_NAME, STATE_CODE, ZIP_CODE,
+    COUNTY_SERVED, POPULATION_SERVED_COUNT, SERVICE_CONNECTIONS_COUNT, ADMIN_NAME,
+    PHONE_NUMBER, ALT_PHONE_NUMBER, FAX_NUMBER, GW_SW_CODE, PWS_TYPE_CODE.
+    NO WEBSITE URL FIELD EXISTS IN SDWIS DATA MODEL.
+    Updated weekly. Too large for Excel; use database or Python.
+
+- source_key: epa_envirofacts_sdwis_api
+  display_name: "EPA Envirofacts SDWIS REST API"
+  source_type: federal_api
+  states_covered: [ALL]
+  url: "https://data.epa.gov/efservice/sdwis.water_system/"
+  format: api  # REST API returning JSON/CSV/XML
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true
+  estimated_cws_count: 150000  # all PWS types, not just CWS
+  last_checked: "2026-03-25"
+  notes: >
+    Queryable REST API for SDWIS tables. Supports filtering by state, county, etc.
+    Example: https://data.epa.gov/efservice/sdwis.water_system/STATE_CODE/VA/rows/0:100/JSON
+    Same data model as ECHO download - no website URL field.
+    Useful for programmatic state-by-state extraction.
+    Rate limited; paginate with rows/0:1000 syntax.
+
+- source_key: epa_echo_sdw_rest_api
+  display_name: "EPA ECHO SDW REST Services"
+  source_type: federal_api
+  states_covered: [ALL]
+  url: "https://echodata.epa.gov/echo/sdw_rest_services.get_systems"
+  format: api  # REST API with CSV download capability
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true
+  estimated_cws_count: 50000
+  last_checked: "2026-03-25"
+  notes: >
+    ECHO SDW search API. Use get_systems with state_code parameter, then get_download
+    with QID for CSV export. Returns DfrUrl (EPA Detailed Facility Report URL) but NOT
+    utility website URL. Use qcolumns parameter to select specific fields.
+    QIDs expire after ~30 minutes.
+
+- source_key: epa_pws_service_areas
+  display_name: "EPA Public Water System Service Area Boundaries"
+  source_type: federal_gis
+  states_covered: [ALL]
+  url: "https://www.epa.gov/ground-water-and-drinking-water/public-water-system-service-areas"
+  format: arcgis  # GIS shapefile/feature service
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: false
+  estimated_cws_count: 50000
+  last_checked: "2026-03-25"
+  notes: >
+    Geospatial boundaries for community water systems nationwide.
+    Each polygon attributed with PWSID, name, population, connections.
+    Useful for spatial analysis but no contact or URL data.
+    SDWIS 2023Q4 data for universe definition.
+
+- source_key: ewg_tap_water_database
+  display_name: "EWG Tap Water Database"
+  source_type: aggregator
+  states_covered: [ALL]
+  url: "https://www.ewg.org/tapwater/"
+  format: html_profiles  # Individual pages per PWSID
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: false
+  estimated_cws_count: 48500
+  last_checked: "2026-03-25"
+  notes: >
+    Water quality/contaminant focused profiles. URL pattern:
+    https://www.ewg.org/tapwater/system.php?pws=XX1234567
+    No API or bulk download. No utility website links.
+    Contains contaminant test results from 2021-2023.
+    Not useful for URL discovery but useful for quality data.
+
+# =============================================================================
+# TIER 2: STATE DIRECTORIES — PRIORITY 1 STATES
+# =============================================================================
+
+- source_key: va_vdh_drinking_water_viewer
+  display_name: "Virginia DOH Drinking Water Viewer (DWV)"
+  source_type: state_directory
+  states_covered: [VA]
+  url: "https://www.vdh.virginia.gov/drinking-water/drinking-water-data/"
+  format: searchable_db
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true
+  estimated_cws_count: 2800
+  last_checked: "2026-03-25"
+  notes: >
+    Searchable web application. Registration optional (for public viewing).
+    Individual system pages have contact info, water quality data.
+    No bulk download via DWV interface.
+
+- source_key: va_vdh_waterworks_listing
+  display_name: "Virginia DOH Waterworks and Owners Listing"
+  source_type: state_directory
+  states_covered: [VA]
+  url: "https://www.vdh.virginia.gov/drinking-water/information-for-consumers/listing-of-waterworks-and-owners/"
+  format: pdf  # Large PDF, ~342 pages
+  has_pwsid: true  # 7-digit format, needs VA prefix
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true  # owner name, address, email for some entries
+  estimated_cws_count: 2800
+  last_checked: "2026-03-25"
+  notes: >
+    PDF listing updated ~annually (latest: 12/2025).
+    Includes: PWSID (7-digit), system name, operator category, city/county,
+    system type (C/NTNC/NC), service connections, population, source,
+    owner type, owner name/address, admin contact name/address/email.
+    Some entries have email addresses from which domain can be extracted.
+    Could be parsed with PDF extraction tools.
+    Federal PWSID = 'VA' + 7-digit state ID.
+
+- source_key: tx_tceq_drinking_water_watch
+  display_name: "TCEQ Drinking Water Watch"
+  source_type: state_directory
+  states_covered: [TX]
+  url: "https://www.tceq.texas.gov/assistance/water/pdws"
+  format: searchable_db
+  has_pwsid: true  # 7-digit, first 3 = county number
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true
+  estimated_cws_count: 7000
+  last_checked: "2026-03-25"
+  notes: >
+    TCEQ's main search for public water systems.
+    Includes analytical results, schedules, violations.
+    Contact info update via PWSInven@tceq.texas.gov.
+    Federal PWSID = 'TX' + 7-digit state ID.
+
+- source_key: tx_tceq_water_district_database
+  display_name: "TCEQ Water District Database (WDD)"
+  source_type: state_directory
+  states_covered: [TX]
+  url: "https://www.tceq.texas.gov/waterdistricts/iwdd.html"
+  format: searchable_db  # also on Texas Open Data Portal
+  has_pwsid: false  # uses district identifiers, not PWSIDs
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true  # office addresses, contacts
+  estimated_cws_count: null  # districts, not PWS
+  last_checked: "2026-03-25"
+  notes: >
+    Water district data (MUDs, WCIDs, SUDs, etc.).
+    Texas Open Data Portal has contact info, addresses, counties.
+    Not keyed by PWSID - uses district names/IDs.
+    Would need matching step to map to PWSIDs.
+
+- source_key: tx_tceq_arcgis
+  display_name: "TCEQ GIS Data Hub — Public Water System"
+  source_type: state_gis
+  states_covered: [TX]
+  url: "https://gis-tceq.opendata.arcgis.com/maps/TCEQ::wells-1/about"
+  format: arcgis
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: false
+  estimated_cws_count: 7000
+  last_checked: "2026-03-25"
+  notes: >
+    ArcGIS feature service with PWS locations in Texas.
+    Queryable via REST API for spatial and attribute queries.
+    Location data only - no contact info or URLs.
+
+- source_key: ca_swrcb_ddw_repository
+  display_name: "California DDW Drinking Water Program Repository"
+  source_type: state_directory
+  states_covered: [CA]
+  url: "https://www.waterboards.ca.gov/resources/data_databases/compliance_enforcement.html"
+  format: csv_download  # Multiple CSV files and Excel workbooks
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true  # contact, location, source type
+  estimated_cws_count: 8000
+  last_checked: "2026-03-25"
+  notes: >
+    BEST STATE-LEVEL BULK DOWNLOAD. Multiple CSV/Excel files covering:
+    - Active public water systems (name, contact, location, source, type)
+    - Annual reports from PWS
+    - Conservation reports
+    - Water quality results (2013-present)
+    Contact DDW-DSU@waterboards.ca.gov for assistance.
+    Also accessible via Tracking California: https://trackingcalifornia.org/topics/water-systems
+
+- source_key: ca_drinking_water_watch
+  display_name: "California Drinking Water Watch (PDWW)"
+  source_type: state_directory
+  states_covered: [CA]
+  url: "https://sdwis.waterboards.ca.gov/PDWW/"
+  format: searchable_db
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true
+  estimated_cws_count: 8000
+  last_checked: "2026-03-25"
+  notes: >
+    Searchable by system name/number, county, or regulating agency.
+    Individual system detail pages with facilities, sources, samples.
+    No bulk export from web interface (use Repository CSVs instead).
+
+- source_key: ca_data_gov_pws_info
+  display_name: "CA Drinking Water PWS Information (data.gov)"
+  source_type: state_open_data
+  states_covered: [CA]
+  url: "https://catalog.data.gov/dataset/drinking-water-public-water-system-information"
+  format: csv_download
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true
+  estimated_cws_count: 8000
+  last_checked: "2026-03-25"
+  notes: >
+    Curated dataset on data.gov of all CA public water systems.
+    Includes name, location, general information.
+    May overlap with DDW Repository data.
+
+- source_key: or_oha_data_online
+  display_name: "Oregon OHA Drinking Water Data Online"
+  source_type: state_directory
+  states_covered: [OR]
+  url: "https://yourwater.oregon.gov/"
+  format: searchable_db  # with downloadable inventory list
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true  # contact person name, phone
+  estimated_cws_count: 3600
+  last_checked: "2026-03-25"
+  notes: >
+    Well-structured database with map-based search.
+    Water System Inventory list at: https://yourwater.oregon.gov/inventorylist.php
+    Inventory is filterable and downloadable.
+    Individual system pages: basic info, contacts, coliform, chemical data,
+    violations, enforcement, public notices.
+    Search/inventory URL pattern: https://yourwater.oregon.gov/inventory.php?pwsno=XXXXXXX
+
+- source_key: wa_doh_sentry_internet
+  display_name: "Washington DOH Sentry Internet"
+  source_type: state_directory
+  states_covered: [WA]
+  url: "https://doh.wa.gov/data-statistical-reports/environmental-health/drinking-water-system-data/sentry-internet"
+  format: searchable_db  # with data download files
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true  # address, phone
+  estimated_cws_count: 4000
+  last_checked: "2026-03-25"
+  notes: >
+    Main WA database for drinking water system data.
+    Data download available with system general data and source data.
+    Data terms reference: https://doh.wa.gov/.../data-terms
+    Useful for WFI (Water Facility Inventory) downloads.
+    Search requires system name or ID number.
+
+- source_key: nj_dep_waterwatch
+  display_name: "New Jersey DEP Drinking WaterWatch"
+  source_type: state_directory
+  states_covered: [NJ]
+  url: "https://www-dep.nj.gov/DEP_WaterWatch_public/"
+  format: searchable_db
+  has_pwsid: true
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: true
+  estimated_cws_count: 600
+  last_checked: "2026-03-25"
+  notes: >
+    Searchable by PWSID or system name.
+    Supports wildcards (% character).
+    Contact: Bureau of Safe Drinking Water (609) 292-5550.
+
+# =============================================================================
+# TIER 3: AGGREGATOR / ASSOCIATION SOURCES
+# =============================================================================
+
+- source_key: awwa_member_directory
+  display_name: "AWWA Member Directory"
+  source_type: association
+  states_covered: [ALL]
+  url: "https://www.awwa.org/"
+  format: login_required
+  has_pwsid: false
+  has_website_url: unknown  # behind login wall
+  has_rate_info: false
+  has_contact_info: unknown
+  estimated_cws_count: 4300  # utility members
+  last_checked: "2026-03-25"
+  notes: >
+    Members-only directory. 4,300+ utility members covering ~80% of
+    North America's drinking water. Not publicly accessible.
+    MarketBASE Sourcebook is vendor/supplier directory, not utilities.
+
+- source_key: nawc_member_companies
+  display_name: "National Association of Water Companies"
+  source_type: association
+  states_covered: [ALL]
+  url: "https://nawc.org/"
+  format: no_public_directory
+  has_pwsid: false
+  has_website_url: false
+  has_rate_info: false
+  has_contact_info: false
+  estimated_cws_count: null  # ~30 parent companies, hundreds of subsidiaries
+  last_checked: "2026-03-25"
+  notes: >
+    Represents investor-owned water utilities. No public member directory.
+    Major members (from public sources): American Water Works, Essential Utilities/Aqua,
+    California Water Service, SJW Group, Middlesex Water, Artesian Resources,
+    Connecticut Water, Aquarion, San Jose Water, Peoples Water Service,
+    Central States Water Resources, Global Water Resources, Utilities Inc.
+    These parent companies have known websites; mapping subsidiaries to PWSIDs
+    would require cross-referencing SDWIS owner data.
+
+- source_key: tapwaterdata_commercial
+  display_name: "TapWaterData.com Contact Database (Commercial)"
+  source_type: commercial
+  states_covered: [ALL]
+  url: "https://www.tapwaterdata.com/data"
+  format: csv_download  # paid
+  has_pwsid: true
+  has_website_url: false  # focused on B2B contacts (names, titles, phones, emails)
+  has_rate_info: false
+  has_contact_info: true
+  estimated_cws_count: 4385
+  last_checked: "2026-03-25"
+  notes: >
+    Commercial B2B contact database. 4,385+ US water utilities.
+    Includes: names, titles, phone numbers, emails, mailing addresses.
+    Available by state or nationally. Paid service, requires quote.
+    Does NOT appear to include utility website URLs.

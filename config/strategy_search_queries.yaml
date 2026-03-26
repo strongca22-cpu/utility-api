@@ -1,0 +1,216 @@
+# Strategy: Search-Enhanced URL Discovery for Water Utilities
+# Generated: 2026-03-25
+#
+# Since no federal or state directory contains utility website URLs,
+# this file documents the recommended strategy pivot and optimized
+# search query templates for URL discovery.
+
+# =============================================================================
+# PHASE 1: IMMEDIATE DATA DOWNLOADS
+# =============================================================================
+#
+# Download these bulk datasets to build the master reference:
+#
+# 1. ECHO SDWA Bulk Download
+#    URL: https://echo.epa.gov/tools/data-downloads
+#    File: SDWA ZIP → extract SDWA_PUB_WATER_SYSTEMS.csv
+#    Filter: PWS_TYPE_CODE='CWS' AND active systems
+#    Result: ~50,000 rows with PWSID, name, city, county, state, population
+#
+# 2. California DDW Program Repository
+#    URL: https://www.waterboards.ca.gov/resources/data_databases/compliance_enforcement.html
+#    Files: Active PWS list CSV
+#    Result: ~8,000 CA systems with enhanced contact info
+#
+# 3. Virginia Waterworks Listing PDF
+#    URL: https://www.vdh.virginia.gov/drinking-water/information-for-consumers/listing-of-waterworks-and-owners/
+#    Parse: Extract PWSID, name, owner, admin contact emails
+#    Result: ~2,800 VA systems, some with email domains → website URLs
+
+# =============================================================================
+# PHASE 2: OPTIMIZED SEARCH QUERY TEMPLATES
+# =============================================================================
+#
+# Use these templates with SearXNG or other search engines.
+# Substitute {variables} with data from SDWIS master list.
+# Priority order: highest population first.
+
+search_templates:
+  # Template 1: Direct rate page search (highest value hit)
+  rate_page_direct:
+    query: '"{pws_name}" water rates schedule'
+    expected_result: "Direct link to rate/fee schedule page"
+    success_rate_estimate: "~15-25%"
+
+  # Template 2: Utility department page search
+  utility_department:
+    query: '"{pws_name}" {city} {state_code} water utility'
+    expected_result: "Link to utility/water department page"
+    success_rate_estimate: "~30-40%"
+
+  # Template 3: City/county government site search
+  government_site:
+    query: 'site:.gov "{pws_name}" water'
+    expected_result: "Government website containing water utility info"
+    success_rate_estimate: "~20-30%"
+
+  # Template 4: Consumer Confidence Report search (often links to utility site)
+  ccr_search:
+    query: '"{pws_name}" "consumer confidence report" OR "water quality report" {year}'
+    expected_result: "CCR hosted on utility website"
+    success_rate_estimate: "~25-35%"
+
+  # Template 5: Rate-focused search with city name
+  rate_with_city:
+    query: '{city} {state_code} water rates residential'
+    expected_result: "City water rate page or utility page"
+    success_rate_estimate: "~35-45%"
+
+# =============================================================================
+# PHASE 3: EMAIL DOMAIN → WEBSITE URL EXTRACTION
+# =============================================================================
+#
+# Many state directories include admin contact email addresses.
+# Extract the domain from these emails to discover utility websites.
+#
+# Example:
+#   Email: jlinkous@pulaskicounty.org
+#   Domain: pulaskicounty.org
+#   Likely URL: https://www.pulaskicounty.org
+#   Search within: /water, /utilities, /public-works, /rates
+#
+# This approach bypasses search entirely for systems with known email domains.
+# Parse the VA Waterworks Listing PDF to extract email addresses.
+
+email_domain_strategy:
+  steps:
+    - "Parse state directory PDFs/data for admin contact emails"
+    - "Extract domain from email (e.g., user@city.gov → city.gov)"
+    - "Construct candidate URL: https://www.{domain}"
+    - "Search within site for water/utility/rates pages"
+    - "Map found URLs back to PWSID"
+  applicable_states:
+    - VA  # PDF listing includes some emails
+    - OR  # Data Online has contact info
+    - WA  # Sentry Internet has contact info
+    - CA  # DDW Repository has contact info
+
+# =============================================================================
+# PHASE 4: INVESTOR-OWNED UTILITY MAPPING
+# =============================================================================
+#
+# The major investor-owned water companies serve millions of customers
+# across multiple states. Their corporate/subsidiary websites are known.
+# Map their PWSIDs using SDWIS owner data.
+
+investor_owned_utilities:
+  - parent: "American Water Works Company"
+    website: "https://amwater.com"
+    subsidiaries_pattern: "{state} American Water"
+    states: [NJ, PA, IN, WV, IL, CA, MO, VA, IA, TN, MD, GA, KY, HI]
+    estimated_pwsids: 500+
+
+  - parent: "Essential Utilities (Aqua America)"
+    website: "https://www.essential.co"
+    subsidiaries_pattern: "Aqua {state}"
+    states: [PA, OH, NC, TX, IL, IN, VA, NJ]
+    estimated_pwsids: 400+
+
+  - parent: "California Water Service Group"
+    website: "https://www.calwater.com"
+    subsidiaries_pattern: "California Water Service / Hawaii Water Service / Washington Water Service"
+    states: [CA, HI, WA, NM]
+    estimated_pwsids: 100+
+
+  - parent: "SJW Group"
+    website: "https://www.sjwater.com"
+    subsidiaries_pattern: "San Jose Water / SJWTX"
+    states: [CA, TX, CT, ME]
+    estimated_pwsids: 50+
+
+  - parent: "Middlesex Water Company"
+    website: "https://www.middlesexwater.com"
+    states: [NJ, DE]
+    estimated_pwsids: 30+
+
+  - parent: "Artesian Resources"
+    website: "https://www.artesianwater.com"
+    states: [DE, MD, PA]
+    estimated_pwsids: 30+
+
+  - parent: "Connecticut Water / SJW subsidiary"
+    website: "https://www.ctwater.com"
+    states: [CT, ME]
+    estimated_pwsids: 20+
+
+  - parent: "Aquarion Water Company / Eversource subsidiary"
+    website: "https://www.aquarionwater.com"
+    states: [CT, MA, NH]
+    estimated_pwsids: 30+
+
+  - parent: "Central States Water Resources"
+    website: "https://centralstateswater.com"
+    states: [MO, IL, AR, KY, TN, MS, LA]
+    estimated_pwsids: 150+
+
+# =============================================================================
+# PHASE 5: CCR (CONSUMER CONFIDENCE REPORT) LINK MINING
+# =============================================================================
+#
+# EPA requires all CWS to publish annual CCR reports.
+# Many are hosted on utility websites, creating a URL→PWSID link.
+#
+# EPA CCR Search: https://ofmpub.epa.gov/apex/safewater/f?p=CCR_WISER
+#
+# Strategy:
+#   1. Query EPA CCR database by state for all CWS
+#   2. Extract CCR document URLs
+#   3. Strip path to get base utility website URL
+#   4. Map back to PWSID
+#
+# This is a high-potential source — if the CCR database stores URLs
+# where utilities host their reports, it could yield thousands of URLs.
+
+ccr_link_mining:
+  epa_ccr_search_url: "https://ofmpub.epa.gov/apex/safewater/f?p=CCR_WISER"
+  notes: >
+    Investigate whether the CCR search returns URLs to utility-hosted CCR documents.
+    If so, extract the base domain from these URLs to discover utility websites.
+    This could be a high-yield source since CCRs are mandatory for all CWS.
+  priority: HIGH
+  estimated_yield: "potentially 10,000+ URLs if CCR links are available"
+
+# =============================================================================
+# PRIORITIZED ACTION ITEMS
+# =============================================================================
+
+action_items:
+  - priority: 1
+    action: "Download ECHO SDWA bulk data and build master CWS reference table"
+    estimated_time: "2 hours"
+    expected_yield: "50,000 CWS with names, addresses, populations"
+
+  - priority: 2
+    action: "Investigate EPA CCR search for utility-hosted CCR URLs"
+    estimated_time: "4 hours"
+    expected_yield: "potentially 10,000+ utility website URLs"
+
+  - priority: 3
+    action: "Parse VA Waterworks Listing PDF for email domains"
+    estimated_time: "3 hours"
+    expected_yield: "~500 utility website domains from email addresses"
+
+  - priority: 4
+    action: "Map investor-owned utility PWSIDs via SDWIS owner name matching"
+    estimated_time: "4 hours"
+    expected_yield: "~1,500 PWSIDs mapped to known company websites"
+
+  - priority: 5
+    action: "Download CA DDW Repository CSV and run optimized searches"
+    estimated_time: "6 hours"
+    expected_yield: "~2,000 CA utility URLs via targeted search"
+
+  - priority: 6
+    action: "Run optimized SearXNG searches using SDWIS data for top-1000 CWS by population"
+    estimated_time: "8 hours (rate-limited)"
+    expected_yield: "~500-700 URLs (50-70% hit rate for large systems)"
