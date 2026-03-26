@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""
+Process Pending Domain-Guessed URLs Through Pipeline
+
+Purpose:
+    Processes domain-guesser URLs through scrape -> filter -> parse,
+    separate from the main orchestrator's SearXNG flow. The orchestrator
+    handles SearXNG gap-fill; this script handles domain-guesser bulk
+    processing.
+
+Author: AI-Generated
+Created: 2026-03-25
+Modified: 2026-03-25
+
+Dependencies:
+    - sqlalchemy
+    - utility_api agents (scrape, parse, best_estimate)
+
+Usage:
+    python scripts/process_guesser_batch.py              # process 50 (default)
+    python scripts/process_guesser_batch.py --max 200    # process 200
+    python scripts/process_guesser_batch.py --state AL   # AL only
+    python scripts/process_guesser_batch.py --dry-run    # show what would run
+
+Notes:
+    - Uses pre-parse content filter (saves ~74% of API cost on junk)
+    - Multi-level deep crawl enabled (default depth 3)
+    - Processes by population descending (biggest utilities first)
+    - Logs to /var/log/uapi/guesser_processing.log
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+from loguru import logger
+from sqlalchemy import text
+
+# Ensure project src is importable
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from utility_api.agents.parse import ParseAgent
+from utility_api.agents.scrape import ScrapeAgent
+from utility_api.config import settings
+from utility_api.db import engine
+
+schema = settings.utility_schema
+
+# Add file logging
+LOG_PATH = Path("/var/log/uapi/guesser_processing.log")
+if LOG_PATH.parent.exists():
+    logger.add(str(LOG_PATH), rotation="10 MB", retention="30 days")
+
+
+def get_pending_guesser_urls(
+    max_count: int = 50, state: str | None = None,
+) -> list[dict]:
+    """Get pending domain-guesser URLs, ordered by population (biggest first)."""
+    query = f"""
+        SELECT sr.id as registry_id, sr.pwsid, sr.url, pc.population_served,
+               pc.pws_name, pc.state_code
+        FROM {schema}.scrape_registry sr
+        JOIN {schema}.pwsid_coverage pc ON pc.pwsid = sr.pwsid
+        WHERE sr.url_source = 'domain_guesser'
+        AND sr.status = 'pending'
+    """
+    params: dict = {}
+
+    if state:
+        query += " AND pc.state_code = :state"
+        params["state"] = state.upper()
+
+    query += " ORDER BY pc.population_served DESC NULLS LAST LIMIT :max_count"
+    params["max_count"] = max_count
+
+    with engine.connect() as conn:
+        result = conn.execute(text(query), params)
+        return [dict(row._mapping) for row in result]
+
+
+def process_batch(
+    max_count: int = 50,
+    state: str | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """Process a batch of domain-guessed URLs."""
+    pending = get_pending_guesser_urls(max_count, state)
+
+    if not pending:
+        logger.info("No pending domain-guesser URLs to process")
+        return {"processed": 0}
+
+    state_label = f" (state={state})" if state else ""
+    logger.info(
+        f"Processing {len(pending)} domain-guesser URLs{state_label}"
+        f"{' [DRY RUN]' if dry_run else ''}"
+    )
+
+    if dry_run:
+        for p in pending[:20]:
+            pop = p["population_served"] or "?"
+            logger.info(
+                f"  {p['pwsid']} | {p['pws_name'][:30]:30s} | "
+                f"pop {pop:>7} | {p['url'][:50]}"
+            )
+        if len(pending) > 20:
+            logger.info(f"  ... +{len(pending) - 20} more")
+        return {"processed": 0, "dry_run": True}
+
+    scrape = ScrapeAgent()
+    parse = ParseAgent()
+
+    stats = {
+        "processed": 0,
+        "scrape_ok": 0,
+        "filtered": 0,
+        "parse_ok": 0,
+        "parse_failed": 0,
+        "scrape_failed": 0,
+        "total_cost": 0.0,
+    }
+
+    for item in pending:
+        pwsid = item["pwsid"]
+        stats["processed"] += 1
+
+        try:
+            # Scrape (free — just HTTP)
+            scrape_result = scrape.run(pwsid=pwsid)
+
+            if not scrape_result.get("raw_texts"):
+                stats["scrape_failed"] += 1
+                continue
+
+            stats["scrape_ok"] += 1
+
+            # Parse the best text (pre-parse filter handles junk)
+            text_entry = scrape_result["raw_texts"][0]
+            parse_result = parse.run(
+                pwsid=pwsid,
+                raw_text=text_entry["text"],
+                content_type=text_entry["content_type"],
+                source_url=text_entry["url"],
+                registry_id=text_entry.get("registry_id", item["registry_id"]),
+            )
+
+            cost = parse_result.get("cost_usd", 0)
+            stats["total_cost"] += cost
+
+            if parse_result.get("skipped"):
+                stats["filtered"] += 1
+            elif parse_result.get("success"):
+                stats["parse_ok"] += 1
+                bill = parse_result.get("bill_10ccf")
+                bill_str = f"${bill:.2f}" if bill else "N/A"
+                logger.info(
+                    f"  \u2713 {pwsid} | {item['pws_name'][:30]} | "
+                    f"bill@10CCF={bill_str}"
+                )
+            else:
+                stats["parse_failed"] += 1
+
+        except Exception as e:
+            logger.error(f"  Error processing {pwsid}: {e}")
+            continue
+
+        # Progress every 50 utilities
+        if stats["processed"] % 50 == 0:
+            logger.info(
+                f"  Progress: {stats['processed']}/{len(pending)} | "
+                f"OK={stats['parse_ok']} filtered={stats['filtered']} "
+                f"failed={stats['parse_failed']} cost=${stats['total_cost']:.2f}"
+            )
+
+    # Final summary
+    parsed_total = stats["parse_ok"] + stats["parse_failed"]
+    success_rate = (
+        f"{100 * stats['parse_ok'] / parsed_total:.1f}%"
+        if parsed_total > 0
+        else "N/A"
+    )
+    filter_rate = (
+        f"{100 * stats['filtered'] / stats['processed']:.1f}%"
+        if stats["processed"] > 0
+        else "N/A"
+    )
+
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"Domain Guesser Batch Complete")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"  Processed:         {stats['processed']}")
+    logger.info(f"  Scrape OK:         {stats['scrape_ok']}")
+    logger.info(f"  Pre-parse filtered:{stats['filtered']}")
+    logger.info(f"  Parse succeeded:   {stats['parse_ok']}")
+    logger.info(f"  Parse failed:      {stats['parse_failed']}")
+    logger.info(f"  Scrape failed:     {stats['scrape_failed']}")
+    logger.info(f"  Success rate:      {success_rate} (of parsed)")
+    logger.info(f"  Filter rate:       {filter_rate}")
+    logger.info(f"  Total API cost:    ${stats['total_cost']:.2f}")
+    logger.info(f"{'=' * 60}")
+
+    return stats
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Process pending domain-guessed URLs through pipeline"
+    )
+    parser.add_argument(
+        "--max", type=int, default=50, help="Max URLs to process (default: 50)"
+    )
+    parser.add_argument("--state", help="Filter to single state code")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be processed"
+    )
+    args = parser.parse_args()
+
+    process_batch(max_count=args.max, state=args.state, dry_run=args.dry_run)

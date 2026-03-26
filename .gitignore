@@ -42,3 +42,4 @@ Thumbs.db
 # This repo shares a PostGIS DB but is a separate codebase
 strong-strategic/
 strong_strategic/
+data/guesser_incoming/
