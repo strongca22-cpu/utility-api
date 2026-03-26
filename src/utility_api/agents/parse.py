@@ -91,6 +91,16 @@ def route_model(text_content: str) -> str:
     return "claude-haiku-4-5-20251001"
 
 
+def _safe_float(val) -> float | None:
+    """Coerce LLM response values to float. Returns None if not numeric."""
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+
 def validate_parse_result(result: dict) -> tuple[bool, list[str]]:
     """Validate parsed rate structure for sanity."""
     issues = []
@@ -100,7 +110,7 @@ def validate_parse_result(result: dict) -> tuple[bool, list[str]]:
         issues.append("no_tier_1_rate")
 
     for i in range(1, 5):
-        rate = result.get(f"tier_{i}_rate")
+        rate = _safe_float(result.get(f"tier_{i}_rate"))
         if rate is not None:
             if rate < 0.1:
                 issues.append(f"tier_{i}_rate_too_low:{rate}")
@@ -108,7 +118,7 @@ def validate_parse_result(result: dict) -> tuple[bool, list[str]]:
                 issues.append(f"tier_{i}_rate_too_high:{rate}")
 
     # Check fixed charge
-    fixed = result.get("fixed_charge_monthly")
+    fixed = _safe_float(result.get("fixed_charge_monthly"))
     if fixed is not None and fixed > 500:
         issues.append(f"fixed_charge_high:{fixed}")
 
@@ -344,7 +354,7 @@ class ParseAgent(BaseAgent):
 
         # Build canonical JSONB structures
         tiers = _build_volumetric_tiers_from_parse(result)
-        fixed_charge = result.get("fixed_charge_monthly", 0) or 0
+        fixed_charge = _safe_float(result.get("fixed_charge_monthly")) or 0
         fixed_charges_json = json.dumps([{
             "name": "Service Charge",
             "amount": round(float(fixed_charge), 2),
