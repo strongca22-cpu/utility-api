@@ -263,6 +263,34 @@ def efc(
     )
 
 
+@app.command("duke-reference")
+def duke_reference(
+    state: list[str] = typer.Option(None, "--state", "-s", help="State(s) to ingest"),
+    all_states: bool = typer.Option(False, "--all", help="Ingest all 10 Duke states"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+):
+    """Ingest Duke/Nicholas Institute rate data as INTERNAL REFERENCE.
+
+    CC BY-NC-ND 4.0 license — NOT for commercial redistribution.
+    Stored in duke_reference_rates table (never exposed via API).
+
+    Examples:
+        ua-ingest duke-reference --state TX --dry-run
+        ua-ingest duke-reference --all
+    """
+    from utility_api.ingest.duke_reference_ingest import run_duke_reference_ingest
+
+    if not state and not all_states:
+        typer.echo("Specify --state or --all")
+        raise typer.Exit(1)
+
+    run_duke_reference_ingest(
+        states=state or None,
+        all_states=all_states,
+        dry_run=dry_run,
+    )
+
+
 @app.command()
 def rates(
     state: list[str] = typer.Option(None, "--state", "-s", help="Filter to state(s): VA, CA"),

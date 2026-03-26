@@ -1,0 +1,418 @@
+# config/duke_ingest_spec.yaml
+# Complete ingest specification for the Duke/Nicholas Institute Water Affordability Dataset
+# A Claude Code session can implement from this file without further research.
+#
+# Last verified: 2026-03-25 (repo cloned and data inspected)
+
+source:
+  name: "Duke Nicholas Institute Water Affordability Dashboard"
+  source_key: "duke_affordability_2021"
+  repo_url: "https://github.com/NIEPS-Water-Program/water-affordability"
+  dashboard_url: "https://nicholasinstitute.duke.edu/water-affordability/water-affordability-dashboard"
+  project_url: "https://nicholasinstitute.duke.edu/water-affordability/"
+  paper_doi: "http://dx.doi.org/10.1002/aws2.1260"
+  zenodo_doi: "10.5281/zenodo.5156654"
+  data_vintage: "2019-2021 (rates effective dates vary; most are 2020)"
+  total_unique_pwsids: 3297
+  states: [CA, CT, KS, NC, NJ, NM, OR, PA, TX, WA]
+  
+  license:
+    type: "CC BY-NC-ND 4.0"
+    url: "https://creativecommons.org/licenses/by-nc-nd/4.0/"
+    commercial_use: false
+    commercial_contact: "otcquestions@duke.edu (ref OTC File No. 7797)"
+    notes: |
+      NonCommercial + NoDerivatives. For commercial use, must contact
+      Duke Office for Translation & Commercialization. For internal research
+      and development this is fine. For a commercial product, need to either:
+      (a) license from Duke, or (b) use the data to identify which PWSIDs
+      to scrape directly, then scrape the primary sources for rate data.
+
+  citation: |
+    Patterson, Lauren, Martin Doyle, Aislinn McLaughlin, and Sophia Bryson. 2021.
+    Water Affordability Data Repository. Nicholas Institute for Environmental Policy
+    Solutions at Duke University.
+    https://github.com/NIEPS-Water-Program/water-affordability
+
+# =============================================================================
+# ACCESS METHOD: Git clone → Excel files
+# =============================================================================
+
+access_method: "git_clone_xlsx"
+
+git_clone:
+  repo: "https://github.com/NIEPS-Water-Program/water-affordability.git"
+  data_path: "data/rates_data/"
+  files:
+    - "rates_ca.xlsx"   # CA: 673 PWSIDs, 5335 rate rows
+    - "rates_ct.xlsx"   # CT: 65 PWSIDs, 518 rate rows
+    - "rates_ks.xlsx"   # KS: 438 PWSIDs, 5889 rate rows
+    - "rates_nc.xlsx"   # NC: 516 PWSIDs, 6389 rate rows
+    - "rates_nj.xlsx"   # NJ: 214 PWSIDs, 1478 rate rows
+    - "rates_nm.xlsx"   # NM: 53 PWSIDs, 4917 rate rows
+    - "rates_or.xlsx"   # OR: 9 PWSIDs, 480 rate rows
+    - "rates_pa.xlsx"   # PA: 332 PWSIDs, 6836 rate rows
+    - "rates_tx.xlsx"   # TX: 751 PWSIDs, 8509 rate rows
+    - "rates_wa.xlsx"   # WA: 246 PWSIDs, 2244 rate rows
+  metadata_file: "rates_metadata.xlsx"  # Column descriptions
+  sdwis_reference: "data/sdwis/cws_systems.csv"  # 16,848 CWS records for joining
+
+# =============================================================================
+# DATA SCHEMA
+# =============================================================================
+
+schema:
+  # Each .xlsx file has two sheets: ratesMetadata and rateTable
+  
+  sheet_ratesMetadata:
+    description: "One row per (PWSID, service_type) combination. Contains metadata about each rate schedule."
+    columns:
+      pwsid:
+        type: string
+        format: "{SS}{7digits}"  # e.g., "NJ2004001"
+        description: "EPA SDWIS PWSID — direct match to our database"
+        maps_to_epa_pwsid: true
+      service_area:
+        type: string
+        description: "Name of service area provider"
+      city_name:
+        type: string
+        description: "Primary city(ies) covered"
+      utility_name:
+        type: string
+        description: "Name of utility providing the service"
+      effective_date:
+        type: datetime
+        description: "Date rates were passed"
+      service_type:
+        type: string
+        enum: [water, sewer, septic, stormwater]
+        description: "Type of service"
+      website:
+        type: string
+        description: "URL where rate data was found — BONUS: utility website URLs!"
+      notes:
+        type: string
+        description: "Analyst notes, assumptions"
+      year:
+        type: integer
+        description: "Year from effective_date (formula in Excel)"
+      month:
+        type: integer
+        description: "Month from effective_date"
+      day:
+        type: integer
+        description: "Day from effective_date"
+      last_updated:
+        type: integer
+        description: "Year the rates were digitized by analyst"
+      min_wage:
+        type: float
+        description: "Local minimum wage"
+      min_year:
+        type: integer
+        description: "Year minimum wage was in effect"
+
+  sheet_rateTable:
+    description: |
+      One row per rate component. A single PWSID has MULTIPLE rows:
+      - service_charge rows (fixed monthly charge, often per meter size)
+      - commodity_charge_flat rows (uniform volumetric rate)
+      - commodity_charge_tier rows (tiered volumetric rates with value_from/value_to)
+      - surcharge rows (various)
+    columns:
+      pwsid:
+        type: string
+        format: "{SS}{7digits}"
+        maps_to_epa_pwsid: true
+      service_area:
+        type: string
+      city_name:
+        type: string
+      utility_name:
+        type: string
+      effective_date:
+        type: integer
+        description: "Year (XXXX) rates went into effect"
+      rate_code:
+        type: string
+        enum: [water, sewer, septic, storm]
+        description: "Must match service_type in metadata"
+      bill_frequency:
+        type: string
+        enum: [monthly, bi-monthly, quarterly, annually, semi-annually]
+      rate_type:
+        type: string
+        enum: [service_charge, commodity_charge_flat, commodity_charge_tier, commodity_charge_zone]
+        description: |
+          service_charge = fixed charge (often per meter size)
+          commodity_charge_flat = uniform volumetric rate
+          commodity_charge_tier = tiered rate with value_from/value_to breakpoints
+          commodity_charge_zone = fixed charge based on property size range
+          *_surcharge = various surcharges
+      meter_size:
+        type: float_or_na
+        description: "Meter size in inches. 0.625 = typical residential (5/8 inch)"
+      meter_unit:
+        type: string
+        description: "Almost always 'inch'"
+      other_class:
+        type: string
+        description: "Sub-classification (gravity/pumped, elevation, inside/outside)"
+      class_category:
+        type: string
+        description: "Category within classification"
+      volumetric:
+        type: string
+        enum: ["yes", "no", "zone"]
+        description: "Is the charge volume-based?"
+      value_from:
+        type: float_or_na
+        description: "Start of volume range (in vol_unit). NA if not volumetric."
+      value_to:
+        type: float_or_na
+        description: "End of volume range. 1000000000 = unlimited."
+      vol_base:
+        type: float_or_na
+        description: "Volume unit for cost. Typically 1000 (gallons) or 100 (cubic feet)."
+      vol_unit:
+        type: string
+        enum: [gallons, "cubic feet", "square feet", ERU, bedrooms, persons]
+      cost:
+        type: float
+        description: "Price in USD"
+      adjustment:
+        type: float
+        description: "Multiplier. Usually 1.0. 0.8/0.9/0.95 for wastewater % of water usage."
+      notes:
+        type: string
+      update_bill:
+        type: string
+        description: "Internal flag: yes/no"
+
+# =============================================================================
+# SAMPLE RECORDS
+# =============================================================================
+
+sample_records:
+  metadata_row:
+    pwsid: "NJ2004001"
+    service_area: "NJ American Water - Liberty"
+    city_name: "Liberty"
+    utility_name: "NJ American Water - Liberty"
+    effective_date: "2020-11-01"
+    service_type: "water"
+    website: "https://www.amwater.com/njaw/resources/PDF/customer-service-billing/NJAW_Rate_Case_Tariff.pdf"
+    last_updated: 2021
+
+  rate_table_service_charge:
+    pwsid: "NJ0712001"
+    service_area: "NJ American Water - Short Hills"
+    city_name: "Short Hills"
+    utility_name: "NJ American Water - Short Hills"
+    effective_date: 2020
+    rate_code: "water"
+    bill_frequency: "monthly"
+    rate_type: "service_charge"
+    meter_size: 0.625
+    meter_unit: "inch"
+    volumetric: "no"
+    value_from: "NA"
+    value_to: "NA"
+    cost: 18.50
+    adjustment: 1
+
+  rate_table_commodity_flat:
+    pwsid: "NJ0712001"
+    service_area: "NJ American Water - Short Hills"
+    city_name: "Short Hills"
+    utility_name: "NJ American Water - Short Hills"
+    effective_date: 2020
+    rate_code: "water"
+    bill_frequency: "monthly"
+    rate_type: "commodity_charge_flat"
+    volumetric: "yes"
+    value_from: 0
+    value_to: 1000000000
+    vol_base: 1000
+    vol_unit: "gallons"
+    cost: 6.8884
+    adjustment: 1
+
+  rate_table_commodity_tier:
+    pwsid: "NJ0712001"
+    service_area: "NJ American Water - Short Hills"
+    effective_date: 2020
+    rate_code: "sewer"
+    bill_frequency: "monthly"
+    rate_type: "commodity_charge_tier"
+    volumetric: "yes"
+    value_from: 626
+    value_to: 1000000000
+    vol_base: 1000
+    vol_unit: "gallons"
+    cost: 2.15
+    adjustment: 1
+
+# =============================================================================
+# STATE-BY-STATE COVERAGE
+# =============================================================================
+
+state_coverage:
+  TX:
+    pwsid_count: 751
+    rate_rows: 8509
+    efc_overlap: false
+    incremental_value: "CRITICAL — largest unserved state, 4584 CWS total"
+    priority: 1
+
+  KS:
+    pwsid_count: 438
+    rate_rows: 5889
+    efc_overlap: false
+    incremental_value: "HIGH — not in EFC at all"
+    priority: 2
+
+  PA:
+    pwsid_count: 332
+    rate_rows: 6836
+    efc_overlap: false
+    incremental_value: "HIGH — not in EFC, 1854 CWS total"
+    priority: 3
+
+  WA:
+    pwsid_count: 246
+    rate_rows: 2244
+    efc_overlap: false
+    incremental_value: "HIGH — not in EFC, 2125 CWS total"
+    priority: 4
+
+  NJ:
+    pwsid_count: 214
+    rate_rows: 1478
+    efc_overlap: false
+    incremental_value: "HIGH — not in EFC, 800+ CWS total, major IOU presence"
+    priority: 5
+
+  CA:
+    pwsid_count: 673
+    rate_rows: 5335
+    efc_overlap: true  # eAR + OWRS already cover ~600
+    incremental_value: "MODERATE — some overlap with eAR/OWRS, but may have different utilities"
+    priority: 7
+
+  NC:
+    pwsid_count: 516
+    rate_rows: 6389
+    efc_overlap: true  # EFC NC covers 403
+    incremental_value: "LOW — already have 403 from EFC, may complement"
+    priority: 8
+
+  CT:
+    pwsid_count: 65
+    rate_rows: 518
+    efc_overlap: true
+    incremental_value: "LOW — EFC CT exists"
+    priority: 9
+
+  NM:
+    pwsid_count: 53
+    rate_rows: 4917
+    efc_overlap: false
+    incremental_value: "MODERATE — not in EFC, but only 53 utilities"
+    priority: 6
+
+  OR:
+    pwsid_count: 9
+    rate_rows: 480
+    efc_overlap: false
+    incremental_value: "LOW — only 9 utilities"
+    priority: 10
+
+# =============================================================================
+# INGEST IMPLEMENTATION GUIDANCE
+# =============================================================================
+
+recommendation:
+  approach: |
+    1. Clone the GitHub repo (or download the data/rates_data/ directory)
+    2. For each state Excel file, read both sheets (ratesMetadata + rateTable)
+    3. Filter rateTable for rate_code='water' (exclude sewer/storm/septic)
+    4. For each PWSID, extract:
+       - Fixed charge: rows where rate_type='service_charge' AND meter_size=0.625
+       - Volumetric rates: rows where rate_type starts with 'commodity_charge'
+       - Tier breakpoints: value_from and value_to for commodity_charge_tier rows
+    5. Calculate estimated monthly bill at standard consumption levels (5000 gal)
+    6. Join with our SDWIS database on pwsid
+    7. BONUS: Extract utility website URLs from ratesMetadata.website column
+    
+  estimated_effort: "4-6 hours"
+  estimated_new_pwsids: 2034  # States not in EFC: TX+KS+PA+WA+NJ+NM
+  
+  priority_ingest_order:
+    - TX   # 751 PWSIDs, largest gap fill
+    - KS   # 438 PWSIDs, no EFC coverage
+    - PA   # 332 PWSIDs, no EFC coverage
+    - WA   # 246 PWSIDs, no EFC coverage
+    - NJ   # 214 PWSIDs, no EFC coverage
+    - NM   # 53 PWSIDs, no EFC coverage
+
+  overlap_handling: |
+    For CA, NC, CT: check if PWSIDs already exist in our database from
+    EFC or eAR/OWRS sources. If so, skip or compare vintages and keep newer.
+
+  key_implementation_notes:
+    - "Excel files use 'NA' as string for missing values, not null/empty"
+    - "value_to=1000000000 means unlimited (last tier)"
+    - "meter_size=0.625 is standard residential 5/8 inch meter"
+    - "adjustment field is a multiplier, usually 1.0"
+    - "bill_frequency varies — normalize all to monthly for comparison"
+    - "effective_date in rateTable is just a year (integer), not full date"
+    - "effective_date in ratesMetadata is a datetime"
+    - "Some formulas remain in ratesMetadata year/month/day columns — compute from effective_date"
+    - "ratesMetadata.website contains utility URLs — extract these as a bonus output"
+    - "The rateTable has both water AND sewer data — filter by rate_code='water' for water rates only"
+    - "Python library: openpyxl (already installed in pipeline)"
+
+  target_table: "utility.rate_schedules"
+  source_key: "duke_affordability_2021"
+  
+  bill_calculation: |
+    To calculate monthly bill at X gallons:
+    1. Start with service_charge where meter_size=0.625 (or smallest available)
+    2. Apply volumetric charges:
+       - For commodity_charge_flat: cost × (X / vol_base)
+       - For commodity_charge_tier: iterate tiers, applying each tier's rate
+         to the gallons within that tier's range (value_from to value_to)
+    3. Add any surcharges
+    4. Multiply sewer charges by adjustment factor
+    5. If bill_frequency != 'monthly', divide/multiply accordingly
+
+# =============================================================================
+# BONUS: RELATED DATASETS IN REPO
+# =============================================================================
+
+related_data_in_repo:
+  sdwis_cws_systems:
+    path: "data/sdwis/cws_systems.csv"
+    rows: 16848
+    description: "CWS systems with PWSID, name, state, population, connections, city, counties_served"
+    useful_for: "Cross-reference and gap analysis"
+
+  service_area_boundaries:
+    path: "data/ (check for GeoJSON/shapefiles)"
+    description: |
+      The README mentions 'raw service area boundaries' in the data folder.
+      These may be pulled dynamically by the R scripts from external sources
+      (e.g., EPA, state GIS portals). Check the R code in rcode/ for
+      boundary data source URLs.
+    useful_for: "Geospatial join of rates to census tracts"
+
+  national_dashboard_data:
+    url: "https://nicholasinstitute.duke.edu/water-affordability/water-affordability-united-states/"
+    description: |
+      A SEPARATE nationwide dashboard covering 787 communities representing
+      half the US population. This appears to be a more recent, expanded
+      version. Published in PLOS Water. Check for downloadable data.
+    utility_count: 787
+    notes: "May have additional states beyond the 10 in the GitHub repo"
