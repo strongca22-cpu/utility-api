@@ -162,7 +162,7 @@ states:
     state_code: WI
     source_key: efc_wi_2016
     vintage: "2016"
-    status: pending
+    status: ingested
 
   wv:
     dashboard_id: 177

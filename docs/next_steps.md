@@ -983,21 +983,60 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] CLI commands: `ua-ingest efc-fl [--dry-run] [--refresh]`, `ua-ingest wv-psc [--dry-run] [--refresh]`
 - [x] WV PSC requires browser User-Agent header (blocks default httpx UA with 404)
 
-## Next (Sprint 18+)
+## Completed (Sprint 18b — Generic EFC Module, 20-State Systematic Ingest)
 
-### Generic EFC API Module (Track B — High Priority)
-- [ ] Generalize FL API pattern: one module, 24 states
-- [ ] Extract utility IDs from each state's dashboard HTML (option elements)
-- [ ] Per-state config: dashboard_id, source_key, vintage_date
-- [ ] Estimated yield: 4,000–5,000 PWSIDs from one engineering session
-- [ ] States with dashboards: NC, FL, WV, and ~21 others at efc.sog.unc.edu
+- [x] Generic EFC module: `efc_generic.py` — one module, 20 states, 7,096 dashboard utilities
+  - Auto-discovers utility IDs from dashboard HTML `<option>` elements
+  - Per-state config in `config/efc_dashboards.yaml` (dashboard_id, vintage, source_key)
+  - CLI: `ua-ingest efc --state WI`, `ua-ingest efc --all --skip-ingested`, `ua-ingest efc --list`
+  - Handles variable bill curve increments (500-gal default, 1000-gal for AR, custom for SC)
+  - Caches API responses per state at `data/raw/efc_{state}/api_cache.json`
+- [x] All 20 EFC states ingested — 5,677 records from EFC + WV PSC:
+  | State | Records | Avg @10CCF |
+  |-------|---------|-----------|
+  | AR | 599 | $48.76 |
+  | IA | 570 | $60.40 |
+  | WI | 569 | $54.72 |
+  | GA | 488 | $41.88 |
+  | NC | 403 | $60.52 |
+  | OH | 367 | $64.57 |
+  | MS | 359 | $40.61 |
+  | AZ | 329 | $140.91 |
+  | AL | 323 | $55.43 |
+  | FL | 281 | $36.95 |
+  | MA | 272 | $70.13 |
+  | IL | 242 | $59.29 |
+  | WV (PSC) | 241 | $100.84 |
+  | NH | 167 | $97.86 |
+  | CT | 151 | $63.44 |
+  | ME | 144 | $45.83 |
+  | MO | 73 | $44.82 |
+  | HI | 69 | $55.45 |
+  | DE | 24 | $40.36 |
+  | SC | 6 | $31.31 |
+- [x] Total database: **6,746 water_rates records, 6,120 unique PWSIDs** (up from ~1,391)
+- [x] Zero API cost (all EFC JSON API, no LLM calls)
+- [x] AZ has outlier max ($9,315) — likely EFC source data error
+- [x] SC low yield (6 records) — 223/257 utilities lack PWSIDs in API
+
+## Next (Sprint 19+)
+
+### Data Quality
+- [ ] AZ outlier review: $9,315 max bill @10CCF — investigate and flag
+- [ ] NH outlier: $3,414 max — investigate
+- [ ] SC low yield: 223 utilities lack SDWIS PWSIDs — name matching possible?
 
 ### WV PSC Name Matching Improvements
 - [ ] 42 unmatched WV PSC utilities — manual PWSID mapping file
-- [ ] 42 duplicate PWSIDs — many are the same utility appearing under different tariff IDs (e.g., Beckley Water Company ×5)
-- [ ] Consider scraping tariff detail pages (325 URLs) for richer rate data (3 consumption levels + customer charge)
+- [ ] Consider scraping tariff detail pages (325 URLs) for richer rate data
 
+### Duke/Nicholas Institute Dashboard
+- [ ] Check if data downloadable at internetofwater.org
+- [ ] 2,349 utilities across 7 states (NC, NJ, NM, GA, AZ, CA, WI)
+- [ ] May have overlap with EFC but covers NJ and NM (not in EFC)
 
+### TX TML Survey
+- [ ] 168-237 Texas cities, annual survey, no PWSIDs (name matching needed)
 
 ### IOU Parser Tuning (deferred companies)
 - [ ] AmWater tariff parser: 130-page legal format needs tariff-specific parse prompt or structured PDF table extraction
