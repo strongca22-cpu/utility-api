@@ -183,6 +183,46 @@ def efc_nc(
     run_efc_nc_ingest(dry_run=dry_run)
 
 
+@app.command("efc-fl")
+def efc_fl(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+    refresh: bool = typer.Option(False, "--refresh", help="Force re-fetch from API (ignore cache)"),
+):
+    """Ingest FL water rates from UNC EFC dashboard (2020 Raftelis survey).
+
+    Fetches bill curves for ~227 FL utilities via the EFC JSON API,
+    reverse-engineers tier structures, and normalizes to monthly equivalents.
+    API responses are cached locally for re-runs.
+
+    Source: https://dashboards.efc.sog.unc.edu/fl
+
+    Example: ua-ingest efc-fl --dry-run
+    """
+    from utility_api.ingest.efc_fl_ingest import run_efc_fl_ingest
+
+    run_efc_fl_ingest(dry_run=dry_run, refresh=refresh)
+
+
+@app.command("wv-psc")
+def wv_psc(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+    refresh: bool = typer.Option(False, "--refresh", help="Force re-fetch from PSC website"),
+):
+    """Ingest WV water rates from Public Service Commission rankings.
+
+    Scrapes cost rankings at 3,400 and 4,000 gallon consumption levels
+    for ~325 WV utilities. Derives volumetric rates from the two data
+    points and fuzzy-matches utility names to SDWIS PWSIDs.
+
+    Source: https://www.psc.state.wv.us/scripts/Utilities/rptWaterRankings4000.cfm
+
+    Example: ua-ingest wv-psc --dry-run
+    """
+    from utility_api.ingest.wv_psc_ingest import run_wv_psc_ingest
+
+    run_wv_psc_ingest(dry_run=dry_run, refresh=refresh)
+
+
 @app.command()
 def rates(
     state: list[str] = typer.Option(None, "--state", "-s", help="Filter to state(s): VA, CA"),
