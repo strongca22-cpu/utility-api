@@ -156,6 +156,15 @@ states:
     vintage: "2014"
     status: pending
 
+  vt:
+    dashboard_id: 127
+    utility_count: 187
+    state_code: VT
+    source_key: efc_vt_2021
+    vintage: "2021"
+    status: pending
+    notes: "VT DEC + EPA cooperative agreement. Rates as of July 2021."
+
   wi:
     dashboard_id: 263
     utility_count: 579

@@ -1,0 +1,212 @@
+# UAPI Ingest Specs — Small/Remaining Gap States
+# Session: 2026-03-26
+# Sources clearing the 50+ incremental PWSID threshold
+
+- source_key: "nm_nmed_rate_survey_2025"
+  name: "New Mexico NMED Drinking Water Bureau Annual Water & Sewer Rate Survey (2025 edition)"
+  tier: "premium"
+  commercial_use: true
+  license: "none stated — New Mexico state government publication"
+
+  # Access
+  url: "https://www.env.nm.gov/drinking_water/rates/"
+  download_url: "https://service.web.env.nm.gov/urls/nxEGQnEO"
+  # Note: download_url is a short URL that resolves to a cloud.env.nm.gov PDF.
+  # For prior years, use the direct links on the /rates/ page:
+  # 2024: https://service.web.env.nm.gov/urls/NekeTjOD
+  # 2023: https://service.web.env.nm.gov/urls/iJRCTreC
+  # 2019+: https://www.env.nm.gov/wp-content/uploads/sites/5/...
+  format: "pdf_table"
+  authentication: "none"
+
+  # Scope
+  states_covered: [NM]
+  estimated_total_records: 200  # estimated from 15-page PDF at ~14 rows/page
+  estimated_incremental_pwsids: 165  # NM covered by Duke (internal_only); this adds commercial PWSIDs
+  has_pwsid: false
+  pwsid_format: "NM1234567"
+  matching_strategy: "utility_name_fuzzy"
+  data_vintage: "2024"  # "December 2024 Rates" in 2025 edition
+
+  # Schema — confirmed from PDF extraction of 2025 edition
+  schema:
+    note: >
+      PDF is text-selectable. Header row repeats on each page.
+      Two sections: "Publicly Owned-Community Water Systems" and
+      (likely) investor-owned. Target the publicly-owned section.
+      "N/A" appears for missing values — treat as null.
+    columns:
+      - name: "System Name"
+        maps_to: "utility_name"
+        type: "string"
+        description: "Full utility name as reported to NMED. Multi-word entries may span a line break in the PDF."
+        sample_value: "Artesia Municipal Water System"
+      - name: "County"
+        maps_to: "county"
+        type: "string"
+        description: "New Mexico county name. Useful disambiguation for matching."
+        sample_value: "Eddy"
+      - name: "RESIDENTIAL 6,000 Gal. WATER Rate / Month Dec. 2024"
+        maps_to: "monthly_bill_water_6kgal"
+        type: "float"
+        description: "Monthly water bill at 6,000 gallons for residential customers. Strip $ sign."
+        sample_value: "10.02"
+      - name: "COMMERCIAL 6,000 Gal. WATER Rate/ Month Dec. 2024"
+        maps_to: "monthly_bill_water_commercial_6kgal"
+        type: "float"
+        description: "Monthly water bill at 6,000 gallons for commercial customers. Often same as residential."
+        sample_value: "21.52"
+      - name: "Number of RESIDENTIAL WATER Connections"
+        maps_to: "residential_connections"
+        type: "integer"
+        description: "Count of residential service connections. Useful for validation."
+        sample_value: "4781"
+      - name: "RESIDENTIAL 6,000 Gal. Sewer Rate/ Month Dec. 2024"
+        maps_to: "monthly_bill_sewer_6kgal"
+        type: "float"
+        description: "Monthly sewer bill at 6,000 gallons. N/A for water-only utilities."
+        sample_value: "13.48"
+
+  # Sample records
+  sample_records:
+    - utility_name: "Artesia Municipal Water System"
+      county: "Eddy"
+      monthly_bill_water_6kgal: 10.02
+      monthly_bill_water_commercial_6kgal: 21.52
+      residential_connections: 4781
+      monthly_bill_sewer_6kgal: 13.48
+    - utility_name: "Bloomfield Water Supply System"
+      county: "San Juan"
+      monthly_bill_water_6kgal: 46.32
+      monthly_bill_water_commercial_6kgal: 46.32
+      residential_connections: 2781
+      monthly_bill_sewer_6kgal: 46.32
+    - utility_name: "Canada De Los Alamos MDWCA"
+      county: "Santa Fe"
+      monthly_bill_water_6kgal: 284.00
+      monthly_bill_water_commercial_6kgal: 284.00
+      residential_connections: 27
+      monthly_bill_sewer_6kgal: null
+    - utility_name: "Carlsbad Municipal Water System"
+      county: "Eddy"
+      monthly_bill_water_6kgal: 17.45
+      monthly_bill_water_commercial_6kgal: 20.66
+      residential_connections: 11209
+      monthly_bill_sewer_6kgal: 32.41
+
+  # Implementation guidance
+  ingest_approach: |
+    1. Download the PDF from https://service.web.env.nm.gov/urls/nxEGQnEO
+       (or use the /rates/ page to find the current year's link).
+
+    2. Extract text with pdfplumber. The PDF is text-selectable.
+       Header row repeats on each page — skip duplicate headers.
+
+    3. Parse rows. Key quirks:
+       - Utility names sometimes span two lines in the PDF (line break mid-name).
+         Join continuation lines that don't contain a county name.
+       - "N/A" values → store as null.
+       - Dollar signs on rates — strip and parse as float.
+       - The section header "Publicly Owned-Community Water Systems" marks
+         the target section. A separate section for investor-owned systems
+         may also be present — include both.
+       - Some rows have asterisks (*) next to certain rate values — these
+         appear to denote footnotes about rate structures. Strip asterisks.
+       - Rows at section breaks (page headers, section titles) should be skipped.
+
+    4. PWSID matching:
+       a. Query NM CWS from EPA SDWIS (state code NM).
+       b. Fuzzy match utility_name against SDWIS system names.
+       c. Use county as a disambiguation field when multiple NM systems
+          share similar names.
+       d. "MDWCA" = Mutual Domestic Water Consumers Association (common NM
+          organizational form). Match these against SDWIS names carefully —
+          abbreviations vary.
+
+    5. Rate data type: bill_at_consumption (monthly bill at 6,000 gal).
+       Map to water_rates table as bill_amount_per_month with
+       consumption_gallons = 6000, consumption_unit = "gal".
+
+    6. Annual refresh: check https://www.env.nm.gov/drinking_water/rates/
+       for a new year's link each summer (2025 edition was revised 7-22-25).
+       Contact: Michael Montoya at NMED, 505-570-7682.
+
+  similar_to: "in_iurc_water_billing_2024"  # Single-state PDF table, bill-at-consumption
+  key_differences:
+    - "Uses 6,000 gal baseline (vs. 4,000 gal for IN IURC)"
+    - "15 pages vs 4 pages — larger dataset"
+    - "MDWCA (Mutual Domestic Water Consumers Association) is common NM entity type"
+    - "Many rural systems with N/A for sewer — handle gracefully"
+    - "PDF uses short-URL redirects — resolve and cache the final PDF URL"
+  estimated_effort: "3-4 hours"
+  data_quality_notes:
+    - "N/A is frequent for smaller systems and sewer data — expected, not an error"
+    - "Some utility names include line breaks in original PDF — join correctly"
+    - "Canada De Los Alamos MDWCA bills $284.00/month at 6,000 gal — extremely high, likely correct for a tiny high-altitude system (27 connections)"
+    - "Investor-owned systems are listed in a separate section (or may be on later pages) — confirm during ingest whether a separate IOU table exists"
+    - "Vintage is December prior year. NMED notes: 'Please Call (505) 570-7682 to report any Rate Survey informational errors'"
+
+
+---
+
+- source_key: "efc_vt_2021"
+  name: "UNC EFC Vermont Water and Wastewater Rates Dashboard (2021)"
+  tier: "premium"
+  commercial_use: true
+  license: "none stated — state/federal partnership (VT DEC + EPA cooperative agreement)"
+
+  # Access
+  url: "https://dashboards.efc.sog.unc.edu/vt"
+  download_url: "https://dashboards.efc.sog.unc.edu/vt"
+  # Data is served via the same Topsail JSON API used by all 19 existing EFC dashboards.
+  # API endpoint pattern (same as existing efc_* sources):
+  # https://dashboards.efc.sog.unc.edu/api/...  (confirm exact endpoint from existing pipeline)
+  format: "json_api"
+  authentication: "none"
+
+  # Scope
+  states_covered: [VT]
+  estimated_total_records: 182  # confirmed from EFC resource page
+  estimated_incremental_pwsids: 155  # Vermont has near-zero existing commercial coverage
+  has_pwsid: true  # EFC dashboards cross-reference EPA SDWIS PWSIDs
+  pwsid_format: "VT1234567"
+  matching_strategy: "direct_pwsid"
+  data_vintage: "2021"  # "Rates as of July 1, 2021"
+
+  # Schema
+  schema:
+    note: >
+      Identical schema to all existing efc_{state} sources.
+      Full tier structures available (fixed charge + volumetric blocks).
+      Data includes water rates, wastewater rates, financial metrics.
+      See existing efc_wI_2024 or any other efc_* ingest module for
+      the exact field mapping — this source is a direct clone.
+
+  # Sample records
+  sample_records:
+    - note: "Schema not re-extracted — identical to existing EFC sources. Use any efc_* module as reference."
+
+  # Implementation guidance
+  ingest_approach: |
+    Direct clone of any existing efc_{state} ingest module.
+    Steps:
+    1. Point the state code / dashboard URL to "vt" / dashboards.efc.sog.unc.edu/vt
+    2. Use the existing Topsail API query pattern (same endpoint structure as WI, OH, etc.)
+    3. Extract all utility records with PWSIDs and rate structures
+    4. Map to rate_schedules table using existing EFC field mapping
+    5. Tag with source_key "efc_vt_2021" and data_vintage "2021-07-01"
+
+    No new engineering required — this is a configuration change, not a new module.
+
+  similar_to: "efc_wi_2024"  # or any existing efc_* module
+  key_differences:
+    - "State code: VT"
+    - "Dashboard URL: dashboards.efc.sog.unc.edu/vt"
+    - "Data vintage: July 2021 (older than most EFC states)"
+    - "Funded by Vermont DEC, not EFC core grant"
+  estimated_effort: "1-2 hours"
+  data_quality_notes:
+    - "Data is from July 2021 — ~4 years stale. Rates will be understated vs. current."
+    - "182 utilities covers 'nearly all' VT utilities per EFC — good coverage"
+    - "Vermont has both municipal and private (PUC-regulated) water utilities — both should be in the EFC survey"
+    - "No known update to the dashboard since August 2021 — this is the only available vintage"

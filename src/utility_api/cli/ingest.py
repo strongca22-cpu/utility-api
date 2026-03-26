@@ -291,6 +291,25 @@ def duke_reference(
     )
 
 
+@app.command("nm-nmed")
+def nm_nmed(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+    refresh: bool = typer.Option(False, "--refresh", help="Force re-download PDF"),
+):
+    """Ingest NM NMED annual water rate survey (2025 edition, Dec 2024 rates).
+
+    Parses PDF with monthly bills at 6,000 gal for ~200 publicly-owned NM
+    community water systems. Fuzzy-matches utility names to SDWIS PWSIDs.
+
+    Examples:
+        ua-ingest nm-nmed --dry-run
+        ua-ingest nm-nmed
+    """
+    from utility_api.ingest.nm_nmed_ingest import run_nm_nmed_ingest
+
+    run_nm_nmed_ingest(dry_run=dry_run, refresh=refresh)
+
+
 @app.command("ky-psc")
 def ky_psc(
     dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),

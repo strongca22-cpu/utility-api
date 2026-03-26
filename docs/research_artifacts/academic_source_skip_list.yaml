@@ -85,6 +85,58 @@ skipped_sources:
     url: "https://journals.plos.org/water/article?id=10.1371/journal.pwat.0000362"
     reason: "Focuses on water QUALITY disparities (contaminant levels, violations), not rates. Uses EPA service area boundaries but no rate data."
 
+  # --- Sprint 19b: Small/gap state research (2026-03-26) ---
+
+  - name: "NJ BPU Water Tariffs"
+    url: "https://www.nj.gov/bpu/about/divisions/water/tariffs_water.html"
+    verified: "2026-03-26"
+    reason: "Regulates ~30 private IOUs only; no bulk download; no bill comparison tool."
+
+  - name: "League of Oregon Cities Water Rates Survey"
+    url: "https://www.orcities.org/application/files/7217/0870/9731/WaterRatesSurveyReport.pdf"
+    verified: "2026-03-26"
+    reason: "Aggregate/regional averages only, not per-utility. 70-city sample. No utility names, no PWSIDs."
+
+  - name: "Oregon Health Authority Drinking Water Services"
+    url: "https://www.oregon.gov/oha/ph/healthyenvironments/drinkingwater/pages/index.aspx"
+    verified: "2026-03-26"
+    reason: "Water quality compliance. Does not collect rate data."
+
+  - name: "Nebraska PSC / DWEE"
+    verified: "2026-03-26"
+    reason: "PSC only regulates privately-owned water companies (very few). DWEE manages water rights, not rates."
+
+  - name: "Kansas Corporation Commission — Water"
+    verified: "2026-03-26"
+    reason: "KCC regulates electric/gas. Water utilities not regulated at state level for rates."
+
+  - name: "Nevada PUCN Water/Wastewater"
+    url: "https://puc.nv.gov/Utilities/Water/"
+    verified: "2026-03-26"
+    reason: "Only 27 IOUs regulated; LVVWD/SNWA/TMWA (dominant utilities) NOT regulated. Too few for bulk."
+
+  - name: "Rhode Island RIPUC Water"
+    verified: "2026-03-26"
+    reason: "Only 6 regulated water utilities. Below 50-PWSID threshold."
+
+  - name: "DC Water"
+    verified: "2026-03-26"
+    reason: "Single dominant utility. Handle via scraping pipeline, not bulk source."
+
+  - name: "Wyoming/Montana/South Dakota/North Dakota/Idaho DEQ"
+    verified: "2026-03-26"
+    reason: "No state PUC for water in any of these 5 states. No statewide rate aggregation found."
+
+  - name: "Tennessee TAUD Rate Survey"
+    url: "https://taud.org/taudratesurvey/"
+    verified: "2026-03-26"
+    reason: "Member-only input form, not published results. Server error on page."
+
+  - name: "Louisiana Rural Water Association (LRWA)"
+    url: "https://lrwa.org/"
+    verified: "2026-03-26"
+    reason: "Provides rate analysis to individual members. No aggregate rate survey published."
+
   - name: "Hughes et al. 2025 rate extension (AWWA Water Science)"
     url: "https://awwa.onlinelibrary.wiley.com/doi/full/10.1002/aws2.70014"
     verified: "2026-03-26"
@@ -175,6 +227,18 @@ investigate_further:
       For the 10 states already in the GitHub repo, adds nothing (GitHub has more utilities).
       For ~40 other states, this would be the ONLY Duke source.
       Highest value for gap states: NY, MI, IN, CO, MN, VA, KY, TN, LA, OK, MD, etc.
+
+  - name: "Jersey WaterCheck Excel Export (NJ)"
+    url: "https://www.njwatercheck.com/Reports"
+    status: "DEFER — export requires interactive browser verification"
+    action: "Manual browser session to verify: (1) login requirement, (2) PWSID inclusion, (3) data vintage"
+    potential_value: "~150-200 incremental NJ PWSIDs if export is public and includes PWSIDs"
+
+  - name: "Virginia EFC Rates Dashboard (2019 data)"
+    url: "https://dashboards.efc.sog.unc.edu/va"
+    status: "DEFER — data is 2019 vintage (updated Feb 2020). Verify if updated."
+    action: "Check if Topsail API returns 2019 or newer data before scheduling ingest"
+    potential_value: "~136 VA utilities. But 2019 data is 6+ years stale."
 
   - name: "Duke OTC licensing for commercial use"
     contact: "otcquestions@duke.edu (reference OTC File No. 8047)"

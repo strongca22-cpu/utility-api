@@ -1,0 +1,117 @@
+# UAPI Skip List Updates — Small/Remaining Gap States Session
+# Session: 2026-03-26
+# Append these entries to the cumulative skip list. Never remove old entries.
+
+- name: "NJ BPU Water Tariffs"
+  url: "https://www.nj.gov/bpu/about/divisions/water/tariffs_water.html"
+  investigated: "2026-03-26"
+  reason: "Regulates ~30 private IOUs only; no bulk download; no bill comparison tool. Municipal systems (majority of NJ CWS) are not regulated."
+  revisit: "never"
+
+- name: "League of Oregon Cities Annual Water Rates Survey"
+  url: "https://www.orcities.org/application/files/7217/0870/9731/WaterRatesSurveyReport.pdf"
+  investigated: "2026-03-26"
+  reason: "Aggregate/regional averages only, not per-utility data. 70-city sample of 241 Oregon cities. No utility names, no rates table, no PWSIDs."
+  revisit: "never"
+
+- name: "Oregon Health Authority Drinking Water Services"
+  url: "https://www.oregon.gov/oha/ph/healthyenvironments/drinkingwater/pages/index.aspx"
+  investigated: "2026-03-26"
+  reason: "Manages drinking water quality compliance. Does not collect rate data."
+  revisit: "never"
+
+- name: "Nebraska PSC Private Water Company Regulation"
+  url: "https://psc.nebraska.gov/"
+  investigated: "2026-03-26"
+  reason: "Only regulates privately-owned water companies (very few). Cities, villages, and special districts are not regulated. No bulk rate tool."
+  revisit: "never"
+
+- name: "Nebraska DHHS / DWEE Drinking Water"
+  url: "https://dwee.nebraska.gov/"
+  investigated: "2026-03-26"
+  reason: "Water quality compliance oversight only. Does not collect rate data."
+  revisit: "never"
+
+- name: "Kansas Corporation Commission (KCC) — Water"
+  url: "https://kcc.ks.gov/"
+  investigated: "2026-03-26"
+  reason: "KCC regulates electric and gas utilities. Water utilities in Kansas are not regulated at the state level for rates."
+  revisit: "never"
+
+- name: "KDHE Public Water Supply Data Collector (Kansas)"
+  url: "https://www.kdhe.ks.gov/427/Public-Water-Supply-Data-Collector"
+  investigated: "2026-03-26"
+  reason: "Compliance monitoring data submission system. Does not collect rate data."
+  revisit: "never"
+
+- name: "Nevada PUCN Water/Wastewater"
+  url: "https://puc.nv.gov/Utilities/Water/"
+  investigated: "2026-03-26"
+  reason: "Only regulates 27 investor-owned utilities serving ~22,300 customers. LVVWD, SNWA, and TMWA (serving the majority of Nevada's population) are explicitly NOT regulated. Too few utilities for bulk ingest."
+  revisit: "never"
+
+- name: "Rhode Island RIPUC Regulated Water Suppliers"
+  url: "https://ripuc.ri.gov/utility-information/water/ri-regulated-water-suppliers-rates-updated-september-3-2020"
+  investigated: "2026-03-26"
+  reason: "Only 6 regulated water utilities in Rhode Island. Far below 50-PWSID threshold. Rates are published in a simple HTML table — addressable manually, not via bulk pipeline."
+  revisit: "never"
+
+- name: "DC Water"
+  url: "https://dcwater.com/"
+  investigated: "2026-03-26"
+  reason: "DC Water is the single dominant utility for the District. Single utility; handle via LLM scraping pipeline, not bulk source."
+  revisit: "never"
+
+- name: "Wyoming DEQ Drinking Water"
+  url: "https://deq.wyoming.gov/"
+  investigated: "2026-03-26"
+  reason: "No state PUC for water. No statewide rate aggregation. Rural state with no centralized rate data."
+  revisit: "never"
+
+- name: "Montana DEQ Drinking Water"
+  url: "https://deq.mt.gov/"
+  investigated: "2026-03-26"
+  reason: "No state PUC for water. No statewide rate aggregation."
+  revisit: "never"
+
+- name: "South Dakota DENR Drinking Water"
+  url: "https://denr.sd.gov/"
+  investigated: "2026-03-26"
+  reason: "No state PUC for water. No statewide rate aggregation."
+  revisit: "never"
+
+- name: "North Dakota DEQ Drinking Water"
+  url: "https://www.deq.nd.gov/"
+  investigated: "2026-03-26"
+  reason: "No state PUC for water. No statewide rate aggregation."
+  revisit: "never"
+
+- name: "Idaho DEQ Drinking Water"
+  url: "https://www.deq.idaho.gov/"
+  investigated: "2026-03-26"
+  reason: "No state PUC for water. No statewide rate aggregation."
+  revisit: "never"
+
+- name: "Tennessee Association of Utility Districts (TAUD) Rate Survey"
+  url: "https://taud.org/taudratesurvey/"
+  investigated: "2026-03-26"
+  reason: "Page returns server error; appears to be a member-only input form for utilities to submit rate data, not a published results page. TAUD provides rate analysis to individual members but does not publish aggregate results publicly."
+  revisit: "if_taud_publishes_public_rate_survey_results"
+
+- name: "Louisiana Rural Water Association (LRWA)"
+  url: "https://lrwa.org/"
+  investigated: "2026-03-26"
+  reason: "Provides rate analysis as technical assistance to individual member utilities but does not publish an aggregate rate survey. Resources page shows salary/benefits survey (confidential) but no water rate survey."
+  revisit: "never"
+
+- name: "Jersey WaterCheck Excel Export (NJ)"
+  url: "https://www.njwatercheck.com/Reports"
+  investigated: "2026-03-26"
+  reason: "DEFER not skip — export requires interactive browser verification. Unknown if login required; unknown if PWSIDs included; unknown data vintage. Rate metrics confirmed present in the metric list. Revisit with manual browser session before scheduling ingest."
+  revisit: "if_export_confirmed_public_and_includes_pwsids"
+
+- name: "Virginia EFC Rates Dashboard (2019 data)"
+  url: "https://dashboards.efc.sog.unc.edu/va"
+  investigated: "2026-03-26"
+  reason: "DEFER not skip — dashboard exists and uses same Topsail pipeline as existing EFC sources, but data is 2019 vintage (updated Feb 2020). Verify if a more recent update exists from TRC 2022/2023 survey before scheduling ingest."
+  revisit: "if_efc_va_dashboard_updated_with_2022_or_newer_data"

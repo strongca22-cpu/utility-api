@@ -1057,6 +1057,20 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Source catalog seeding:** `--seed-catalog` flag populates `source_catalog` with full Duke provenance (SPDX, DOI, attribution text, tier rationale)
 - [x] **SourceCatalog ORM model** updated with all 16 provenance fields
 
+## Completed (Sprint 19b — NM NMED + VT EFC + Gap State Research)
+
+- [x] **NM NMED rate survey** (`nm_nmed_rate_survey_2025`) → `water_rates`:
+  - PDF: 186 utilities parsed, 176 with bill data, 175 matched (99.4% match rate)
+  - Bill at 6,000 gal/month. Avg @10CCF: $60.55 (range $8-263)
+  - CLI: `ua-ingest nm-nmed [--dry-run]`
+- [x] **VT EFC dashboard** (`efc_vt_2021`) → `water_rates`:
+  - Topsail JSON API: 187 utilities, 170 matched and inserted
+  - Rates as of July 2021. First VT coverage in the database.
+  - Used existing `efc_generic.py` — just added VT to efc_dashboards.yaml config
+- [x] **Gap state research:** 16 states investigated, 12 skipped (no bulk rate data path),
+  2 deferred (NJ WaterCheck, VA EFC 2019), 2 ingested (NM, VT)
+- [x] Skip list updated with 13 new entries from gap state research
+
 ## Completed (Sprint 18 — Duke Batch + TX TML)
 
 - [x] TX TML 2023 ingest: 476 cities matched to PWSIDs (98.8% match rate, $0 cost)
