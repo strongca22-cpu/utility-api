@@ -1,0 +1,4 @@
+node_modules/
+dist/
+public/data/*.geojson
+public/data/*.pmtiles
