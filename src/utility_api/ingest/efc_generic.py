@@ -293,6 +293,9 @@ def fetch_all_for_state(
 def _extract_tiers_from_bill_curve(bill_water: dict) -> list[dict]:
     """Extract tier structure from bill curve by detecting marginal rate changes.
 
+    Handles variable gallon increments (500-gal, 1000-gal, or custom).
+    Auto-detects the increment from the bill curve keys.
+
     Parameters
     ----------
     bill_water : dict
@@ -303,35 +306,53 @@ def _extract_tiers_from_bill_curve(bill_water: dict) -> list[dict]:
     list[dict]
         Each dict: start_gal, end_gal, rate_per_kgal, is_allowance.
     """
-    bills = []
-    for gal in BILL_GALS:
-        val = bill_water.get(str(gal))
-        if val is None:
-            break
-        bills.append(float(val))
+    # Build sorted (gallon, bill) pairs from whatever keys are present
+    points = []
+    for k, v in bill_water.items():
+        try:
+            gal = int(k)
+            bill = float(v)
+            points.append((gal, bill))
+        except (ValueError, TypeError):
+            continue
 
-    if len(bills) < 2:
+    points.sort(key=lambda x: x[0])
+
+    if len(points) < 2:
         return []
 
-    marginal_rates = []
-    for i in range(1, len(bills)):
-        rate_per_kgal = (bills[i] - bills[i - 1]) / 0.5
-        marginal_rates.append(rate_per_kgal)
+    gal_levels = [p[0] for p in points]
+    bill_values = [p[1] for p in points]
 
+    # Compute marginal rates between each consecutive pair
+    marginal_rates = []
+    marginal_gals = []  # start gallon for each marginal rate
+    for i in range(1, len(points)):
+        delta_gal = gal_levels[i] - gal_levels[i - 1]
+        if delta_gal <= 0:
+            continue
+        rate_per_kgal = (bill_values[i] - bill_values[i - 1]) / (delta_gal / 1000.0)
+        marginal_rates.append(rate_per_kgal)
+        marginal_gals.append(gal_levels[i - 1])
+
+    if not marginal_rates:
+        return []
+
+    # Group consecutive similar rates into tiers
     tiers = []
     current_rate = marginal_rates[0]
-    current_start_gal = BILL_GALS[0]
+    current_start_gal = marginal_gals[0]
 
     for i in range(1, len(marginal_rates)):
         if abs(marginal_rates[i] - current_rate) > TIER_TOLERANCE_PER_KGAL:
             tiers.append({
                 "start_gal": current_start_gal,
-                "end_gal": BILL_GALS[i],
+                "end_gal": marginal_gals[i],
                 "rate_per_kgal": current_rate,
                 "is_allowance": current_rate < TIER_TOLERANCE_PER_KGAL,
             })
             current_rate = marginal_rates[i]
-            current_start_gal = BILL_GALS[i]
+            current_start_gal = marginal_gals[i]
 
     tiers.append({
         "start_gal": current_start_gal,
@@ -409,28 +430,53 @@ def _tiers_to_schema(tiers: list[dict], divisor: int) -> dict:
 
 
 def _interpolate_bill(bill_water: dict, target_gal: float) -> float | None:
-    """Interpolate bill at any gallon consumption level."""
+    """Interpolate bill at any gallon consumption level.
+
+    Handles arbitrary gallon increments by finding the two bracketing
+    data points and linearly interpolating between them.
+    """
     if target_gal < 0:
         return None
 
-    lower_idx = int(target_gal // 500)
-    if lower_idx >= len(BILL_GALS) - 1:
-        gal_a, gal_b = str(BILL_GALS[-2]), str(BILL_GALS[-1])
-        val_a, val_b = bill_water.get(gal_a), bill_water.get(gal_b)
-        if val_a is not None and val_b is not None:
-            rate = (float(val_b) - float(val_a)) / 500.0
-            return float(val_b) + rate * (target_gal - BILL_GALS[-1])
+    # Build sorted gallon→bill pairs
+    points = []
+    for k, v in bill_water.items():
+        try:
+            points.append((int(k), float(v)))
+        except (ValueError, TypeError):
+            continue
+    points.sort()
+
+    if not points:
         return None
 
-    gal_a = BILL_GALS[lower_idx]
-    gal_b = BILL_GALS[lower_idx + 1]
-    val_a, val_b = bill_water.get(str(gal_a)), bill_water.get(str(gal_b))
+    # Below range
+    if target_gal <= points[0][0]:
+        return points[0][1]
 
-    if val_a is None or val_b is None:
+    # Beyond range — extrapolate from last two
+    if target_gal > points[-1][0]:
+        if len(points) >= 2:
+            gal_a, val_a = points[-2]
+            gal_b, val_b = points[-1]
+            delta = gal_b - gal_a
+            if delta > 0:
+                rate = (val_b - val_a) / delta
+                return val_b + rate * (target_gal - gal_b)
         return None
 
-    frac = (target_gal - gal_a) / (gal_b - gal_a)
-    return float(val_a) + frac * (float(val_b) - float(val_a))
+    # Find bracketing points
+    for i in range(1, len(points)):
+        if points[i][0] >= target_gal:
+            gal_a, val_a = points[i - 1]
+            gal_b, val_b = points[i]
+            delta = gal_b - gal_a
+            if delta <= 0:
+                return val_a
+            frac = (target_gal - gal_a) / delta
+            return val_a + frac * (val_b - val_a)
+
+    return None
 
 
 def _compute_monthly_bill(bill_water: dict, ccf: float, divisor: int) -> float | None:
