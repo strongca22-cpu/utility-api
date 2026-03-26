@@ -1057,13 +1057,30 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Source catalog seeding:** `--seed-catalog` flag populates `source_catalog` with full Duke provenance (SPDX, DOI, attribution text, tier rationale)
 - [x] **SourceCatalog ORM model** updated with all 16 provenance fields
 
+## Completed (Sprint 18 — Duke Batch + TX TML)
+
+- [x] TX TML 2023 ingest: 476 cities matched to PWSIDs (98.8% match rate, $0 cost)
+  - TX coverage: 0 → 485 PWSIDs (33.2% pop). Median bill $42 @5,000 gal, $68 @10,000 gal.
+  - Outlier corrected (Gregory $4,141 → $41.41), 6 duplicates handled, 6 unmatched (apostrophes/tiny towns)
+- [x] Duke URL batch processing started: 3,718 URLs across 7 gap-fill states (TX, KS, PA, WA, NJ, NM, OR)
+  - ~15% success rate on non-dead URLs. 113 successes from 771 processed so far.
+  - ~35% of URLs are dead (404) — expected from 4-5 year old URLs
+  - Batch running in tmux `duke_batch`, ~2,947 remaining
+- [x] Fixed LLM string-vs-float type errors in parse agent (crashed Duke batch twice)
+- [x] Domain guesser automation running unattended: 21 states processed, 99 successes
+- [x] Coverage: 6,170 → 6,780 PWSIDs, 38.7% → 44.6% population. 9 new states with data.
+
 ## Next (Sprint 19+)
 
-### Duke URL Scraping (Highest Priority — Commercially Clean)
-- [ ] Validate 5 TX Duke URLs through scrape → parse pipeline
-- [ ] If URLs work: batch-process all gap-fill states (3,718 pending URLs)
-- [ ] Expected: 30-50% URL validity (4-5 year old URLs) → 500-1,200 new commercial PWSIDs
-- [ ] Converts Duke reference data into commercially clean scraped data
+### Duke 404 URLs → Domain Guesser Seeding (after Duke batch completes)
+- [ ] Duke batch will produce ~500-700 dead (404) URLs with known utility PWSIDs and stale domains
+- [ ] These are NOT throwaway — the domain is stale but the PWSID and utility identity are known
+- [ ] Feed failed Duke domains into the domain guesser as additive seeds: use the utility name + state
+  to guess the current domain (utility may have moved from `cityofirving.org/357/Rates` to `irvingtx.gov/water/rates`)
+- [ ] Only run after Duke batch is fully complete (don't want to double-process pending URLs)
+- [ ] Domain guesser is still running on VPS — no need to stop it. The seeding adds to the queue, not replaces it
+- [ ] Expected yield: Duke 404 URLs are high-quality leads (researcher-verified utilities), so domain guesser
+  hit rate on these should be higher than on blind SDWIS PWSIDs
 
 ### Data Quality
 - [ ] AZ outlier review: $9,315 max bill @10CCF — investigate and flag
@@ -1074,8 +1091,9 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] 42 unmatched WV PSC utilities — manual PWSID mapping file
 - [ ] Consider scraping tariff detail pages (325 URLs) for richer rate data
 
-### TX TML Survey
-- [ ] 168-237 Texas cities, annual survey, no PWSIDs (name matching needed)
+### TX TML Multi-Year Union (Optional)
+- [ ] Ingest 2019-2021 XLSX files for cities not in 2023 — estimated +100-150 unique cities
+- [ ] Each city gets most recent year's rates. Union across 2019-2024 = ~600-650 unique.
 
 ### IOU Parser Tuning (deferred companies)
 - [ ] AmWater tariff parser: 130-page legal format needs tariff-specific parse prompt or structured PDF table extraction
@@ -1085,13 +1103,12 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] 370 IOU URLs total deferred to 2026-06-01
 
 ### Domain Guesser Improvements
-- [ ] Domain-guessed URLs have ~6% parse success rate — structural issue, not parser issue
+- [ ] Automated pipeline running (tmux `guesser_sync`). ~2.2% parse success rate across 21 states.
 - [ ] Main blocker: city gov homepages ≠ water utility sites. Many water utils are separate authorities
-- [ ] Possible fixes: (a) better domain guessing for water authorities specifically, (b) SearXNG discovery for water-specific URLs from gov homepages, (c) utility-specific domain patterns
-- [ ] 434 domain-guessed URLs remain pending in registry — will benefit from any crawl improvements
+- [ ] URL selection fix applied: water-specific domains now prioritized over generic .gov
+- [ ] ~29 states still running on VPS. Will auto-import as each completes.
 
 ### Later
-- [ ] Run domain guesser with city patterns on full 21K uncovered CWS
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
 - [ ] Self-hosted LLM for discovery scoring (Llama 3.1 8B)
