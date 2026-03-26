@@ -943,19 +943,38 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 | SJW/CT Water | 4 | DEFERRED | Homepage, no rate links |
 | SJW/TX | 3 | DEFERRED | URL 404 |
 
+## Completed (Sprint 17b — Multi-Level Deep Crawl + Domain Guesser Import)
+
+- [x] Multi-level deep crawl implemented (configurable depth, default 3)
+  - Level 1: broad navigation scoring (water/utility/departments from homepage)
+  - Level 2+: rate-focused scoring (rate/fee/tariff schedule pages)
+  - Max 15 HTTP fetches per utility to prevent runaway crawling
+  - Configurable via `config/agent_config.yaml` or `--max-depth` CLI flag
+- [x] Validated: Juneau AK navigated homepage → utilities-division → rates-flat at depth 2
+- [x] Regression: 3/3 previously-working utilities still pass (no unnecessary deep crawling)
+- [x] Domain guesser results imported: VA (345 PWSIDs) + AK (89 PWSIDs) = 434 new URLs
+  - Best URL per PWSID selected (preferring .gov domains, filtering bad redirects)
+- [x] Domain guesser success rate: ~6% (1/16 tested). Low because:
+  - Most URLs are city/county gov homepages, not water utility sites
+  - Many cities outsource water to separate authorities (different domain)
+  - JS-heavy CivicPlus/Granicus platforms block link extraction
+- [x] Coverage: 862 → 866 PWSIDs (+4: 1 Juneau + 3 from VA batch)
+- [x] Total session API cost: ~$0.85
+
 ## Next (Sprint 18+)
 
 ### IOU Parser Tuning (deferred companies)
-- [ ] 2-level deep crawl for companies where rate-adjacent page links to tariff PDFs (Aquarion, Middlesex)
 - [ ] AmWater tariff parser: 130-page legal format needs tariff-specific parse prompt or structured PDF table extraction
 - [ ] Aqua/Essential: needs fresh URL discovery (current URLs 404)
 - [ ] Golden State: needs Playwright SPA rendering fix
 - [ ] CalWater: needs district-aware crawling
-- [ ] 370 URLs total deferred to 2026-06-01
+- [ ] 370 IOU URLs total deferred to 2026-06-01
 
-### Domain Guesser VA Results
-- [ ] Check VPS for completed VA domain guesser run (no SSH from desktop this session)
-- [ ] If available: import, convert to YAML, process through pipeline
+### Domain Guesser Improvements
+- [ ] Domain-guessed URLs have ~6% parse success rate — structural issue, not parser issue
+- [ ] Main blocker: city gov homepages ≠ water utility sites. Many water utils are separate authorities
+- [ ] Possible fixes: (a) better domain guessing for water authorities specifically, (b) SearXNG discovery for water-specific URLs from gov homepages, (c) utility-specific domain patterns
+- [ ] 434 domain-guessed URLs remain pending in registry — will benefit from any crawl improvements
 
 ### Later
 - [ ] Run domain guesser with city patterns on full 21K uncovered CWS
