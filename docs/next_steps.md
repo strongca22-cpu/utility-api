@@ -915,18 +915,47 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
   - Fix: boost score for links with "tariff" or "rate schedule" in text; penalize vague link text like "here" or "click here"
   - Affects all AmWater state subsidiaries (same page template). ~110 PWSIDs.
 
+## Completed (Sprint 17 — Multi-Company IOU Test)
+
+- [x] Tested 9 IOU companies (all except AmWater): Aqua/Essential, Aquarion, Artesian, CalWater, CSWR, Golden State, Liberty, Middlesex, Nexus, SJW
+- [x] Only SJW/Maine Water parsed successfully — deep crawl found division-specific tariff PDFs
+- [x] Root cause: IOU URLs are corporate homepages; rates are 2-3 levels deep or behind JS/district selection
+- [x] Fix: lowered thin-content threshold from 3+ to 1+ dollar amounts; deep crawl now returns best candidate page even if still "thin" (rate-adjacent page > homepage for parsing)
+- [x] Batch-processed 11 SJW/Maine Water divisions — 11/11 high confidence, $0.22 API cost
+- [x] Coverage: 851 → 862 PWSIDs with rate data
+- [x] Deferred 370 non-working IOU URLs to pending_retry (retry_after=2026-06-01)
+
+### IOU Company Test Results
+
+| Company | URLs | Result | Failure Mode |
+|---------|------|--------|-------------|
+| American Water | 107 | DEFERRED | Legal tariff format (known) |
+| Aqua/Essential | 206 | DEFERRED | URL 404, needs new discovery |
+| Aquarion | ~15 | DEFERRED | Needs 2-level deep crawl |
+| Artesian | 1 | DEFERRED | Tariff page is link directory |
+| CalWater | 6 | DEFERRED | District selection required |
+| CSWR | 3 | DEFERRED | Subsidiary landing page |
+| Golden State | 22 | DEFERRED | JS SPA, Playwright fails |
+| Liberty | 14 | DEFERRED | Minimal homepage |
+| Middlesex | 2 | DEFERRED | Needs 2-level deep crawl to tariff PDF |
+| Nexus | 12 | DEFERRED | Corporate parent site |
+| SJW/Maine Water | 11 | **SUCCESS** | Tariff PDFs found via deep crawl |
+| SJW/CT Water | 4 | DEFERRED | Homepage, no rate links |
+| SJW/TX | 3 | DEFERRED | URL 404 |
+
 ## Next (Sprint 18+)
 
-### Immediate: Multi-Company IOU Test (execution session)
-- [ ] Test 1-2 utilities from each non-AmWater IOU parent: Aqua/Essential (PA, NJ), CalWater (CA), SJW (CA, CT), Middlesex (NJ — already passed), Artesian (DE), Aquarion (CT), Liberty (NY, CA), Golden State (CA), CSWR (MO), Nexus (NC, TX)
-- [ ] For each parent: does the rate page have inline rate data OR a simpler tariff PDF?
-- [ ] Batch-process all IOUs that pass the test (expect 200-300 of the 321 non-AmWater URLs)
-- [ ] Hold AmWater URLs (110) for tariff parser development
+### IOU Parser Tuning (deferred companies)
+- [ ] 2-level deep crawl for companies where rate-adjacent page links to tariff PDFs (Aquarion, Middlesex)
+- [ ] AmWater tariff parser: 130-page legal format needs tariff-specific parse prompt or structured PDF table extraction
+- [ ] Aqua/Essential: needs fresh URL discovery (current URLs 404)
+- [ ] Golden State: needs Playwright SPA rendering fix
+- [ ] CalWater: needs district-aware crawling
+- [ ] 370 URLs total deferred to 2026-06-01
 
-### Development: AmWater Tariff Parser
-- [ ] The 130-page NJ tariff PDF extracts correctly (72 rate pages, 45K chars, dollar amounts present) but the ParseAgent fails with `no_tier_1_rate` — the legal tariff format isn't handled
-- [ ] Options: tariff-specific parse prompt, pre-extraction of rate table sections, or structured PDF table extraction (pymupdf tables API)
-- [ ] Affects all AmWater state subsidiaries (~110 PWSIDs across 14 states)
+### Domain Guesser VA Results
+- [ ] Check VPS for completed VA domain guesser run (no SSH from desktop this session)
+- [ ] If available: import, convert to YAML, process through pipeline
 
 ### Later
 - [ ] Run domain guesser with city patterns on full 21K uncovered CWS

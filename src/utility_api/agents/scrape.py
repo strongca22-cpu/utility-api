@@ -20,7 +20,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-25
+Modified: 2026-03-25 (Sprint 17: lower thin threshold to 1+$, return best deep crawl page)
 
 Dependencies:
     - sqlalchemy
@@ -250,10 +250,10 @@ class ScrapeAgent(BaseAgent):
         # News figures: $1.4 billion, $10 per month, $608M — 0-1 decimals.
         precise_dollars = len(re.findall(r'\$\d{1,3}\.\d{2,5}', text))
 
-        if precise_dollars >= 3:
-            return False  # Has multiple rate-like dollar amounts — substantive
+        if precise_dollars >= 1:
+            return False  # Has rate-like dollar amounts — substantive enough
 
-        # Has rate keywords but few/no precise dollar amounts → landing page
+        # Has rate keywords but no precise dollar amounts → landing page
         logger.debug(
             f"  Thin content: {keyword_matches} rate keywords, "
             f"{precise_dollars} precise dollar amounts"
@@ -269,8 +269,11 @@ class ScrapeAgent(BaseAgent):
     ) -> dict | None:
         """Extract links from page, score for rate relevance, follow top candidates.
 
-        Only follows links on the same domain. Returns the first substantive
-        page found, or None if no deeper rate content is discovered.
+        Only follows links on the same domain. Returns the best page found:
+        - If a substantive page (passes _is_thin_content) is found, returns it
+        - Otherwise returns the best candidate seen (most chars with rate keywords),
+          since a rate-adjacent page is still better than a homepage for parsing
+        - Returns None only if no deeper pages could be fetched at all
 
         When a deeper URL is found, inserts a NEW scrape_registry row for it
         (the original landing page entry is preserved).
@@ -320,6 +323,10 @@ class ScrapeAgent(BaseAgent):
         # Sort by score descending, take top N
         scored_links.sort(reverse=True)
 
+        # Track the best candidate even if still "thin" — a rate-adjacent
+        # page is better than the original homepage for parsing.
+        best_candidate = None
+
         for score, href, link_text in scored_links[:max_links]:
             logger.debug(f"    Deep crawl trying: [{score}] {href[:80]} ({link_text[:40]})")
 
@@ -333,20 +340,52 @@ class ScrapeAgent(BaseAgent):
                 continue
 
             fetched_text = result.text or ""
+            candidate = {
+                "url": href,
+                "text": fetched_text,
+                "is_pdf": getattr(result, "is_pdf", False),
+                "char_count": len(fetched_text),
+                "_result": result,  # keep for registration
+                "_link_score": score,
+            }
+
             if not self._is_thin_content(fetched_text):
-                # Found substantive content — register the deeper URL
+                # Found substantive content — register and return immediately
                 self._register_deep_url(
                     pwsid=pwsid,
                     deep_url=href,
                     original_url=base_url,
                     result=result,
                 )
-                return {
-                    "url": href,
-                    "text": fetched_text,
-                    "is_pdf": getattr(result, "is_pdf", False),
-                    "char_count": len(fetched_text),
-                }
+                del candidate["_result"]
+                del candidate["_link_score"]
+                return candidate
+
+            # Track best fallback: prefer higher link score, then more content
+            if best_candidate is None or (
+                score > best_candidate["_link_score"]
+                or (score == best_candidate["_link_score"]
+                    and len(fetched_text) > best_candidate["char_count"])
+            ):
+                best_candidate = candidate
+
+        # No substantive page found — return best candidate if it's an
+        # improvement over the original (more content or rate-relevant URL)
+        if best_candidate and best_candidate["char_count"] > 200:
+            logger.info(
+                f"  Deep crawl: no substantive page, using best candidate "
+                f"({best_candidate['char_count']:,} chars): "
+                f"{best_candidate['url'][:80]}"
+            )
+            self._register_deep_url(
+                pwsid=pwsid,
+                deep_url=best_candidate["url"],
+                original_url=base_url,
+                result=best_candidate["_result"],
+            )
+            del best_candidate["_result"]
+            del best_candidate["_link_score"]
+            return best_candidate
 
         return None
 
