@@ -1,0 +1,174 @@
+# config/efc_dashboards.yaml
+# UNC EFC Topsail Dashboard Configuration
+#
+# All dashboards share the same JSON API at dashboards.efc.sog.unc.edu.
+# Each state has a unique dashboard_id used to construct API endpoints.
+# Utility IDs (rate_structure_ids) are extracted dynamically from the
+# dashboard HTML at ingest time.
+#
+# Last discovery run: 2026-03-26
+# Total utilities across all states: 7,096
+
+states:
+  al:
+    dashboard_id: 189
+    utility_count: 541
+    state_code: AL
+    source_key: efc_al_2018
+    vintage: "2018"
+    status: pending
+
+  ar:
+    dashboard_id: 136
+    utility_count: 746
+    state_code: AR
+    source_key: efc_ar_2020
+    vintage: "2020"
+    status: pending
+
+  az:
+    dashboard_id: 271
+    utility_count: 452
+    state_code: AZ
+    source_key: efc_az_2014
+    vintage: "2014"
+    status: pending
+
+  ct:
+    dashboard_id: 10
+    utility_count: 153
+    state_code: CT
+    source_key: efc_ct_2018
+    vintage: "2018"
+    status: pending
+
+  de:
+    dashboard_id: 19
+    utility_count: 49
+    state_code: DE
+    source_key: efc_de_2018
+    vintage: "2018"
+    status: pending
+
+  fl:
+    dashboard_id: 15
+    utility_count: 227
+    state_code: FL
+    source_key: efc_fl_2020
+    vintage: "2020"
+    status: ingested
+
+  ga:
+    dashboard_id: 197
+    utility_count: 584
+    state_code: GA
+    source_key: efc_ga_2019
+    vintage: "2019"
+    status: pending
+
+  hi:
+    dashboard_id: 150
+    utility_count: 41
+    state_code: HI
+    source_key: efc_hi_2020
+    vintage: "2020"
+    status: pending
+
+  ia:
+    dashboard_id: 181
+    utility_count: 696
+    state_code: IA
+    source_key: efc_ia_2023
+    vintage: "2023"
+    status: pending
+
+  il:
+    dashboard_id: 11
+    utility_count: 253
+    state_code: IL
+    source_key: efc_il_2018
+    vintage: "2018"
+    notes: "Northeast Illinois only, not statewide"
+    status: pending
+
+  ma:
+    dashboard_id: 247
+    utility_count: 408
+    state_code: MA
+    source_key: efc_ma_2017
+    vintage: "2017"
+    status: pending
+
+  me:
+    dashboard_id: 23
+    utility_count: 238
+    state_code: ME
+    source_key: efc_me_2018
+    vintage: "2018"
+    status: pending
+
+  mo:
+    dashboard_id: 18
+    utility_count: 57
+    state_code: MO
+    source_key: efc_mo_2015
+    vintage: "2015"
+    status: pending
+
+  ms:
+    dashboard_id: 176
+    utility_count: 317
+    state_code: MS
+    source_key: efc_ms_2022
+    vintage: "2022"
+    status: pending
+
+  nc:
+    dashboard_id: 251
+    utility_count: 589
+    state_code: NC
+    source_key: efc_nc_2025
+    vintage: "2025"
+    status: ingested
+    notes: "Already ingested via CSV. API available for future refresh."
+
+  nh:
+    dashboard_id: 267
+    utility_count: 206
+    state_code: NH
+    source_key: efc_nh_2016
+    vintage: "2016"
+    status: pending
+
+  oh:
+    dashboard_id: 178
+    utility_count: 383
+    state_code: OH
+    source_key: efc_oh_2019
+    vintage: "2019"
+    status: pending
+
+  sc:
+    dashboard_id: 4
+    utility_count: 257
+    state_code: SC
+    source_key: efc_sc_2014
+    vintage: "2014"
+    status: pending
+
+  wi:
+    dashboard_id: 263
+    utility_count: 579
+    state_code: WI
+    source_key: efc_wi_2016
+    vintage: "2016"
+    status: pending
+
+  wv:
+    dashboard_id: 177
+    utility_count: 320
+    state_code: WV
+    source_key: efc_wv_2012
+    vintage: "2012"
+    status: ingested
+    notes: "Also ingested via WV PSC HTML scrape (wv_psc_2026, fresher data)"

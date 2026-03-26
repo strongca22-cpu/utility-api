@@ -1,0 +1,581 @@
+# config/bulk_source_catalog.yaml
+# Bulk Water Rate Data Source Catalog
+# Purpose: Structured catalog of every identified bulk rate data source
+# Last updated: 2026-03-25
+#
+# Key finding: The UNC Environmental Finance Center (EFC) has rate dashboards
+# covering 24+ US states with downloadable data. The EFC page explicitly states:
+# "Data displayed on the dashboard are available for download from links provided
+# on the dashboard webpages." This is the single most valuable discovery.
+#
+# Additionally, a National Water Affordability Dashboard exists at Duke/Nicholas
+# Institute covering 2,349+ utilities across 7 states with detailed rate data.
+#
+# The EFC blog (2017) mentions "4,493 communities across the country" in their
+# database, and a 2025 blog post references a new national dashboard with
+# "over 7,000 utilities."
+
+# =============================================================================
+# TIER 1: HIGHEST VALUE — MULTI-STATE / LARGE UTILITY COUNT
+# =============================================================================
+
+- source_key: "efc_national_affordability"
+  display_name: "UNC EFC National Water Affordability Dashboard"
+  source_type: bulk_academic
+  states_covered: [MULTI]
+  url: "https://efc.sog.unc.edu/dashboards/"
+  download_url: null  # Check individual dashboard pages for download links
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 7000
+  vintage: "2019-2025"
+  refresh_cadence: annual
+  access: free
+  notes: |
+    The EFC states that dashboard data is available for download. The 2025 blog
+    mentions a national dashboard with 7,000+ utilities. This is the SINGLE
+    HIGHEST VALUE source to investigate. The EFC's 2017 blog mentions 4,493
+    communities; by 2025 this has grown to 7,000+.
+    
+    The dashboard webpages use a custom JavaScript framework at
+    dashboards.efc.sog.unc.edu. Each state dashboard may have different data
+    download mechanisms — check each one individually.
+    
+    Key question: Is there a single bulk download of all states, or must each
+    state be downloaded separately? Check the API/data endpoints.
+  ingest_difficulty: moderate
+  priority: 1
+
+- source_key: "awwa_raftelis_rate_survey"
+  display_name: "AWWA/Raftelis Water and Wastewater Rate Survey"
+  source_type: bulk_survey
+  states_covered: [MULTI]
+  url: "https://www.awwa.org/data-products/rate-survey/"
+  download_url: null
+  format: html_dashboard  # New digital subscription platform
+  has_pwsid: false  # Survey-based, uses utility names
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 500
+  vintage: "2023-2025"
+  refresh_cadence: biennial  # Now every 6 months
+  access: paywall  # Subscription required
+  notes: |
+    AWWA and Raftelis co-publish the most widely cited water rate survey.
+    Redesigned to update every 6 months (was biennial). Covers ~500 utilities
+    across all 50 states. New digital subscription platform launched.
+    Pricing unknown but likely $500-$2,000/year for members.
+    No PWSIDs — would need fuzzy name matching.
+  ingest_difficulty: moderate
+  priority: 10  # Lower priority due to paywall and lack of PWSIDs
+
+- source_key: "duke_water_affordability"
+  display_name: "Duke Nicholas Institute Water Affordability Dashboard"
+  source_type: bulk_academic
+  states_covered: [NC, NJ, NM, GA, AZ, CA, WI]
+  url: "https://internetofwater.org/blog/water-affordability"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 2349
+  vintage: "2019-2021"
+  refresh_cadence: unknown
+  access: free
+  notes: |
+    Duke University Water Policy Program dashboard. As of blog post, covers
+    2,349 utilities across 7 states. Uses service area boundaries for
+    affordability analysis. Includes detailed rate structure data.
+    Check if data is downloadable.
+  ingest_difficulty: moderate
+  priority: 3
+
+# =============================================================================
+# TIER 2: STATE EFC DASHBOARDS — SORTED BY UTILITY COUNT
+# =============================================================================
+# All EFC dashboards explicitly offer data downloads per the EFC website.
+# Each dashboard URL follows pattern: dashboards.efc.sog.unc.edu/{state_abbrev}
+
+- source_key: "efc_ia"
+  display_name: "Iowa Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [IA]
+  url: "https://dashboards.efc.sog.unc.edu/ia"
+  download_url: null  # Check dashboard for download link
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 690
+  vintage: "2023"
+  refresh_cadence: annual
+  access: free
+  notes: "Previously investigated — no bulk CSV download found, but per-utility HTML endpoints exist at ~690 URLs. Revisit for download link."
+  ingest_difficulty: moderate
+  priority: 4
+
+- source_key: "efc_wi"
+  display_name: "Wisconsin Water Rates Dashboard (EFC + PSC)"
+  source_type: bulk_academic
+  states_covered: [WI]
+  url: "https://dashboards.efc.sog.unc.edu/wi"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 577
+  vintage: "2020"
+  refresh_cadence: unknown
+  access: free
+  notes: |
+    Funded by WI PSC. Data from PSC tariff and annual report databases.
+    WI PSC regulates 96% of population served by CWS including municipals.
+    The PSC also has a separate "Quarterly Water Bill Comparison" tool.
+    EFC page says "Download the data in the dashboard summarizing rates across the state."
+  ingest_difficulty: easy
+  priority: 2
+
+- source_key: "efc_ga"
+  display_name: "Georgia Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [GA]
+  url: "https://dashboards.efc.sog.unc.edu/ga"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 450
+  vintage: "2017-2023"
+  refresh_cadence: annual
+  access: free
+  notes: "Funded by Georgia Environmental Finance Authority. Data collected since 2007. ~450 public service providers."
+  ingest_difficulty: moderate
+  priority: 5
+
+- source_key: "efc_nc"
+  display_name: "North Carolina Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [NC]
+  url: "https://dashboards.efc.sog.unc.edu/nc"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 403
+  vintage: "2025"
+  refresh_cadence: annual
+  access: free
+  notes: "ALREADY INGESTED as CSV. Dashboard data source listed as '2025 NC water & wastewater rates survey.' Confirm we have latest vintage."
+  ingest_difficulty: easy
+  priority: 99  # Already ingested
+
+- source_key: "efc_oh"
+  display_name: "Ohio Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [OH]
+  url: "https://dashboards.efc.sog.unc.edu/oh"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 400
+  vintage: "2020-2023"
+  refresh_cadence: unknown
+  access: free
+  notes: "Ohio has 1,632 CWS — EFC likely covers the larger ones."
+  ingest_difficulty: moderate
+  priority: 6
+
+- source_key: "efc_fl"
+  display_name: "Florida Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [FL]
+  url: "https://dashboards.efc.sog.unc.edu/fl"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 300
+  vintage: "2020"
+  refresh_cadence: unknown
+  access: free
+  notes: "Raftelis-funded 2020 FL survey. FL has 1,386 CWS."
+  ingest_difficulty: moderate
+  priority: 7
+
+- source_key: "efc_al"
+  display_name: "Alabama Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [AL]
+  url: "https://dashboards.efc.sog.unc.edu/al"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 300
+  vintage: "2016-2023"
+  refresh_cadence: unknown
+  access: free
+  ingest_difficulty: moderate
+  priority: 12
+
+- source_key: "efc_az"
+  display_name: "Arizona Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [AZ]
+  url: "https://dashboards.efc.sog.unc.edu/az"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 200
+  vintage: "2016-2023"
+  refresh_cadence: unknown
+  access: free
+  notes: "Funded by Water Infrastructure Finance Authority of Arizona."
+  ingest_difficulty: moderate
+  priority: 13
+
+- source_key: "efc_il"
+  display_name: "Northeast Illinois Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [IL]
+  url: "https://dashboards.efc.sog.unc.edu/il"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 200
+  vintage: "2016-2023"
+  refresh_cadence: unknown
+  access: free
+  notes: "Covers NORTHEAST Illinois only — not statewide. IL has 1,632 CWS total."
+  ingest_difficulty: moderate
+  priority: 9
+
+- source_key: "efc_sc"
+  display_name: "South Carolina Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [SC]
+  url: "https://dashboards.efc.sog.unc.edu/sc"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 200
+  vintage: "2020-2023"
+  refresh_cadence: unknown
+  access: free
+  ingest_difficulty: moderate
+  priority: 14
+
+- source_key: "efc_mo"
+  display_name: "Missouri Water Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [MO]
+  url: "https://dashboards.efc.sog.unc.edu/mo"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 200
+  vintage: "2020-2023"
+  refresh_cadence: unknown
+  access: free
+  ingest_difficulty: moderate
+  priority: 15
+
+- source_key: "efc_ms"
+  display_name: "Mississippi Water Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [MS]
+  url: "https://dashboards.efc.sog.unc.edu/ms"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 150
+  vintage: "2020-2023"
+  refresh_cadence: unknown
+  access: free
+  ingest_difficulty: moderate
+  priority: 16
+
+- source_key: "efc_ar"
+  display_name: "Arkansas Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [AR]
+  url: "https://dashboards.efc.sog.unc.edu/ar"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 150
+  vintage: "2020-2023"
+  refresh_cadence: unknown
+  access: free
+  ingest_difficulty: moderate
+  priority: 17
+
+- source_key: "efc_wv"
+  display_name: "West Virginia Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [WV]
+  url: "https://dashboards.efc.sog.unc.edu/wv"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: true
+  has_rate_tiers: true
+  has_bill_amounts: true
+  has_fixed_charges: true
+  estimated_utility_count: 150
+  vintage: "2022"
+  refresh_cadence: unknown
+  access: free
+  notes: "Data from WV Public Service Commission."
+  ingest_difficulty: moderate
+  priority: 18
+
+# Remaining EFC states (smaller utility counts or less critical)
+- source_key: "efc_ma"
+  display_name: "Massachusetts Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [MA]
+  url: "https://dashboards.efc.sog.unc.edu/ma"
+  estimated_utility_count: 150
+  vintage: "2020-2023"
+  access: free
+  ingest_difficulty: moderate
+  priority: 19
+
+- source_key: "efc_ct"
+  display_name: "Connecticut Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [CT]
+  url: "https://dashboards.efc.sog.unc.edu/ct"
+  estimated_utility_count: 100
+  vintage: "2020-2023"
+  access: free
+  ingest_difficulty: moderate
+  priority: 20
+
+- source_key: "efc_de"
+  display_name: "Delaware Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [DE]
+  url: "https://dashboards.efc.sog.unc.edu/de"
+  estimated_utility_count: 50
+  access: free
+  ingest_difficulty: moderate
+  priority: 25
+
+- source_key: "efc_nh"
+  display_name: "New Hampshire Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [NH]
+  url: "https://dashboards.efc.sog.unc.edu/nh"
+  estimated_utility_count: 100
+  vintage: "2021"
+  access: free
+  ingest_difficulty: moderate
+  priority: 22
+
+- source_key: "efc_me"
+  display_name: "Maine Water & Wastewater Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [ME]
+  url: "https://dashboards.efc.sog.unc.edu/me"
+  estimated_utility_count: 100
+  access: free
+  ingest_difficulty: moderate
+  priority: 23
+
+- source_key: "efc_hi"
+  display_name: "Hawaii Water Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [HI]
+  url: "https://dashboards.efc.sog.unc.edu/hi"
+  estimated_utility_count: 30
+  access: free
+  ingest_difficulty: moderate
+  priority: 30
+
+- source_key: "efc_ca_small"
+  display_name: "California Small Water Systems Rates Dashboard (EFC)"
+  source_type: bulk_academic
+  states_covered: [CA]
+  url: "https://efc.sog.unc.edu/resource/california-small-water-systems-rates-dashboard/"
+  estimated_utility_count: 200
+  access: free
+  notes: "Focuses on small CA systems — may complement the eAR and OWRS data already ingested."
+  ingest_difficulty: moderate
+  priority: 11
+
+# =============================================================================
+# TIER 3: STATE-SPECIFIC NON-EFC SOURCES
+# =============================================================================
+
+- source_key: "tx_tml_survey"
+  display_name: "Texas Municipal League Water & Wastewater Survey"
+  source_type: bulk_survey
+  states_covered: [TX]
+  url: "https://www.tml.org/229/Water-Wastewater-Survey-Results"
+  download_url: null  # Check if survey results are downloadable tables or PDFs
+  format: html_dashboard  # Survey results displayed on web, multiple years available
+  has_pwsid: false
+  has_rate_tiers: false
+  has_bill_amounts: true
+  has_fixed_charges: false
+  estimated_utility_count: 237
+  vintage: "2024-2025"
+  refresh_cadence: annual
+  access: free
+  notes: |
+    Annual survey of TX cities. 2025: 168 cities. 2024: 237 cities.
+    Includes water fees by population group, residential/commercial costs.
+    Results available for 2019-2025. No PWSIDs — would need city name matching.
+    TX has 4,584 CWS — this covers only municipalities, not MUDs or IOUs.
+    TX PUC regulates IOUs separately (Aqua TX, Texas Water Utilities/Nexus).
+  ingest_difficulty: moderate
+  priority: 8
+
+- source_key: "wi_psc_bill_comparison"
+  display_name: "Wisconsin PSC Quarterly Water Bill Comparison Tool"
+  source_type: bulk_government
+  states_covered: [WI]
+  url: "https://psc.wi.gov/Pages/ServiceType/Water/RateSetting.aspx"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: false
+  has_rate_tiers: false
+  has_bill_amounts: true
+  has_fixed_charges: false
+  estimated_utility_count: 577
+  vintage: "current"
+  refresh_cadence: quarterly
+  access: free
+  notes: |
+    PSC tool for comparing estimated bills by utility class or county.
+    Data from PSC tariff database. Excludes fire protection charges.
+    May complement the EFC WI dashboard which uses the same underlying PSC data.
+  ingest_difficulty: moderate
+  priority: 20
+
+- source_key: "wi_psc_tariffs"
+  display_name: "Wisconsin PSC Water Utility Tariffs Database"
+  source_type: puc_filing
+  states_covered: [WI]
+  url: "https://apps.psc.wi.gov/pages/tariffs.htm"
+  download_url: null
+  format: html_dashboard
+  has_pwsid: false
+  has_rate_tiers: true
+  has_bill_amounts: false
+  has_fixed_charges: true
+  estimated_utility_count: 577
+  vintage: "current"
+  refresh_cadence: continuous
+  access: free
+  notes: |
+    Individual tariff filings for all WI regulated water utilities.
+    Very detailed rate structure data but would require per-utility extraction.
+    WI PSC regulates 96% of population served by CWS including municipals.
+  ingest_difficulty: hard
+  priority: 25
+
+- source_key: "mwra_rate_survey"
+  display_name: "MWRA Advisory Board Water & Sewer Rate Survey (Massachusetts)"
+  source_type: bulk_survey
+  states_covered: [MA]
+  url: "https://www.mwraadvisoryboard.com/2024-rate-survey-released/"
+  download_url: null
+  format: pdf_table  # Likely PDF report with appendix tables
+  has_pwsid: false
+  has_rate_tiers: false
+  has_bill_amounts: true
+  has_fixed_charges: false
+  estimated_utility_count: 100
+  vintage: "2024"
+  refresh_cadence: annual
+  access: free
+  notes: |
+    30+ year survey of MWRA communities in MA. 2024 average combined bill $2,017.50.
+    Now includes 31 US cities nationally. Compares with UNC MA Dashboard data.
+    May be PDF-only — check for Excel/CSV download.
+  ingest_difficulty: moderate
+  priority: 22
+
+# =============================================================================
+# STATES WITH NO BULK SOURCE FOUND
+# =============================================================================
+# These states require per-utility scraping or further investigation.
+
+# TX — TML survey covers ~237 cities (of 4,584 CWS). No state-level bulk source for all.
+# PA — No bulk source found. PA PUC regulates IOUs but no statewide rate database.
+# NY — No bulk source found. NY PSC regulates IOUs only.
+# NJ — No bulk source found. NJ BPU regulates IOUs.
+# IN — No bulk source found. IN IURC regulates IOUs.
+# CO — No bulk source found. Not on EFC list.
+# MN — No bulk source found. Not on EFC list.
+# MI — No bulk source found. Not on EFC list.
+# WA — No bulk source found. Not on EFC list.
+# VA — No bulk source found from this session (LLM scraping ongoing).
+
+# =============================================================================
+# ALREADY INGESTED (for reference)
+# =============================================================================
+
+- source_key: "ca_swrcb_ear"
+  display_name: "CA SWRCB Electronic Annual Reports"
+  source_type: bulk_government
+  states_covered: [CA]
+  estimated_utility_count: 194
+  vintage: "2020-2022"
+  status: ingested
+
+- source_key: "ca_owrs"
+  display_name: "CA Open Water Rate Specification"
+  source_type: bulk_government
+  states_covered: [CA]
+  estimated_utility_count: 387
+  vintage: "2023"
+  status: ingested
+
+- source_key: "efc_nc_csv"
+  display_name: "UNC EFC 2025 NC Rate Survey (CSV)"
+  source_type: bulk_academic
+  states_covered: [NC]
+  estimated_utility_count: 403
+  vintage: "2025"
+  status: ingested

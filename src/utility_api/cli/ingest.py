@@ -224,6 +224,46 @@ def wv_psc(
 
 
 @app.command()
+def efc(
+    state: list[str] = typer.Option(None, "--state", "-s", help="State(s) to ingest (e.g., WI, GA)"),
+    all_states: bool = typer.Option(False, "--all", help="Ingest all configured EFC states"),
+    skip_ingested: bool = typer.Option(False, "--skip-ingested", help="Skip states already ingested"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Parse and report, no DB writes"),
+    refresh: bool = typer.Option(False, "--refresh", help="Force re-fetch from API (ignore cache)"),
+    list_states: bool = typer.Option(False, "--list", help="List all configured states and exit"),
+):
+    """Generic EFC dashboard ingest — works for any of the 20+ EFC states.
+
+    Fetches bill curves from the UNC EFC Topsail JSON API, extracts
+    tier structures, and writes to water_rates. All states share the
+    same API pattern.
+
+    Examples:
+        ua-ingest efc --list
+        ua-ingest efc --state WI --dry-run
+        ua-ingest efc --state GA --state OH
+        ua-ingest efc --all --skip-ingested
+    """
+    from utility_api.ingest.efc_generic import list_efc_states, run_efc_ingest
+
+    if list_states:
+        list_efc_states()
+        return
+
+    if not state and not all_states:
+        typer.echo("Specify --state or --all. Use --list to see available states.")
+        raise typer.Exit(1)
+
+    run_efc_ingest(
+        states=state or None,
+        all_states=all_states,
+        skip_ingested=skip_ingested,
+        dry_run=dry_run,
+        refresh=refresh,
+    )
+
+
+@app.command()
 def rates(
     state: list[str] = typer.Option(None, "--state", "-s", help="Filter to state(s): VA, CA"),
     pwsid: list[str] = typer.Option(None, "--pwsid", "-p", help="Specific PWSID(s) to process"),
