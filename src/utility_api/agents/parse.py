@@ -12,7 +12,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-24
+Modified: 2026-03-25 (Sprint 17b: pre-parse content filter)
 
 Dependencies:
     - anthropic
@@ -203,6 +203,24 @@ class ParseAgent(BaseAgent):
         dict
             pwsid, success, model, cost_usd, confidence, tiers_found.
         """
+        # === PRE-PARSE FILTER ===
+        skip_reason = self._should_skip_parse(raw_text)
+        if skip_reason:
+            logger.info(f"  ParseAgent: {pwsid} — skipped ({skip_reason})")
+            if registry_id:
+                self._update_registry(
+                    registry_id, parse_result="skipped",
+                    confidence="none", cost=0.0, model="none",
+                )
+            self.log_run(status="skipped", notes=skip_reason)
+            return {
+                "pwsid": pwsid,
+                "success": False,
+                "skipped": True,
+                "skip_reason": skip_reason,
+                "cost_usd": 0.0,
+            }
+
         from anthropic import Anthropic
 
         schema = settings.utility_schema
@@ -430,6 +448,71 @@ class ParseAgent(BaseAgent):
             "bill_10ccf": bill_10,
             "issues": issues if not valid else [],
         }
+
+    @staticmethod
+    def _should_skip_parse(text: str) -> str | None:
+        """Check if content is worth sending to the LLM for rate parsing.
+
+        Returns None if content should be parsed, or a skip reason string.
+
+        Deliberately conservative — only skips pages that OBVIOUSLY don't
+        contain rate data. Ambiguous pages still go to the parser.
+        """
+        if not text or not text.strip():
+            return "empty_content"
+
+        text_stripped = text.strip()
+        text_lower = text_stripped.lower()
+        length = len(text_stripped)
+
+        # Too short to contain a rate schedule
+        if length < 100:
+            return f"too_short ({length} chars)"
+
+        # Parked domain / placeholder detection
+        parked_signals = [
+            "domain is for sale", "buy this domain",
+            "this domain may be for sale", "parked domain",
+            "coming soon", "under construction",
+            "website coming soon", "page not found",
+            "this site is temporarily unavailable",
+            "default web page", "welcome to nginx",
+            "apache2 default page", "it works!",
+            "index of /", "godaddy", "parking page",
+        ]
+        for signal in parked_signals:
+            if signal in text_lower:
+                return f"parked_domain ({signal})"
+
+        # Very short + no water keywords
+        if length < 500:
+            water_signals = [
+                "water", "utility", "sewer", "rate", "fee",
+                "billing", "customer", "service",
+            ]
+            has_water = any(s in text_lower for s in water_signals)
+            if not has_water:
+                return f"short_no_water_keywords ({length} chars)"
+
+        # No dollar amounts AND no rate keywords
+        import re
+        has_dollar = bool(re.search(r"\$\d", text))
+
+        rate_keywords = [
+            "rate", "tariff", "fee schedule", "water charge",
+            "service charge", "per 1,000", "per thousand",
+            "ccf", "hcf", "kgal", "gallons",
+            "volumetric", "tier", "base charge",
+            "fixed charge", "monthly charge",
+            "billing", "usage charge",
+        ]
+        rate_keyword_count = sum(1 for kw in rate_keywords if kw in text_lower)
+
+        if not has_dollar and rate_keyword_count == 0:
+            return "no_financial_or_rate_content"
+
+        # Passed all filters — send to parser
+        return None
 
     def _update_registry(
         self, registry_id: int | None, parse_result: str,
