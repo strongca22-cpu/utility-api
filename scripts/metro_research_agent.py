@@ -127,8 +127,31 @@ def _extract_yaml_from_response(response) -> list[dict]:
         logger.debug(f"Raw text was:\n{raw_text[:500]}")
         return []
 
+    # Handle various response shapes:
+    # - list of dicts (expected)
+    # - dict with a key containing a list (e.g., {"results": [...]})
+    # - str (model returned prose instead of YAML)
+    if isinstance(results, dict):
+        # Try to find a list value inside the dict
+        for key, val in results.items():
+            if isinstance(val, list) and val and isinstance(val[0], dict):
+                results = val
+                break
+        else:
+            # Single dict — might be one result wrapped
+            if "pwsid" in results:
+                results = [results]
+            else:
+                logger.warning(
+                    f"Got dict without recognizable structure. "
+                    f"Keys: {list(results.keys())[:5]}"
+                )
+                logger.debug(f"Raw text was:\n{raw_text[:500]}")
+                return []
+
     if not isinstance(results, list):
         logger.warning(f"Expected list from YAML, got {type(results).__name__}")
+        logger.debug(f"Raw text was:\n{raw_text[:500]}")
         return []
 
     # Normalize: ensure every result has expected keys
@@ -176,13 +199,29 @@ def research_batch(utilities: list[dict], metro_name: str) -> list[dict]:
         + "\n".join(utility_descriptions)
     )
 
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
-        messages=[{"role": "user", "content": user_message}],
-    )
+    # Retry with exponential backoff for transient errors (overloaded, rate limit)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                system=SYSTEM_PROMPT,
+                tools=[{"type": "web_search_20250305", "name": "web_search"}],
+                messages=[{"role": "user", "content": user_message}],
+            )
+            break
+        except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            wait = 2 ** (attempt + 1)  # 2, 4, 8 seconds
+            if attempt < max_retries - 1:
+                logger.warning(
+                    f"  API error (attempt {attempt + 1}/{max_retries}): {e}. "
+                    f"Retrying in {wait}s..."
+                )
+                time.sleep(wait)
+            else:
+                logger.error(f"  API error after {max_retries} attempts: {e}. Skipping batch.")
+                return []
 
     # Log token usage for cost tracking
     usage = response.usage
