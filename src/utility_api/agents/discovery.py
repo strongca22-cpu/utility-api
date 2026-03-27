@@ -129,14 +129,14 @@ def expand_utility_name(name: str, county: str | None = None) -> str:
 def _get_system_metadata(pwsid: str) -> dict:
     """Fetch SDWIS + CWS metadata for a PWSID.
 
-    Returns dict with: pws_name, state_code, county, population, owner_type.
+    Returns dict with: pws_name, state_code, county, city, population, owner_type.
     """
     schema = settings.utility_schema
     with engine.connect() as conn:
         row = conn.execute(text(f"""
             SELECT
                 s.pws_name, s.state_code, s.population_served_count,
-                s.owner_type_code, c.county_served
+                s.owner_type_code, c.county_served, s.city
             FROM {schema}.sdwis_systems s
             LEFT JOIN {schema}.cws_boundaries c ON c.pwsid = s.pwsid
             WHERE s.pwsid = :pwsid
@@ -144,12 +144,13 @@ def _get_system_metadata(pwsid: str) -> dict:
 
     if not row:
         return {"pws_name": None, "state_code": pwsid[:2], "county": None,
-                "population": None, "owner_type": None}
+                "city": None, "population": None, "owner_type": None}
 
     return {
         "pws_name": row.pws_name,
         "state_code": row.state_code,
         "county": row.county_served,
+        "city": row.city,
         "population": row.population_served_count,
         "owner_type": row.owner_type_code,
     }
@@ -225,28 +226,98 @@ def build_search_queries(
     if owner_type in ("L", "S", "M", None):
         queries.append(f'site:.gov "{best_name}" water rates')
 
-    return queries[:7]
+    # Query 8: County water authority pattern (Sprint 21)
+    # Many gap-state utilities are county water authorities
+    if county:
+        queries.append(f'{county} County water authority rates {state}')
+
+    # Query 9: Consumer-oriented "pay your bill" query (Sprint 21)
+    # Some utilities publish rates on billing pages, not formal rate schedules
+    queries.append(f'"{best_name}" monthly water bill {state}')
+
+    return queries[:10]
 
 
-# --- URL Relevance Scoring ---
+# --- URL Relevance Scoring (v2 — Sprint 21) ---
 
-def score_url_relevance(url: str, title: str, snippet: str) -> int:
-    """Score 0-100 using keyword heuristics. No LLM needed for most cases."""
-    score = 0
+# Domains that are never water utility rate pages
+_AGGREGATOR_DOMAINS = frozenset([
+    "facebook.com", "twitter.com", "youtube.com", "linkedin.com",
+    "reddit.com", "nextdoor.com", "yelp.com", "wikipedia.org",
+    "patch.com", "google.com", "bing.com", "yahoo.com",
+    "amazon.com", "ebay.com", "instagram.com", "tiktok.com",
+])
+
+
+def score_url_relevance(
+    url: str,
+    title: str,
+    snippet: str,
+    utility_name: str = "",
+    city: str = "",
+    state: str = "",
+) -> int:
+    """Score 0-100 using layered heuristics. No LLM needed for most cases.
+
+    Layers:
+        Base keywords:       0-60  (rate, schedule, tariff, etc.)
+        Domain authority:    0-15  (.gov/.org boost, aggregator penalty)
+        Utility/city match:  0-25  (utility or city name in domain)
+        PDF + rate keyword:  0-20  (PDF with rate-related path/content)
+        Negative keywords:   -20 each (meeting, agenda, job, etc.)
+    """
+    from urllib.parse import urlparse
+
     combined = f"{url} {title} {snippet}".lower()
+    url_lower = url.lower()
+    hostname = (urlparse(url).hostname or "").lower()
+    score = 0
 
-    # Positive signals
+    # --- Layer 1: Base keyword scoring ---
     for kw in ["rate", "schedule", "tariff", "water bill", "fee schedule",
                 "rate structure", "charges", "pricing", "rate study"]:
         if kw in combined:
             score += 15
 
-    # Strong positive — PDF rate schedules
-    if url.lower().endswith(".pdf"):
+    # --- Layer 2: Domain authority ---
+    if ".gov" in hostname:
+        score += 15
+    elif ".org" in hostname:
+        score += 10
+    elif ".us" in hostname:
+        score += 8
+
+    if any(agg in hostname for agg in _AGGREGATOR_DOMAINS):
+        score -= 25
+
+    # --- Layer 3: Utility/city name in domain ---
+    if utility_name and hostname:
+        util_slug = re.sub(r"[^a-z0-9]", "", utility_name.lower())
+        domain_slug = re.sub(r"[^a-z0-9]", "", hostname.replace("www.", ""))
+
+        if len(util_slug) > 5 and util_slug in domain_slug:
+            score += 25
+        else:
+            # Check significant words (>4 chars, not generic water terms)
+            generic = {"water", "city", "town", "county", "district",
+                       "authority", "department", "service", "system",
+                       "utility", "utilities", "board"}
+            words = [w.lower() for w in utility_name.split()
+                     if len(w) > 4 and w.lower() not in generic]
+            if any(w in hostname for w in words):
+                score += 15
+
+    if city and hostname:
+        city_slug = re.sub(r"[^a-z0-9]", "", city.lower())
+        if len(city_slug) > 3 and city_slug in hostname:
+            score += 15
+
+    # --- Layer 4: PDF + rate keyword bonus ---
+    if url_lower.endswith(".pdf"):
         if any(kw in combined for kw in ["rate", "schedule", "fee", "tariff"]):
             score += 20
 
-    # Negative signals
+    # --- Layer 5: Negative keyword penalties ---
     for neg in ["meeting", "agenda", "minutes", "news", "press release",
                 "election", "job", "career", "bid", "rfp"]:
         if neg in combined:
@@ -258,9 +329,12 @@ def score_url_relevance(url: str, title: str, snippet: str) -> int:
 def score_with_llm_fallback(
     url: str, title: str, snippet: str,
     utility_name: str, state: str,
+    city: str = "",
 ) -> int:
-    """Keyword score first. Haiku for anything with even a weak signal (15-60)."""
-    keyword_score = score_url_relevance(url, title, snippet)
+    """Keyword score first. Haiku for anything in the ambiguous zone (15-60)."""
+    keyword_score = score_url_relevance(
+        url, title, snippet, utility_name, city, state
+    )
 
     if keyword_score > 60 or keyword_score < 15:
         return keyword_score  # confident high or clearly irrelevant
@@ -426,9 +500,13 @@ class DiscoveryAgent(BaseAgent):
         queries = build_search_queries(utility_name, state, county, owner_type)
         all_candidates = []
         seen_urls = set()
+        raw_result_count = 0
+        city = meta.get("city") or ""
+        diagnostic = kwargs.get("diagnostic", False)
 
         for query in queries:
             results = _searxng_search(query)
+            raw_result_count += len(results)
             for r in results:
                 url = r["url"]
                 if url in seen_urls or not url.startswith("http"):
@@ -437,10 +515,14 @@ class DiscoveryAgent(BaseAgent):
 
                 if use_llm:
                     score = score_with_llm_fallback(
-                        url, r["title"], r["snippet"], utility_name, state
+                        url, r["title"], r["snippet"],
+                        utility_name, state, city,
                     )
                 else:
-                    score = score_url_relevance(url, r["title"], r["snippet"])
+                    score = score_url_relevance(
+                        url, r["title"], r["snippet"],
+                        utility_name, city, state,
+                    )
 
                 all_candidates.append({
                     "url": url,
@@ -452,11 +534,28 @@ class DiscoveryAgent(BaseAgent):
 
             time.sleep(search_delay)
 
-        # Sort by score, take top candidates (score > 50)
+        # Sort by score, compute funnel stats
         all_candidates.sort(key=lambda c: c["score"], reverse=True)
-        top_candidates = [c for c in all_candidates if c["score"] > 50][:3]
+        above_threshold = [c for c in all_candidates if c["score"] > 50]
+        near_misses = [c for c in all_candidates if 15 <= c["score"] <= 50]
+        below_threshold = [c for c in all_candidates if c["score"] < 15]
 
-        logger.info(f"  Found {len(all_candidates)} URLs, {len(top_candidates)} scored >50")
+        # Sprint 21: Cap at 1 URL per PWSID (top result is almost always correct)
+        top_candidates = above_threshold[:1]
+
+        logger.info(
+            f"  Funnel: {raw_result_count} raw → {len(seen_urls)} deduped → "
+            f"{len(above_threshold)} above 50 → {len(near_misses)} near-miss → "
+            f"{len(top_candidates)} written"
+        )
+
+        # Diagnostic mode: log near-misses for threshold tuning
+        if diagnostic and near_misses:
+            for nm in near_misses[:5]:
+                logger.info(
+                    f"  NEAR-MISS [{nm['score']:3d}] "
+                    f"{nm['title'][:50]} → {nm['url'][:60]}"
+                )
 
         # Write to scrape_registry
         urls_written = 0
@@ -492,10 +591,33 @@ class DiscoveryAgent(BaseAgent):
 
                 conn.commit()
 
+        # Fix 2: Always mark search attempted (prevents infinite re-queuing)
+        self._mark_searched(pwsid, schema)
+
+        # Fix 10: Log full scoring funnel to search_log
+        self._log_search(
+            pwsid=pwsid,
+            schema=schema,
+            queries_run=len(queries),
+            raw_results_count=raw_result_count,
+            deduped_count=len(seen_urls),
+            above_threshold_count=len(above_threshold),
+            near_miss_count=len(near_misses),
+            below_threshold_count=len(below_threshold),
+            written_count=urls_written,
+            best_score=top_candidates[0]["score"] if top_candidates else 0,
+            best_url=top_candidates[0]["url"] if top_candidates else None,
+        )
+
+        # Fix 3: Log to pipeline_runs for visibility
         self.log_run(
-            status="success",
+            status="success" if urls_written > 0 else "no_results",
             rows_affected=urls_written,
-            notes=f"{utility_name}: {len(all_candidates)} found, {urls_written} written",
+            notes=(
+                f"{utility_name} ({state}): "
+                f"{raw_result_count} raw → {len(seen_urls)} dedup → "
+                f"{len(above_threshold)} scored >50 → {urls_written} written"
+            ),
         )
 
         return {
@@ -505,3 +627,64 @@ class DiscoveryAgent(BaseAgent):
             "top_candidates": top_candidates,
             "queries_sent": queries,
         }
+
+    @staticmethod
+    def _mark_searched(pwsid: str, schema: str) -> None:
+        """Record that this PWSID was searched, regardless of outcome.
+
+        Prevents infinite re-queuing of PWSIDs with no web presence.
+        The orchestrator respects a 30-day re-search window.
+        """
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(f"""
+                    UPDATE {schema}.pwsid_coverage
+                    SET search_attempted_at = NOW()
+                    WHERE pwsid = :pwsid
+                """), {"pwsid": pwsid})
+                conn.commit()
+        except Exception as e:
+            logger.debug(f"  search_attempted_at update failed: {e}")
+
+    @staticmethod
+    def _log_search(
+        pwsid: str,
+        schema: str,
+        queries_run: int,
+        raw_results_count: int,
+        deduped_count: int,
+        above_threshold_count: int,
+        near_miss_count: int,
+        below_threshold_count: int,
+        written_count: int,
+        best_score: float,
+        best_url: str | None,
+    ) -> None:
+        """Log the full scoring funnel to search_log for threshold tuning."""
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(f"""
+                    INSERT INTO {schema}.search_log
+                        (pwsid, queries_run, raw_results_count, deduped_count,
+                         above_threshold_count, near_miss_count,
+                         below_threshold_count, written_count,
+                         best_score, best_url)
+                    VALUES
+                        (:pwsid, :queries, :raw, :dedup,
+                         :above, :near, :below, :written,
+                         :score, :url)
+                """), {
+                    "pwsid": pwsid,
+                    "queries": queries_run,
+                    "raw": raw_results_count,
+                    "dedup": deduped_count,
+                    "above": above_threshold_count,
+                    "near": near_miss_count,
+                    "below": below_threshold_count,
+                    "written": written_count,
+                    "score": best_score,
+                    "url": best_url,
+                })
+                conn.commit()
+        except Exception as e:
+            logger.debug(f"  search_log write failed: {e}")

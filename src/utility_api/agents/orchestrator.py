@@ -117,12 +117,34 @@ class OrchestratorAgent(BaseAgent):
                 params["state"] = state_filter.upper()
 
             rows = conn.execute(text(f"""
+                WITH gap_states AS (
+                    -- States with < 20% population coverage from bulk sources
+                    SELECT state_code
+                    FROM (
+                        SELECT state_code,
+                               ROUND(100.0 * COUNT(*) FILTER (WHERE has_rate_data)
+                                     / NULLIF(COUNT(*), 0), 1) AS pct
+                        FROM {schema}.pwsid_coverage
+                        GROUP BY state_code
+                    ) s
+                    WHERE pct < 20
+                )
                 SELECT pc.pwsid, pc.pws_name, pc.state_code,
                        pc.priority_tier, pc.population_served, pc.scrape_status
                 FROM {schema}.pwsid_coverage pc
                 WHERE pc.has_rate_data = FALSE
                   AND pc.scrape_status IN ('not_attempted', 'url_discovered')
                   AND pc.priority_tier IS NOT NULL
+                  -- Sprint 21: skip recently searched (30-day window)
+                  AND (pc.search_attempted_at IS NULL
+                       OR pc.search_attempted_at < NOW() - INTERVAL '30 days')
+                  -- Sprint 21: skip tiny systems (rarely have websites)
+                  AND (pc.population_served > 3000
+                       OR pc.scrape_status = 'url_discovered')
+                  -- Sprint 21: focus on gap states (bypass if explicit --state filter)
+                  AND ({f"TRUE" if state_filter else
+                        "pc.state_code IN (SELECT state_code FROM gap_states) "
+                        "OR pc.scrape_status = 'url_discovered'"})
                   {state_clause}
                 ORDER BY
                     -- Prioritize url_discovered (ready to scrape, no search needed)
