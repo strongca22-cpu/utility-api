@@ -49,14 +49,27 @@ from utility_api.db import engine
 schema = settings.utility_schema
 
 
-def _get_pending_pwsids(conn) -> set[str]:
-    """Get PWSIDs that already have pending or active URLs in scrape_registry."""
+def _get_pwsids_with_coverage(conn) -> set[str]:
+    """Get PWSIDs that already have URLs in the pipeline.
+
+    Excludes from research:
+    - Any PWSID with a pending/active/pending_retry URL (any source) — already in pipeline
+    - Any PWSID already researched by metro_research (any status, including dead) —
+      prevents cross-metro duplicate API spend
+
+    Does NOT exclude:
+    - PWSIDs with only dead/blocked domain_guesser URLs — the metro scanner
+      exists precisely because it finds better URLs than the guesser
+    """
     result = conn.execute(
         text(f"""
             SELECT DISTINCT pwsid
             FROM {schema}.scrape_registry
-            WHERE status IN ('pending', 'active', 'pending_retry')
-            AND pwsid IS NOT NULL
+            WHERE pwsid IS NOT NULL
+            AND (
+                status IN ('pending', 'active', 'pending_retry')
+                OR url_source = 'metro_research'
+            )
         """)
     )
     return {row.pwsid for row in result}
@@ -135,7 +148,7 @@ def generate_metro_context(
         all_systems = conn.execute(text(query), params).fetchall()
 
         # Get PWSIDs with pending URLs
-        pending_pwsids = _get_pending_pwsids(conn)
+        pending_pwsids = _get_pwsids_with_coverage(conn)
 
     # Split into buckets
     already_covered = []
@@ -146,6 +159,7 @@ def generate_metro_context(
         if s.has_rate_data:
             already_covered.append(s)
         elif s.pwsid in pending_pwsids:
+            # Has pending/active URL or was already metro-researched
             has_pending_url.append(s)
         else:
             needs_url.append(s)
