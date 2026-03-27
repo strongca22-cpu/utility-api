@@ -45,6 +45,9 @@ from utility_api.agents.scrape import ScrapeAgent
 from utility_api.config import settings
 from utility_api.db import engine
 
+# Lazy import — only needed in --batch mode
+# from utility_api.agents.batch import BatchAgent
+
 schema = settings.utility_schema
 
 # Add file logging
@@ -85,18 +88,25 @@ def process_batch(
     state: str | None = None,
     dry_run: bool = False,
     url_source: str = "domain_guesser",
+    use_batch_api: bool = False,
 ) -> dict:
-    """Process a batch of pending URLs through scrape → parse pipeline."""
+    """Process a batch of pending URLs through scrape → parse pipeline.
+
+    In default mode: scrape + parse synchronously per URL.
+    With use_batch_api=True: scrape synchronously, then submit all parse
+    tasks to the Anthropic Batch API (50% cheaper, async results).
+    """
     pending = get_pending_guesser_urls(max_count, state, url_source=url_source)
 
     if not pending:
-        logger.info("No pending domain-guesser URLs to process")
+        logger.info("No pending URLs to process")
         return {"processed": 0}
 
     state_label = f" (state={state})" if state else ""
+    mode_label = " [BATCH API]" if use_batch_api else ""
     logger.info(
-        f"Processing {len(pending)} domain-guesser URLs{state_label}"
-        f"{' [DRY RUN]' if dry_run else ''}"
+        f"Processing {len(pending)} {url_source} URLs{state_label}"
+        f"{' [DRY RUN]' if dry_run else mode_label}"
     )
 
     if dry_run:
@@ -111,7 +121,6 @@ def process_batch(
         return {"processed": 0, "dry_run": True}
 
     scrape = ScrapeAgent()
-    parse = ParseAgent()
 
     stats = {
         "processed": 0,
@@ -122,6 +131,10 @@ def process_batch(
         "scrape_failed": 0,
         "total_cost": 0.0,
     }
+
+    # In batch mode, collect parse tasks; in immediate mode, parse inline
+    pending_parse_tasks = []
+    parse = None if use_batch_api else ParseAgent()
 
     for item in pending:
         pwsid = item["pwsid"]
@@ -136,32 +149,42 @@ def process_batch(
                 continue
 
             stats["scrape_ok"] += 1
-
-            # Parse the best text (pre-parse filter handles junk)
             text_entry = scrape_result["raw_texts"][0]
-            parse_result = parse.run(
-                pwsid=pwsid,
-                raw_text=text_entry["text"],
-                content_type=text_entry["content_type"],
-                source_url=text_entry["url"],
-                registry_id=text_entry.get("registry_id", item["registry_id"]),
-            )
 
-            cost = parse_result.get("cost_usd", 0)
-            stats["total_cost"] += cost
-
-            if parse_result.get("skipped"):
-                stats["filtered"] += 1
-            elif parse_result.get("success"):
-                stats["parse_ok"] += 1
-                bill = parse_result.get("bill_10ccf")
-                bill_str = f"${bill:.2f}" if bill else "N/A"
-                logger.info(
-                    f"  \u2713 {pwsid} | {item['pws_name'][:30]} | "
-                    f"bill@10CCF={bill_str}"
-                )
+            if use_batch_api:
+                # Collect for batch submission
+                pending_parse_tasks.append({
+                    "pwsid": pwsid,
+                    "raw_text": text_entry["text"],
+                    "content_type": text_entry["content_type"],
+                    "source_url": text_entry["url"],
+                    "registry_id": text_entry.get("registry_id", item["registry_id"]),
+                })
             else:
-                stats["parse_failed"] += 1
+                # Parse immediately
+                parse_result = parse.run(
+                    pwsid=pwsid,
+                    raw_text=text_entry["text"],
+                    content_type=text_entry["content_type"],
+                    source_url=text_entry["url"],
+                    registry_id=text_entry.get("registry_id", item["registry_id"]),
+                )
+
+                cost = parse_result.get("cost_usd", 0)
+                stats["total_cost"] += cost
+
+                if parse_result.get("skipped"):
+                    stats["filtered"] += 1
+                elif parse_result.get("success"):
+                    stats["parse_ok"] += 1
+                    bill = parse_result.get("bill_10ccf")
+                    bill_str = f"${bill:.2f}" if bill else "N/A"
+                    logger.info(
+                        f"  \u2713 {pwsid} | {item['pws_name'][:30]} | "
+                        f"bill@10CCF={bill_str}"
+                    )
+                else:
+                    stats["parse_failed"] += 1
 
         except Exception as e:
             logger.error(f"  Error processing {pwsid}: {e}")
@@ -171,35 +194,62 @@ def process_batch(
         if stats["processed"] % 50 == 0:
             logger.info(
                 f"  Progress: {stats['processed']}/{len(pending)} | "
-                f"OK={stats['parse_ok']} filtered={stats['filtered']} "
-                f"failed={stats['parse_failed']} cost=${stats['total_cost']:.2f}"
+                f"scrape_ok={stats['scrape_ok']} failed={stats['scrape_failed']}"
+            )
+
+    # Batch mode: submit all collected parse tasks
+    if use_batch_api and pending_parse_tasks:
+        from utility_api.agents.batch import BatchAgent
+
+        logger.info(
+            f"\nSubmitting {len(pending_parse_tasks)} parse tasks to Batch API "
+            f"(50% cost savings)"
+        )
+        batch_agent = BatchAgent()
+        batch_result = batch_agent.submit(
+            parse_tasks=pending_parse_tasks,
+            state_filter=state,
+        )
+
+        if batch_result.get("batch_id"):
+            logger.info(f"  Batch submitted: {batch_result['batch_id']}")
+            logger.info(f"  Tasks: {batch_result['task_count']}")
+            logger.info(f"  Check with: ua-ops batch-status {batch_result['batch_id']}")
+            logger.info(f"  Collect with: ua-ops process-batches")
+        else:
+            logger.error(
+                f"  Batch submission failed: {batch_result.get('error', 'unknown')}"
             )
 
     # Final summary
-    parsed_total = stats["parse_ok"] + stats["parse_failed"]
-    success_rate = (
-        f"{100 * stats['parse_ok'] / parsed_total:.1f}%"
-        if parsed_total > 0
-        else "N/A"
-    )
-    filter_rate = (
-        f"{100 * stats['filtered'] / stats['processed']:.1f}%"
-        if stats["processed"] > 0
-        else "N/A"
-    )
-
     logger.info(f"\n{'=' * 60}")
-    logger.info(f"Domain Guesser Batch Complete")
+    logger.info(f"Batch Processing Complete ({url_source})")
     logger.info(f"{'=' * 60}")
     logger.info(f"  Processed:         {stats['processed']}")
     logger.info(f"  Scrape OK:         {stats['scrape_ok']}")
-    logger.info(f"  Pre-parse filtered:{stats['filtered']}")
-    logger.info(f"  Parse succeeded:   {stats['parse_ok']}")
-    logger.info(f"  Parse failed:      {stats['parse_failed']}")
     logger.info(f"  Scrape failed:     {stats['scrape_failed']}")
-    logger.info(f"  Success rate:      {success_rate} (of parsed)")
-    logger.info(f"  Filter rate:       {filter_rate}")
-    logger.info(f"  Total API cost:    ${stats['total_cost']:.2f}")
+
+    if use_batch_api:
+        logger.info(f"  Parse tasks queued: {len(pending_parse_tasks)}")
+    else:
+        parsed_total = stats["parse_ok"] + stats["parse_failed"]
+        success_rate = (
+            f"{100 * stats['parse_ok'] / parsed_total:.1f}%"
+            if parsed_total > 0
+            else "N/A"
+        )
+        filter_rate = (
+            f"{100 * stats['filtered'] / stats['processed']:.1f}%"
+            if stats["processed"] > 0
+            else "N/A"
+        )
+        logger.info(f"  Pre-parse filtered:{stats['filtered']}")
+        logger.info(f"  Parse succeeded:   {stats['parse_ok']}")
+        logger.info(f"  Parse failed:      {stats['parse_failed']}")
+        logger.info(f"  Success rate:      {success_rate} (of parsed)")
+        logger.info(f"  Filter rate:       {filter_rate}")
+        logger.info(f"  Total API cost:    ${stats['total_cost']:.2f}")
+
     logger.info(f"{'=' * 60}")
 
     return stats
@@ -220,9 +270,13 @@ if __name__ == "__main__":
         "--url-source", default="domain_guesser",
         help="URL source to process (domain_guesser, metro_research, etc.)",
     )
+    parser.add_argument(
+        "--batch", action="store_true",
+        help="Submit parse tasks to Batch API (50%% cheaper, async results)",
+    )
     args = parser.parse_args()
 
     process_batch(
         max_count=args.max, state=args.state, dry_run=args.dry_run,
-        url_source=args.url_source,
+        url_source=args.url_source, use_batch_api=args.batch,
     )
