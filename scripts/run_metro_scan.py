@@ -48,7 +48,14 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from metro_template_generator import generate_metro_context
-from metro_research_agent import research_metro
+from metro_research_agent import (
+    build_batch_requests,
+    check_batch_status,
+    collect_batch_results,
+    list_batches,
+    research_metro,
+    submit_batch_request,
+)
 from metro_url_importer import import_research_results
 
 # Add file logging
@@ -120,6 +127,7 @@ def run_metro(
     large_only: bool = False,
     force: bool = False,
     process: bool = True,
+    budget_remaining: float | None = None,
 ) -> dict | None:
     """Run the full metro scan pipeline for a single metro.
 
@@ -129,6 +137,7 @@ def run_metro(
         large_only: Skip utilities with population < 10,000.
         force: Skip cost confirmation prompt.
         process: Run through scrape/parse pipeline after import.
+        budget_remaining: If set, cap utilities so estimated cost stays within budget.
 
     Returns:
         Summary dict, or None if metro not found.
@@ -169,12 +178,26 @@ def run_metro(
         logger.info("  No utilities to research after filtering. Done.")
         return {"metro_id": metro_id, "status": "nothing_to_research"}
 
+    # Budget enforcement: truncate utility list to fit remaining budget
+    if budget_remaining is not None:
+        max_batches = max(1, int(budget_remaining / 0.75))
+        max_utilities = max_batches * 10
+        if len(utilities) > max_utilities:
+            logger.info(
+                f"  Budget cap: ${budget_remaining:.2f} remaining → "
+                f"truncating from {len(utilities)} to {max_utilities} utilities"
+            )
+            utilities = utilities[:max_utilities]
+        elif budget_remaining < 0.75:
+            logger.info(f"  Budget exhausted (${budget_remaining:.2f} remaining). Skipping.")
+            return {"metro_id": metro_id, "status": "budget_exhausted", "estimated_cost": 0}
+
     # Cost estimate
-    batches_needed = math.ceil(len(utilities) / 10)
-    estimated_cost = batches_needed * 0.18
+    batches_needed = math.ceil(len(utilities) / 5)
+    estimated_cost = batches_needed * 0.75
     logger.info(
         f"  Estimated research cost: ${estimated_cost:.2f} "
-        f"({batches_needed} API calls × ~$0.18)"
+        f"({batches_needed} API calls × ~$0.75)"
     )
 
     if dry_run:
@@ -261,7 +284,123 @@ def run_metro(
         "researched": len(results),
         "found": len(found),
         "imported": import_stats["imported"],
+        "estimated_cost": estimated_cost,
     }
+
+
+def batch_submit(
+    metro_ids: list[str],
+    large_only: bool = False,
+) -> str | None:
+    """Generate contexts for metros and submit all as one Batch API request.
+
+    Args:
+        metro_ids: List of metro IDs to research.
+        large_only: Skip utilities with population < 10,000.
+
+    Returns:
+        Batch ID string, or None if nothing to submit.
+    """
+    metro_contexts = []
+
+    for metro_id in metro_ids:
+        config = load_metro_config(metro_id)
+        if not config:
+            logger.warning(f"Metro '{metro_id}' not found — skipping")
+            continue
+
+        context = generate_metro_context(config)
+        stats = context["stats"]
+
+        logger.info(
+            f"  {metro_id}: {stats['total_cws_in_area']} CWS, "
+            f"{stats['already_covered']} covered, "
+            f"{stats['needs_url']} need research "
+            f"(L:{stats['large']} M:{stats['medium']} S:{stats['small']})"
+        )
+
+        if stats["needs_url"] == 0:
+            logger.info(f"  {metro_id}: all covered — skipping")
+            update_metro_status(metro_id, "complete")
+            continue
+
+        utilities = context["utilities"]
+        if large_only:
+            utilities = [u for u in utilities if u["tier"] in ("large", "medium")]
+            if not utilities:
+                logger.info(f"  {metro_id}: no large/medium utilities — skipping")
+                continue
+
+        metro_contexts.append({
+            "metro_id": metro_id,
+            "metro_name": config["name"],
+            "utilities": utilities,
+        })
+
+    if not metro_contexts:
+        logger.info("No utilities to research across selected metros.")
+        return None
+
+    # Build batch requests
+    requests = build_batch_requests(metro_contexts)
+    total_utilities = sum(len(ctx["utilities"]) for ctx in metro_contexts)
+
+    logger.info(f"\nBatch summary:")
+    logger.info(f"  Metros: {len(metro_contexts)}")
+    logger.info(f"  Utilities: {total_utilities}")
+    logger.info(f"  API requests: {len(requests)}")
+    logger.info(f"  Est. cost: ${len(requests) * 0.38:.2f} (batch rate, 50% off)")
+
+    # Submit
+    metro_id_list = [ctx["metro_id"] for ctx in metro_contexts]
+    batch_id = submit_batch_request(requests, metro_id_list)
+
+    # Mark metros as processing
+    for ctx in metro_contexts:
+        update_metro_status(ctx["metro_id"], "batch_submitted")
+
+    return batch_id
+
+
+def batch_collect(batch_id: str) -> None:
+    """Collect results from a completed batch and import to scrape_registry.
+
+    Args:
+        batch_id: The batch ID from batch_submit().
+    """
+    # Check status
+    status = check_batch_status(batch_id)
+    if status["processing_status"] != "ended":
+        logger.info(
+            f"Batch not ready yet. Status: {status['processing_status']}. "
+            f"Check again later with: "
+            f"python scripts/run_metro_scan.py --batch-status {batch_id}"
+        )
+        return
+
+    # Collect and parse results
+    results_by_metro = collect_batch_results(batch_id)
+
+    if not results_by_metro:
+        logger.warning("No results to import.")
+        return
+
+    # Import each metro's results
+    for metro_id, results in results_by_metro.items():
+        found = sum(1 for r in results if r.get("url"))
+        logger.info(f"\n  {metro_id}: {found}/{len(results)} URLs found")
+
+        if results:
+            import_stats = import_research_results(results, metro_id)
+            logger.info(
+                f"  {metro_id}: {import_stats['imported']} imported, "
+                f"{import_stats['skipped_no_url']} no URL, "
+                f"{import_stats['skipped_exists']} already exist"
+            )
+
+        update_metro_status(metro_id, "complete")
+
+    logger.info(f"\nBatch collection complete for {len(results_by_metro)} metros.")
 
 
 def main():
@@ -282,6 +421,22 @@ def main():
         "--list", action="store_true",
         help="Show metro status table",
     )
+    group.add_argument(
+        "--batch-submit", nargs="*", metavar="METRO",
+        help="Submit metros to Batch API (50%% cheaper). Use metro IDs or 'all'/'top:N'",
+    )
+    group.add_argument(
+        "--batch-status", metavar="BATCH_ID",
+        help="Check status of a submitted batch",
+    )
+    group.add_argument(
+        "--batch-collect", metavar="BATCH_ID",
+        help="Collect results from a completed batch and import to DB",
+    )
+    group.add_argument(
+        "--batch-list", action="store_true",
+        help="List all submitted batches",
+    )
 
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -299,6 +454,10 @@ def main():
         "--no-process", action="store_true",
         help="Skip pipeline processing after import",
     )
+    parser.add_argument(
+        "--max-cost", type=float, default=None, metavar="USD",
+        help="Maximum total API spend across all metros (e.g., 5.00)",
+    )
 
     args = parser.parse_args()
 
@@ -306,7 +465,45 @@ def main():
         list_metros()
         return
 
+    if args.batch_list:
+        list_batches()
+        return
+
+    if args.batch_status:
+        check_batch_status(args.batch_status)
+        return
+
+    if args.batch_collect:
+        batch_collect(args.batch_collect)
+        return
+
+    if args.batch_submit is not None:
+        # Parse metro IDs: explicit list, "all", or "top:N"
+        metro_args = args.batch_submit
+        if not metro_args or "all" in metro_args:
+            metros = load_all_metros()
+            metro_ids = [
+                m["id"] for m in metros if m.get("status") == "pending"
+            ]
+        elif any(a.startswith("top:") for a in metro_args):
+            n = int(next(a for a in metro_args if a.startswith("top:")).split(":")[1])
+            metros = load_all_metros()
+            pending = [m for m in metros if m.get("status") == "pending"]
+            pending.sort(key=lambda m: m.get("priority", 999))
+            metro_ids = [m["id"] for m in pending[:n]]
+        else:
+            metro_ids = metro_args
+
+        if not metro_ids:
+            logger.info("No pending metros to submit.")
+            return
+
+        batch_submit(metro_ids, large_only=args.large_only)
+        return
+
     process = not args.no_process
+
+    budget = args.max_cost
 
     if args.metro:
         run_metro(
@@ -315,6 +512,7 @@ def main():
             large_only=args.large_only,
             force=args.force,
             process=process,
+            budget_remaining=budget,
         )
 
     elif args.top or args.all:
@@ -333,15 +531,33 @@ def main():
             f"Running {len(pending)} metros: "
             f"{', '.join(m['id'] for m in pending)}"
         )
+        if budget is not None:
+            logger.info(f"Budget cap: ${budget:.2f}")
 
+        total_spent = 0.0
         for metro in pending:
-            run_metro(
+            remaining = (budget - total_spent) if budget is not None else None
+            if remaining is not None and remaining < 0.75:
+                logger.info(
+                    f"Budget exhausted (${remaining:.2f} remaining). "
+                    f"Stopping before {metro['id']}."
+                )
+                break
+
+            result = run_metro(
                 metro["id"],
                 dry_run=args.dry_run,
                 large_only=args.large_only,
                 force=args.force,
                 process=process,
+                budget_remaining=remaining,
             )
+
+            if result and result.get("estimated_cost"):
+                total_spent += result["estimated_cost"]
+
+        if budget is not None:
+            logger.info(f"\nTotal estimated spend: ${total_spent:.2f} / ${budget:.2f} budget")
 
 
 if __name__ == "__main__":
