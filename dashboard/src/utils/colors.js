@@ -1,28 +1,60 @@
 /**
  * Color constants and ramp functions for the choropleth layers.
  *
- * Coverage mode:  blue (has data), amber (reference only), gray (no data)
- * Bill mode:      green→yellow→orange→red graduated by bill_10ccf
+ * Coverage mode: green (free/gov), blue (premium), amber (reference), gray (no data)
+ * Bill mode:     selectable neutral sequential ramp (no good/bad connotation)
  */
 
-// --- Coverage mode colors ---
-export const COVERAGE_COLORS = {
-  hasData: "#2563eb",       // blue-600
-  referenceOnly: "#f59e0b", // amber-500
-  noData: "#e5e7eb",        // gray-200
+// --- Tier colors (used in coverage mode, settings panel, coverage bar) ---
+export const TIER_COLORS = {
+  free: "#059669",            // emerald-600 — government/survey data
+  premium: "#2563eb",         // blue-600 — LLM-scraped (proprietary)
+  reference: "#f59e0b",       // amber-500 — Duke NIEPS (internal only)
+  noData: "#e5e7eb",          // gray-200
 };
 
-// --- Bill mode color stops (bill_10ccf in $/month) ---
-// Maplibre interpolate-hcl expression expects [value, color] pairs
-export const BILL_COLOR_STOPS = [
-  [0, "#059669"],    // emerald-600 (cheapest)
-  [20, "#059669"],
-  [25, "#34d399"],   // emerald-400
-  [35, "#fbbf24"],   // amber-400 (median range)
-  [50, "#f97316"],   // orange-500
-  [70, "#ef4444"],   // red-500
-  [100, "#991b1b"],  // red-800 (most expensive)
-];
+// --- Bill color ramps (neutral sequential, no good/bad valence) ---
+// Each ramp: array of [billAmount, hexColor] pairs for Maplibre interpolate
+export const BILL_RAMPS = {
+  teal: {
+    name: "Teal",
+    description: "ColorBrewer Blues — light steel to dark navy",
+    stops: [
+      [0, "#C6DBEF"],
+      [20, "#9ECAE1"],
+      [35, "#6BAED6"],
+      [50, "#3182BD"],
+      [75, "#1A6D8E"],
+      [100, "#08306B"],
+    ],
+  },
+  violet: {
+    name: "Violet → Indigo",
+    description: "Plasma-inspired — dusty rose to deep indigo",
+    stops: [
+      [0, "#DAAFC6"],
+      [20, "#C488BE"],
+      [35, "#9B72AA"],
+      [50, "#7B5C9E"],
+      [75, "#584B96"],
+      [100, "#2D1E5B"],
+    ],
+  },
+  earth: {
+    name: "Earth",
+    description: "CARTO Earth — pale gold to dark mahogany",
+    stops: [
+      [0, "#FEDD84"],
+      [20, "#F2B950"],
+      [35, "#E8932E"],
+      [50, "#D66B27"],
+      [75, "#B03A2E"],
+      [100, "#6C2116"],
+    ],
+  },
+};
+
+export const DEFAULT_BILL_RAMP = "violet";
 
 // --- UI chrome colors ---
 export const CHROME = {
@@ -35,33 +67,34 @@ export const CHROME = {
 
 /**
  * Build a Maplibre fill-color expression for coverage mode.
- * Uses case expression on has_rate_data / has_reference_only properties.
+ * Colors by data_tier: free (green), premium (blue), reference (amber), no data (gray).
  */
 export function coverageFillExpression() {
   return [
-    "case",
-    ["==", ["get", "has_rate_data"], true],
-    COVERAGE_COLORS.hasData,
-    ["==", ["get", "has_reference_only"], true],
-    COVERAGE_COLORS.referenceOnly,
-    COVERAGE_COLORS.noData,
+    "match",
+    ["get", "data_tier"],
+    "free", TIER_COLORS.free,
+    "premium", TIER_COLORS.premium,
+    "reference", TIER_COLORS.reference,
+    TIER_COLORS.noData,
   ];
 }
 
 /**
  * Build a Maplibre fill-color expression for bill-at-10CCF mode.
- * Uses interpolate on bill_10ccf, falling back to gray for nulls.
+ * Uses the specified ramp key, falling back to gray for nulls.
  */
-export function billFillExpression() {
+export function billFillExpression(rampKey) {
+  const ramp = BILL_RAMPS[rampKey] || BILL_RAMPS[DEFAULT_BILL_RAMP];
   return [
     "case",
     ["==", ["get", "bill_10ccf"], null],
-    COVERAGE_COLORS.noData,
+    TIER_COLORS.noData,
     [
       "interpolate",
       ["linear"],
       ["get", "bill_10ccf"],
-      ...BILL_COLOR_STOPS.flat(),
+      ...ramp.stops.flat(),
     ],
   ];
 }

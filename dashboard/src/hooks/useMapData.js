@@ -18,9 +18,10 @@ export function useMapData() {
 
     async function load() {
       try {
+        const base = import.meta.env.BASE_URL || "/";
         const [geoRes, statsRes] = await Promise.all([
-          fetch("/data/cws_rates.geojson"),
-          fetch("/data/coverage_stats.json"),
+          fetch(`${base}data/cws_rates.geojson`),
+          fetch(`${base}data/coverage_stats.json`),
         ]);
 
         if (!geoRes.ok) throw new Error(`GeoJSON fetch failed: ${geoRes.status}`);

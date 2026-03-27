@@ -5,10 +5,11 @@
  *   1. cws-fill: polygon fill (colored by coverage or bill amount)
  *   2. cws-outline: polygon outline (visible at higher zoom levels)
  *
- * Handles hover (tooltip) and click (detail panel) interactions.
+ * Handles hover (tooltip) and click (detail panel + zoom-to-feature).
+ * Supports settings: fill opacity, reference/no-data visibility, outlines.
  */
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useImperativeHandle, forwardRef } from "react";
 import maplibregl from "maplibre-gl";
 import Tooltip from "./Tooltip";
 import { coverageFillExpression, billFillExpression } from "../utils/colors";
@@ -20,11 +21,22 @@ const OUTLINE_LAYER = "cws-outline";
 const INITIAL_CENTER = [-98.5, 39.5];
 const INITIAL_ZOOM = 4;
 
-export default function Map({ geojson, layerMode, onFeatureClick }) {
+const Map = forwardRef(function Map({ geojson, layerMode, billRamp, mapSettings, onFeatureClick }, ref) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const hoveredIdRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+
+  // Expose flyTo method to parent
+  useImperativeHandle(ref, () => ({
+    flyTo(lng, lat, zoom) {
+      const map = mapRef.current;
+      if (map) {
+        map.flyTo({ center: [lng, lat], zoom: zoom || 10, duration: 800 });
+      }
+    },
+  }));
 
   // Initialize map once
   useEffect(() => {
@@ -70,7 +82,19 @@ export default function Map({ geojson, layerMode, onFeatureClick }) {
     map.addControl(new maplibregl.NavigationControl(), "top-left");
     mapRef.current = map;
 
+    // Track container size for tooltip edge detection
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerSize({
+          w: entry.contentRect.width,
+          h: entry.contentRect.height,
+        });
+      }
+    });
+    ro.observe(containerRef.current);
+
     return () => {
+      ro.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -96,16 +120,7 @@ export default function Map({ geojson, layerMode, onFeatureClick }) {
         source: SOURCE_ID,
         paint: {
           "fill-color": coverageFillExpression(),
-          "fill-opacity": [
-            "case",
-            ["boolean", ["feature-state", "hover"], false],
-            0.85,
-            ["==", ["get", "has_rate_data"], true],
-            0.6,
-            ["==", ["get", "has_reference_only"], true],
-            0.5,
-            0.15,
-          ],
+          "fill-opacity": buildOpacityExpression(mapSettings),
         },
       });
 
@@ -125,7 +140,6 @@ export default function Map({ geojson, layerMode, onFeatureClick }) {
         minzoom: 6,
       });
 
-      // Attach interactions after layers exist
       attachHover(map);
       attachClick(map);
     }
@@ -137,13 +151,30 @@ export default function Map({ geojson, layerMode, onFeatureClick }) {
     }
   }, [geojson]);
 
-  // Update fill color when layer mode changes
+  // Update fill color when layer mode or bill ramp changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(FILL_LAYER)) return;
-    const expr = layerMode === "bill" ? billFillExpression() : coverageFillExpression();
+    const expr = layerMode === "bill" ? billFillExpression(billRamp) : coverageFillExpression();
     map.setPaintProperty(FILL_LAYER, "fill-color", expr);
-  }, [layerMode]);
+  }, [layerMode, billRamp]);
+
+  // Update opacity + visibility when settings change
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer(FILL_LAYER)) return;
+
+    map.setPaintProperty(FILL_LAYER, "fill-opacity", buildOpacityExpression(mapSettings));
+
+    // Outline visibility
+    if (map.getLayer(OUTLINE_LAYER)) {
+      map.setLayoutProperty(
+        OUTLINE_LAYER,
+        "visibility",
+        mapSettings.showOutlines ? "visible" : "none"
+      );
+    }
+  }, [mapSettings]);
 
   // Store onFeatureClick in a ref so the click handler always has current value
   const onClickRef = useRef(onFeatureClick);
@@ -187,7 +218,8 @@ export default function Map({ geojson, layerMode, onFeatureClick }) {
   function attachClick(map) {
     map.on("click", FILL_LAYER, (e) => {
       if (e.features.length > 0) {
-        onClickRef.current(e.features[0].properties);
+        const feat = e.features[0];
+        onClickRef.current(feat.properties, feat);
       }
     });
   }
@@ -202,7 +234,51 @@ export default function Map({ geojson, layerMode, onFeatureClick }) {
         feature={tooltip?.feature}
         x={tooltip?.x || 0}
         y={tooltip?.y || 0}
+        containerWidth={containerSize.w}
+        containerHeight={containerSize.h}
       />
     </div>
   );
+});
+
+/**
+ * Build a Maplibre fill-opacity expression based on current settings.
+ * Handles: hover boost, per-tier visibility, no-data hiding.
+ *
+ * data_tier values: "free", "premium", "reference", null (no data)
+ */
+function buildOpacityExpression(settings) {
+  const base = settings?.fillOpacity ?? 0.6;
+  const showFree = settings?.showFree ?? true;
+  const showPremium = settings?.showPremium ?? true;
+  const showRef = settings?.showReference ?? true;
+  const showNoData = settings?.showNoData ?? true;
+
+  return [
+    "case",
+    // Hover: always boost (but only if the tier is visible)
+    ["all",
+      ["boolean", ["feature-state", "hover"], false],
+      ["any",
+        ["all", ["==", ["get", "data_tier"], "free"], ["literal", showFree]],
+        ["all", ["==", ["get", "data_tier"], "premium"], ["literal", showPremium]],
+        ["all", ["==", ["get", "data_tier"], "reference"], ["literal", showRef]],
+        ["all", ["!", ["has", "data_tier"]], ["literal", showNoData]],
+      ],
+    ],
+    Math.min(base + 0.25, 1),
+    // Free tier
+    ["==", ["get", "data_tier"], "free"],
+    showFree ? base : 0,
+    // Premium tier
+    ["==", ["get", "data_tier"], "premium"],
+    showPremium ? base : 0,
+    // Reference tier
+    ["==", ["get", "data_tier"], "reference"],
+    showRef ? base * 0.8 : 0,
+    // No data (data_tier is null)
+    showNoData ? base * 0.25 : 0,
+  ];
 }
+
+export default Map;

@@ -131,9 +131,15 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
             rs.tier_count,
             rs.bill_20ccf,
 
-            -- Duke reference flag
+            -- Duke reference flag: true if duke data exists (regardless of other sources)
+            CASE WHEN dr.pwsid IS NOT NULL THEN true ELSE false END as has_duke_reference,
+
+            -- Reference-only: duke exists but no non-duke commercial rate data
+            -- Duke data (CC BY-NC-ND 4.0) is internal-only, not commercial rate data
             CASE
-                WHEN dr.pwsid IS NOT NULL AND rbe.pwsid IS NULL THEN true
+                WHEN dr.pwsid IS NOT NULL
+                    AND (rbe.pwsid IS NULL OR rbe.selected_source = 'duke_nieps_10state')
+                THEN true
                 ELSE false
             END as has_reference_only
 
@@ -179,8 +185,12 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         stats["total_cws"] += 1
         pop = row.population_served or 0
 
-        has_rate_data = row.bill_10ccf is not None or row.bill_estimate_10ccf is not None
         has_reference_only = bool(row.has_reference_only)
+        # Duke-only PWSIDs are reference, not commercial rate data
+        has_rate_data = (
+            (row.bill_10ccf is not None or row.bill_estimate_10ccf is not None)
+            and not has_reference_only
+        )
 
         # Accumulate stats
         stats["population_total"] += pop
@@ -225,6 +235,34 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         # Source metadata from catalog
         source_meta = source_lookup.get(row.source_key or "", {})
 
+        # Assign data_tier based on source
+        # - "reference": Duke NIEPS (CC BY-NC-ND, internal only)
+        # - "premium": LLM-scraped (proprietary)
+        # - "free": government surveys, EFC, eAR, PUC filings
+        # - null: no rate data
+        if has_reference_only:
+            data_tier = "reference"
+        elif row.source_key == "scraped_llm":
+            data_tier = "premium"
+        elif has_rate_data:
+            data_tier = "free"
+        else:
+            data_tier = None
+
+        # For Duke-only PWSIDs, suppress detail panel fields but KEEP bill_10ccf
+        # for the map bill choropleth. Duke values (CC BY-NC-ND 4.0) must not
+        # appear in tooltips/detail panels, but the map color ramp needs them.
+        if has_reference_only:
+            source_key = None
+            source_meta_out = {}
+            vintage = None
+            confidence = None
+        else:
+            source_key = row.source_key
+            source_meta_out = source_lookup.get(row.source_key or "", {})
+            vintage = str(row.rate_effective_date) if row.rate_effective_date else None
+            confidence = row.confidence
+
         # Build flat properties
         properties = {
             "pwsid": row.pwsid,
@@ -235,17 +273,18 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
             "population_served": row.population_served,
             "owner_type": row.owner_type,
             "has_rate_data": has_rate_data,
-            "source_key": row.source_key,
-            "source_name": source_meta.get("display_name"),
-            "source_tier": source_meta.get("tier"),
-            "data_vintage": str(row.rate_effective_date) if row.rate_effective_date else None,
+            "data_tier": data_tier,
+            "source_key": source_key,
+            "source_name": source_meta_out.get("display_name"),
+            "source_tier": source_meta_out.get("tier"),
+            "data_vintage": vintage,
             "bill_5ccf": _round(row.bill_5ccf),
             "bill_10ccf": _round(bill_10),
             "bill_20ccf": _round(row.bill_20ccf),
             "fixed_charge": _round(row.fixed_charge),
             "rate_structure_type": row.rate_structure_type,
             "tier_count": row.tier_count,
-            "confidence": row.confidence,
+            "confidence": confidence,
             "has_reference_only": has_reference_only,
         }
 
