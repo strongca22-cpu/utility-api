@@ -1149,11 +1149,37 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
   - Bottom coverage bar: 3,190/44,643 PWSIDs (7.1%), 31.9% pop coverage
   - Run: `python scripts/export_dashboard_data.py && cd dashboard && npm run dev`
   - Node 22 via nvm required (system Node v12 too old for Vite)
-- [ ] Session 2: polish detail panel, hover states, responsive panel sizing
-- [ ] Session 2: settings gear (opacity, reference visibility, state boundaries)
+- [x] Session 2 complete (2026-03-26): settings, tier filtering, bill legend, deploy
+  - Settings gear: data tier filter (free/premium/reference), opacity slider, visibility toggles
+  - Data tier system: free (gov), premium (LLM-scraped), reference (Duke NIEPS internal)
+  - Duke PWSIDs reclassified as reference-only (CC BY-NC-ND compliance)
+  - Dynamic coverage bar: split progress bar (green/blue/amber), live stat updates
+  - Three neutral bill color ramps (Teal, Violet→Indigo, Earth) — no good/bad valence
+  - Dev Tools sidebar (Ctrl+Shift+D) for ramp comparison
+  - Bill legend overlay with gradient bar + dollar labels
+  - Detail panel: slide-in animation, sticky header, ESC close, zoom-to-feature
+  - Deployed at http://100.103.211.71:9090/utility-rate-explorer/ (Tailscale)
+  - Rebuild: `cd dashboard && npm run build` then restart uvicorn on 9090
+  - Refresh data: `python scripts/export_dashboard_data.py` (re-run build after)
 - [ ] Session 3: PMTiles optimization if GeoJSON performance is poor at scale
 - [ ] Session 3: state summary view at national zoom
-- [ ] Integration with existing dashboard at 100.103.211.71:9090
+- [ ] Session 3: pick final bill color ramp (currently selectable via Dev Tools)
+- [ ] Session 3: filter panel (state, population range, source, rate structure type)
+
+### Sprint 20: Pipeline Hardening (2026-03-26)
+- [x] **Fix 1:** Marked 1,394 duke_reference non-URL entries dead ("not found", "OS 1997", etc.)
+- [x] **Fix 2:** Normalized 134 non-standard confidence values (partial→medium, success→high, etc.)
+- [x] **Fix 3:** Extended deep crawl file extension skip list (+.docx, .xls, .jpeg, .svg, .pptx, etc.)
+- [x] **Fix 4:** Playwright browser.close() wrapped in try/finally (prevents Chromium leaks)
+- [x] **Fix 5:** Deep crawl now follows subdomain links (water.city.gov ↔ www.city.gov)
+- [x] **Fix 6:** Deep crawl registration gated on same-domain + rate-relevant keywords
+- [x] **Fix 7:** `ua-ops process-backlog` CLI — sweeps orphaned registry entries for parsing
+- [x] **Fix 8:** BestEstimateAgent scoped to affected states only (skip_best_estimate flag for batch callers)
+- [x] **Cleanup:** Marked 1,040 irrelevant deep crawl entries dead (norton.com, paris.fr, etc.)
+- [x] **Deep crawl backlog run:** Parsed 1,183 rate-relevant deep crawl URLs → 254 new rates ($11.32 API cost)
+- [ ] Run `ua-ops process-backlog` on remaining duke_reference entries with valid URLs (~325 active)
+- [ ] Consider content caching (persist fetched text to disk/DB to avoid re-fetching on re-parse)
+- [ ] Investigate 15K char truncation — targeted extraction for large tariff PDFs
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
