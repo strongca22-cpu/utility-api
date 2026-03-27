@@ -50,8 +50,8 @@ import anthropic
 
 # Constants
 MODEL = "claude-sonnet-4-20250514"
-BATCH_SIZE = 10
-MAX_TOKENS = 4000
+BATCH_SIZE = 5
+MAX_TOKENS = 16000
 SLEEP_BETWEEN_CALLS = 2
 
 SYSTEM_PROMPT = """You are a water utility rate page researcher. For each utility listed, use web search to find the URL of their current water rate schedule or rate information page.
@@ -223,11 +223,15 @@ def research_batch(utilities: list[dict], metro_name: str) -> list[dict]:
                 logger.error(f"  API error after {max_retries} attempts: {e}. Skipping batch.")
                 return []
 
-    # Log token usage for cost tracking
+    # Log token usage and stop reason for diagnostics
     usage = response.usage
     logger.debug(
-        f"  API usage: input={usage.input_tokens} output={usage.output_tokens}"
+        f"  API usage: input={usage.input_tokens} output={usage.output_tokens} "
+        f"stop_reason={response.stop_reason}"
     )
+
+    if response.stop_reason == "max_tokens":
+        logger.warning("  Response truncated (hit max_tokens) — YAML may be incomplete")
 
     results = _extract_yaml_from_response(response)
 
