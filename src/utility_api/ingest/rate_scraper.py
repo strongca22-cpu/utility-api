@@ -202,25 +202,26 @@ def _scrape_with_playwright(url: str, timeout_ms: int = 30_000) -> ScrapeResult:
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                ),
-            )
-            page = context.new_page()
+            try:
+                context = browser.new_context(
+                    user_agent=(
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    ),
+                )
+                page = context.new_page()
 
-            # Navigate and wait for content to render
-            page.goto(url, timeout=timeout_ms, wait_until="networkidle")
+                # Navigate and wait for content to render
+                page.goto(url, timeout=timeout_ms, wait_until="networkidle")
 
-            # Give dynamic content a moment to settle
-            page.wait_for_timeout(2000)
+                # Give dynamic content a moment to settle
+                page.wait_for_timeout(2000)
 
-            # Get the rendered HTML
-            html = page.content()
-            status_code = 200  # Playwright doesn't expose status easily
-
-            browser.close()
+                # Get the rendered HTML
+                html = page.content()
+                status_code = 200  # Playwright doesn't expose status easily
+            finally:
+                browser.close()
 
     except Exception as e:
         return ScrapeResult(

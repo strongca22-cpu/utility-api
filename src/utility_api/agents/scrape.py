@@ -355,7 +355,7 @@ class ScrapeAgent(BaseAgent):
 
         from utility_api.ingest.rate_scraper import scrape_rate_page
 
-        base_domain = urlparse(base_url).hostname
+        base_domain = self._get_base_domain(base_url)
 
         try:
             soup = BeautifulSoup(page_html, "html.parser")
@@ -370,14 +370,17 @@ class ScrapeAgent(BaseAgent):
             href = urljoin(base_url, a_tag["href"])
             parsed = urlparse(href)
 
-            # Only same-domain links
-            if parsed.hostname != base_domain:
+            # Only same base-domain links (allows subdomains like water.city.gov)
+            if self._get_base_domain(href) != base_domain:
                 continue
 
             # Skip non-page resources
             path_lower = parsed.path.lower()
             if any(path_lower.endswith(ext) for ext in
-                   (".jpg", ".png", ".gif", ".zip", ".doc", ".xlsx", ".mp4")):
+                   (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp",
+                    ".zip", ".rar", ".gz", ".7z",
+                    ".doc", ".docx", ".xls", ".xlsx", ".pptx",
+                    ".mp4", ".mp3", ".wav", ".avi")):
                 continue
 
             # Deduplicate
@@ -470,6 +473,26 @@ class ScrapeAgent(BaseAgent):
             return best_candidate
 
         return None
+
+    @staticmethod
+    def _get_base_domain(url: str) -> str:
+        """Extract base domain for same-site comparison.
+
+        Allows subdomain traversal (water.city.gov == www.city.gov)
+        while blocking external sites (norton.com != city.gov).
+
+        Handles .gov, .org, .com and state TLDs like .va.us.
+        """
+        from urllib.parse import urlparse
+
+        hostname = (urlparse(url).hostname or "").lower().lstrip("www.")
+        parts = hostname.split(".")
+        if len(parts) >= 3 and parts[-1] == "us" and len(parts[-2]) == 2:
+            # State TLD: roanoke.va.us
+            return ".".join(parts[-3:])
+        if len(parts) >= 2:
+            return ".".join(parts[-2:])
+        return hostname
 
     @staticmethod
     def _score_link(href_lower: str, link_text: str, level: int = 2) -> int:
@@ -630,6 +653,12 @@ class ScrapeAgent(BaseAgent):
 
         return max(0, score)
 
+    # Rate-relevant keywords for deep crawl registration filter
+    _RATE_URL_KEYWORDS = (
+        "rate", "fee", "tariff", "billing", "water", "utility",
+        "schedule", "charge", "service", "customer", "price",
+    )
+
     def _register_deep_url(
         self,
         pwsid: str,
@@ -637,7 +666,25 @@ class ScrapeAgent(BaseAgent):
         original_url: str,
         result,
     ) -> None:
-        """Insert a new scrape_registry row for a deeper URL found via crawl."""
+        """Insert a new scrape_registry row for a deeper URL found via crawl.
+
+        Only registers URLs that are on the same base domain AND have
+        rate-relevant keywords in the path. This prevents junk entries
+        like norton.com, paris.fr, etc.
+        """
+        from urllib.parse import urlparse
+
+        # Quality gate: same base domain
+        if self._get_base_domain(deep_url) != self._get_base_domain(original_url):
+            return
+
+        # Quality gate: rate-relevant URL path or PDF
+        path_lower = urlparse(deep_url).path.lower()
+        is_pdf = path_lower.endswith(".pdf")
+        has_keyword = any(kw in path_lower for kw in self._RATE_URL_KEYWORDS)
+        if not is_pdf and not has_keyword:
+            return
+
         schema = settings.utility_schema
         now = datetime.now(timezone.utc)
         content_hash = getattr(result, "text_hash", None)

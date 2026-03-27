@@ -476,10 +476,14 @@ class BatchAgent(BaseAgent):
             })
             conn.commit()
 
-        # Trigger best estimate refresh
+        # Trigger best estimate refresh (scoped to affected states)
         try:
             from utility_api.agents.best_estimate import BestEstimateAgent
-            BestEstimateAgent().run()
+            affected_states = {
+                d["pwsid"][:2] for d in details if d.get("status") == "success"
+            }
+            for state in sorted(affected_states):
+                BestEstimateAgent().run(state=state)
         except Exception as e:
             logger.debug(f"  Best estimate update skipped: {e}")
 

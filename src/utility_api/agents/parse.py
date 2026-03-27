@@ -199,6 +199,7 @@ class ParseAgent(BaseAgent):
         content_type: str = "html",
         source_url: str | None = None,
         registry_id: int | None = None,
+        skip_best_estimate: bool = False,
         **kwargs,
     ) -> dict:
         """Parse raw text to extract rate structure.
@@ -436,12 +437,13 @@ class ParseAgent(BaseAgent):
                     f"cost=${cost:.4f}"
                 )
 
-                # Trigger best estimate update
-                try:
-                    from utility_api.agents.best_estimate import BestEstimateAgent
-                    BestEstimateAgent().run(state=pwsid[:2])
-                except Exception as e:
-                    logger.debug(f"  Best estimate update skipped: {e}")
+                # Trigger best estimate update (skip in batch mode)
+                if not skip_best_estimate:
+                    try:
+                        from utility_api.agents.best_estimate import BestEstimateAgent
+                        BestEstimateAgent().run(state=pwsid[:2])
+                    except Exception as e:
+                        logger.debug(f"  Best estimate update skipped: {e}")
 
             except Exception as e:
                 logger.warning(f"  DB write failed: {e}")

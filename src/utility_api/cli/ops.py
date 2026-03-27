@@ -964,5 +964,209 @@ def ingest_ccr_links(
             typer.echo(f"    {c['pwsid']} → {c['url']}")
 
 
+@app.command("process-backlog")
+def process_backlog(
+    max_count: int = typer.Option(50, "--max", "-n", help="Maximum entries to process"),
+    url_source: str = typer.Option(None, "--source", "-S", help="Filter by url_source"),
+    state: str = typer.Option(None, "--state", "-s", help="Filter by state code"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview without processing"),
+):
+    """Process orphaned scrape_registry entries that have content but no parse result.
+
+    Finds entries that were fetched (HTTP 200, content > 500 chars) but never
+    parsed — typically from deep crawl registration, duke_reference imports,
+    or other URL sources that don't feed the main orchestrator loop.
+
+    Re-fetches content and runs the ParseAgent. BestEstimate is updated once
+    per affected state at the end, not per-PWSID.
+
+    Examples:
+        ua-ops process-backlog --dry-run
+        ua-ops process-backlog --max 100 --source duke_reference
+        ua-ops process-backlog --state TX --max 25
+    """
+    import time
+    from datetime import datetime, timezone
+
+    from utility_api.config import settings
+    from utility_api.db import engine
+    from utility_api.agents.parse import ParseAgent
+    from utility_api.ingest.rate_scraper import scrape_rate_page
+
+    schema = settings.utility_schema
+    started = datetime.now(timezone.utc)
+
+    # Build query for orphaned entries
+    query = f"""
+        SELECT sr.id, sr.pwsid, sr.url, sr.url_source,
+               sr.last_content_length, sr.content_type,
+               s.pws_name
+        FROM {schema}.scrape_registry sr
+        LEFT JOIN {schema}.sdwis_systems s ON s.pwsid = sr.pwsid
+        WHERE sr.status IN ('active', 'pending')
+          AND sr.last_http_status = 200
+          AND sr.last_content_length > 500
+          AND (sr.last_parse_result IS NULL
+               OR sr.last_parse_result NOT IN ('success', 'skipped'))
+          AND sr.url LIKE 'http%%'
+    """
+    params: dict = {}
+
+    if url_source:
+        query += " AND sr.url_source = :url_source"
+        params["url_source"] = url_source
+
+    if state:
+        query += " AND sr.pwsid LIKE :prefix"
+        params["prefix"] = f"{state.upper()}%"
+
+    query += " ORDER BY sr.last_content_length DESC LIMIT :max_count"
+    params["max_count"] = max_count
+
+    with engine.connect() as conn:
+        rows = conn.execute(text(query), params).fetchall()
+
+    typer.echo("=" * 60)
+    typer.echo(f"  Backlog Sweep: {len(rows)} entries to process")
+    if url_source:
+        typer.echo(f"  Source filter: {url_source}")
+    if state:
+        typer.echo(f"  State filter: {state.upper()}")
+    typer.echo("=" * 60)
+
+    if not rows:
+        typer.echo("  No backlog entries found.")
+        return
+
+    if dry_run:
+        for r in rows[:25]:
+            name = r[6][:30] if r[6] else "?"
+            typer.echo(
+                f"  {r[1]} | {name:30s} | {r[3]:15s} | "
+                f"{r[4]:>6} chars | {r[2][:55]}"
+            )
+        if len(rows) > 25:
+            typer.echo(f"  ... {len(rows)} total")
+        return
+
+    parser = ParseAgent()
+    successes = 0
+    failures = 0
+    fetch_fails = 0
+    skipped = 0
+    api_cost = 0.0
+    affected_states: set[str] = set()
+
+    for i, (reg_id, pwsid, url, src, prev_len, ctype, name) in enumerate(rows):
+        if i % 50 == 0 and i > 0:
+            logger.info(
+                f"--- Progress: {i}/{len(rows)} | success={successes} "
+                f"fail={failures} skip={skipped} cost=${api_cost:.2f} ---"
+            )
+
+        try:
+            result = scrape_rate_page(url)
+
+            if result is None or not getattr(result, "text", None):
+                fetch_fails += 1
+                continue
+
+            raw_text = result.text
+            if len(raw_text) < 100:
+                fetch_fails += 1
+                continue
+
+            content_type = "pdf" if getattr(result, "is_pdf", False) else "html"
+
+            parse_result = parser.run(
+                pwsid=pwsid,
+                raw_text=raw_text,
+                content_type=content_type,
+                source_url=url,
+                registry_id=reg_id,
+                skip_best_estimate=True,
+            )
+
+            if parse_result is None:
+                skipped += 1
+                continue
+
+            conf = parse_result.get("confidence", "failed")
+            cost = parse_result.get("cost_usd", 0) or 0
+            api_cost += cost
+
+            if conf in ("high", "medium"):
+                successes += 1
+                affected_states.add(pwsid[:2])
+                bill = parse_result.get("bill_10ccf", "?")
+                display_name = (name or "?")[:30]
+                logger.info(
+                    f"  [{i+1}] SUCCESS {pwsid} | {display_name} | "
+                    f"{conf} | @10CCF=${bill} | ${cost:.4f}"
+                )
+            else:
+                failures += 1
+
+        except Exception as e:
+            failures += 1
+            if "429" in str(e) or "rate limit" in str(e).lower():
+                logger.warning("  Rate limited — sleeping 30s")
+                time.sleep(30)
+            else:
+                logger.debug(f"  [{i+1}] ERROR {pwsid}: {type(e).__name__}: {str(e)[:80]}")
+
+        time.sleep(0.5)
+
+    # Run BestEstimate once per affected state
+    if affected_states:
+        logger.info(f"  Updating best estimates for {len(affected_states)} states...")
+        try:
+            from utility_api.agents.best_estimate import BestEstimateAgent
+            for st in sorted(affected_states):
+                BestEstimateAgent().run(state=st)
+        except Exception as e:
+            logger.warning(f"  Best estimate update failed: {e}")
+
+    elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+
+    typer.echo("")
+    typer.echo("=" * 60)
+    typer.echo(f"  Backlog Sweep Complete")
+    typer.echo(f"  Total:        {len(rows)}")
+    typer.echo(f"  Successes:    {successes}")
+    typer.echo(f"  Parse fails:  {failures}")
+    typer.echo(f"  Fetch fails:  {fetch_fails}")
+    typer.echo(f"  Skipped:      {skipped}")
+    typer.echo(f"  API cost:     ${api_cost:.2f}")
+    typer.echo(f"  Elapsed:      {elapsed:.0f}s ({elapsed/60:.1f}m)")
+    if rows:
+        typer.echo(f"  Success rate: {successes/len(rows)*100:.1f}%")
+    typer.echo("=" * 60)
+
+    # Log pipeline run
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(f"""
+                INSERT INTO {schema}.pipeline_runs
+                    (step_name, started_at, finished_at, row_count, status, notes)
+                VALUES (:step, :started, NOW(), :count, 'success', :notes)
+            """), {
+                "step": "process-backlog",
+                "started": started,
+                "count": successes,
+                "notes": (
+                    f"total={len(rows)}, success={successes}, "
+                    f"fail={failures}, fetch_fail={fetch_fails}, "
+                    f"skip={skipped}, api_cost=${api_cost:.2f}, "
+                    f"elapsed={elapsed:.0f}s"
+                    f"{f', source={url_source}' if url_source else ''}"
+                    f"{f', state={state}' if state else ''}"
+                ),
+            })
+            conn.commit()
+    except Exception as e:
+        logger.debug(f"Pipeline run log failed: {e}")
+
+
 if __name__ == "__main__":
     app()
