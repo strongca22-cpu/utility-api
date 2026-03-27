@@ -55,6 +55,14 @@ Different URL sources produce dramatically different success rates:
 
 The domain_guesser contributes 5,004 of 13,184 entries (38%) but only 115 successes (12% of all successes). Its high skip/fail rates inflate the pipeline's apparent failure rate. Worth considering: tighter URL pattern requirements for domain-guessed URLs before they enter the registry.
 
+### Failure: Duke Reference Non-URL Entries (RESOLVED Sprint 20)
+
+1,394 duke_reference entries were literal strings ("not found", "OS 1997", "could not find") loaded from the Duke reference dataset's URL column without validation. These were fed to the scraper, which got `http_status=0` and put them in `pending_retry`. **Fixed:** marked dead in Sprint 20. The loading script no longer exists in the codebase, so no code guard was needed.
+
+### Failure: Deep Crawl Orphaned Entries (RESOLVED Sprint 20)
+
+The `ScrapeAgent._register_deep_url()` method registered every page visited during deep crawl into `scrape_registry`, but no downstream step ever parsed them. 97% of registered deep crawl URLs were irrelevant (no rate keywords in URL path). **Fixed:** Sprint 20 added a quality gate (same-domain + rate-relevant keywords) to `_register_deep_url()`, marked 1,040 junk entries dead, and added `ua-ops process-backlog` CLI to sweep orphaned entries.
+
 ---
 
 ## Stage 2: Fetch & Scrape Failures
