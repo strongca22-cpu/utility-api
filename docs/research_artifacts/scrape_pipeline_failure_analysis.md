@@ -42,13 +42,31 @@
 
 **Scale of opportunity:** 451 successes = 12% yield. If the remaining 1,639 have similar distribution (~12% would work), that's ~200 more records. But the 88% failure rate on attempted URLs suggests most of the remaining will also fail.
 
-### Problem 3: Deep Crawl URLs Sit Unprocessed (3,335 entries, 0% parsed)
+### Problem 3: Deep Crawl URLs Fetched But Never Parsed (3,338 entries, 0% parsed)
 
-3,335 `deep_crawl` entries exist with `status=active` but `last_parse_result=NULL`. These are secondary URLs discovered during deep crawling of other pages. They were registered in the scrape_registry but never fed into the parse pipeline.
+3,338 `deep_crawl` entries exist with `status=active`, content fetched (all 3,338 have
+`last_content_length > 0`), but `last_parse_result=NULL`. The scrape agent fetches the
+deep-crawl URL and stores the content, but the parse agent is **never invoked on them.**
 
-**Root cause:** The orchestrator's task queue prioritization doesn't systematically revisit deep_crawl URLs. They were discovered as follow-up links but the pipeline moved on to the next PWSID. They're registered but abandoned.
+**Root cause:** The scrape agent's deep crawl registers follow-up URLs and fetches their
+content into the registry, but the orchestrator's task queue never generates parse tasks
+for `deep_crawl` source entries. The pipeline flow is: scrape → register deep URL → fetch
+content → stop. There's no "parse deep_crawl backlog" task type.
 
-**Scale of opportunity:** Unknown. These URLs were found during deep crawling because they looked rate-relevant (scored high on link keywords). Some may be the actual rate pages that were 1-2 clicks deep from the original URL. But without parsing them, we can't know.
+**Quality breakdown (by URL pattern):**
+- Rate-relevant URLs (rate/fee/tariff/billing/utility/PDF in path): **1,182** (35%)
+- Noise (off-topic links the crawler followed): **2,156** (65%)
+- Rate-relevant AND PWSID has no successful parse from any source: **918**
+
+**Key examples of rate-relevant content sitting unfetched:**
+- Clackamas River Water FY2026 fees PDF (12K chars)
+- Lake Oswego utility rate information page
+- Spokane commercial rates page
+
+**Scale of opportunity:** 918 rate-relevant URLs for uncovered PWSIDs. If these parse
+at even 15-20% (reasonable given they're one click deeper than the original URL and
+have rate keywords), that's **140-180 new successful parses** with zero new scraping
+needed — the content is already in the database.
 
 ### Problem 4: Parse Failures on Substantial Content (1,477 entries with >1K chars)
 
@@ -109,7 +127,7 @@ The path to higher coverage is not "fix the parser" or "improve the scraper." It
 
 | Action | Estimated New Parses | Effort |
 |--------|---------------------|--------|
-| Process 3,335 deep_crawl URLs through parse pipeline | ~200-400 (if 6-12% yield) | Low — just run parser on existing content |
+| Parse 918 rate-relevant deep_crawl URLs (content already fetched) | ~140-180 (15-20% yield) | Low — content in DB, just invoke parser |
 | Re-attempt 1,477 parse failures >1K chars with Sonnet | ~100-200 (10-15% upgrade) | Medium — API cost ~$2-3 |
 | Complete Duke 1,639 pending_retry URLs | ~150-200 (12% yield) | Low — just unblock the retry |
 | Curation campaign: 10 states × 20 URLs each | ~170-185 (93% yield on curated) | High — requires research per state |
@@ -119,7 +137,7 @@ The path to higher coverage is not "fix the parser" or "improve the scraper." It
 
 ## Registry Hygiene Issues
 
-- **3,335 deep_crawl entries** registered but never parsed — pipeline leak
+- **3,338 deep_crawl entries** fetched with content but never parsed — pipeline leak (918 are rate-relevant + uncovered)
 - **4,630 failed domain_guesser entries** still `active` — should be `dead` or `stale`
 - **1,639 Duke pending_retry** deferred to 2026-06-01 — arbitrary date, could process now
 - **Parse=skipped (3,538):** Need to understand skip reasons — are these "no content" or "already covered"?
