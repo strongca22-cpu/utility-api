@@ -1177,7 +1177,19 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Fix 8:** BestEstimateAgent scoped to affected states only (skip_best_estimate flag for batch callers)
 - [x] **Cleanup:** Marked 1,040 irrelevant deep crawl entries dead (norton.com, paris.fr, etc.)
 - [x] **Deep crawl backlog run:** Parsed 1,183 rate-relevant deep crawl URLs → 254 new rates ($11.32 API cost)
-- [ ] Run `ua-ops process-backlog` on remaining duke_reference entries with valid URLs (~325 active)
+- [x] Duke backlog run: 400 entries via `ua-ops process-backlog --source duke_reference` (running)
+- [x] SearXNG orphan processing: 16 new rates from 30 entries ($0.57, 53% hit rate)
+
+### Sprint 21: SearXNG Fix + Retarget (2026-03-27)
+- [x] Port mismatch: verified config correct (8889 = VPS tunnel, 8888 = local Docker)
+- [x] **Scoring v2:** domain authority (.gov +15), utility-name-in-domain (+15-25), aggregator penalty (-25)
+- [x] **Failed search logging:** search_attempted_at column + search_log table (migration 017)
+- [x] **Pipeline runs logging:** DiscoveryAgent now writes to pipeline_runs
+- [x] **URL cap 3→1:** top result only (saves 2/3 of fetch+parse resources per PWSID)
+- [x] **Scoring funnel diagnostics:** full funnel logged (raw→dedup→scored→written), --diagnostic mode
+- [x] **Gap-state targeting:** orchestrator focuses on states with <20% coverage, skips recently-searched
+- [x] **Query improvements:** added county water authority + consumer billing query templates
+- [ ] Run scoring diagnostic for 1 week, then tune threshold based on near-miss data
 - [ ] Consider content caching (persist fetched text to disk/DB to avoid re-fetching on re-parse)
 - [ ] Investigate 15K char truncation — targeted extraction for large tariff PDFs
 
