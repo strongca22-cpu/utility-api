@@ -55,17 +55,18 @@ if LOG_PATH.parent.exists():
 
 def get_pending_guesser_urls(
     max_count: int = 50, state: str | None = None,
+    url_source: str = "domain_guesser",
 ) -> list[dict]:
-    """Get pending domain-guesser URLs, ordered by population (biggest first)."""
+    """Get pending URLs, ordered by population (biggest first)."""
     query = f"""
         SELECT sr.id as registry_id, sr.pwsid, sr.url, pc.population_served,
                pc.pws_name, pc.state_code
         FROM {schema}.scrape_registry sr
         JOIN {schema}.pwsid_coverage pc ON pc.pwsid = sr.pwsid
-        WHERE sr.url_source = 'domain_guesser'
+        WHERE sr.url_source = :url_source
         AND sr.status = 'pending'
     """
-    params: dict = {}
+    params: dict = {"url_source": url_source}
 
     if state:
         query += " AND pc.state_code = :state"
@@ -83,9 +84,10 @@ def process_batch(
     max_count: int = 50,
     state: str | None = None,
     dry_run: bool = False,
+    url_source: str = "domain_guesser",
 ) -> dict:
-    """Process a batch of domain-guessed URLs."""
-    pending = get_pending_guesser_urls(max_count, state)
+    """Process a batch of pending URLs through scrape → parse pipeline."""
+    pending = get_pending_guesser_urls(max_count, state, url_source=url_source)
 
     if not pending:
         logger.info("No pending domain-guesser URLs to process")
@@ -214,6 +216,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dry-run", action="store_true", help="Show what would be processed"
     )
+    parser.add_argument(
+        "--url-source", default="domain_guesser",
+        help="URL source to process (domain_guesser, metro_research, etc.)",
+    )
     args = parser.parse_args()
 
-    process_batch(max_count=args.max, state=args.state, dry_run=args.dry_run)
+    process_batch(
+        max_count=args.max, state=args.state, dry_run=args.dry_run,
+        url_source=args.url_source,
+    )

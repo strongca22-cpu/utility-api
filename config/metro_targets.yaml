@@ -1,0 +1,228 @@
+# config/metro_targets.yaml
+# Priority gap metros from coverage assessment (2026-03-26)
+# Only includes metros with CRITICAL or HIGH gap status
+# Status: pending → processing → complete
+
+metros:
+  # --- CRITICAL: Zero coverage in gap states ---
+
+  - id: nyc
+    name: "New York-Newark-Jersey City"
+    states: [NY, NJ, CT]
+    counties:
+      NY: [New York, Kings, Queens, Bronx, Richmond, Westchester, Rockland, Nassau, Suffolk, Orange, Putnam, Dutchess]
+      NJ: [Bergen, Essex, Hudson, Middlesex, Monmouth, Morris, Ocean, Passaic, Somerset, Sussex, Union, Warren]
+      CT: [Fairfield]
+    anchor_cities: [New York, Newark, Jersey City, Yonkers, Stamford, Paterson]
+    metro_pop: 19800000
+    matched_pop: 8800000
+    current_coverage_pct: 3.0
+    priority: 1
+    status: pending
+
+  - id: denver
+    name: "Denver-Aurora-Lakewood"
+    states: [CO]
+    counties:
+      CO: [Denver, Arapahoe, Jefferson, Adams, Douglas, Broomfield, Boulder, Weld, Clear Creek, Elbert, Gilpin, Park]
+    anchor_cities: [Denver, Aurora, Lakewood, Arvada, Westminster, Thornton, Centennial, Boulder]
+    metro_pop: 2900000
+    current_coverage_pct: 0.0
+    priority: 2
+    status: pending
+
+  - id: las_vegas
+    name: "Las Vegas-Henderson-Paradise"
+    states: [NV]
+    counties:
+      NV: [Clark]
+    anchor_cities: [Las Vegas, Henderson, North Las Vegas, Boulder City]
+    metro_pop: 2200000
+    current_coverage_pct: 0.0
+    priority: 3
+    status: pending
+    notes: "LVVWD and SNWA are dominant utilities — not regulated by NV PUC"
+
+  - id: minneapolis
+    name: "Minneapolis-St. Paul-Bloomington"
+    states: [MN, WI]
+    counties:
+      MN: [Hennepin, Ramsey, Dakota, Anoka, Washington, Scott, Carver, Wright, Sherburne, Isanti, Chisago, Le Sueur, Mille Lacs, Sibley]
+      WI: [St. Croix, Pierce]
+    anchor_cities: [Minneapolis, St. Paul, Bloomington, Plymouth, Brooklyn Park, Eagan, Woodbury, Maple Grove]
+    metro_pop: 3600000
+    current_coverage_pct: 0.0
+    priority: 4
+    status: pending
+
+  - id: baltimore
+    name: "Baltimore-Columbia-Towson"
+    states: [MD]
+    counties:
+      MD: [Baltimore, Baltimore City, Anne Arundel, Howard, Harford, Carroll, Queen Annes]
+    anchor_cities: [Baltimore, Columbia, Towson, Ellicott City, Bel Air]
+    metro_pop: 2800000
+    current_coverage_pct: 0.0
+    priority: 5
+    status: pending
+
+  - id: nashville
+    name: "Nashville-Davidson-Murfreesboro-Franklin"
+    states: [TN]
+    counties:
+      TN: [Davidson, Williamson, Rutherford, Sumner, Wilson, Robertson, Cheatham, Dickson, Maury, Trousdale, Smith]
+    anchor_cities: [Nashville, Murfreesboro, Franklin, Hendersonville, Gallatin, Lebanon, Smyrna]
+    metro_pop: 1900000
+    current_coverage_pct: 0.0
+    priority: 6
+    status: pending
+
+  - id: indianapolis
+    name: "Indianapolis-Carmel-Anderson"
+    states: [IN]
+    counties:
+      IN: [Marion, Hamilton, Hendricks, Johnson, Madison, Hancock, Morgan, Boone, Shelby, Putnam, Brown]
+    anchor_cities: [Indianapolis, Carmel, Fishers, Noblesville, Anderson, Greenwood, Lawrence]
+    metro_pop: 2100000
+    current_coverage_pct: 6.5
+    priority: 7
+    status: pending
+    notes: "IN IURC covers some regulated utilities — check dedup"
+
+  - id: salt_lake_city
+    name: "Salt Lake City-West Valley City-Provo"
+    states: [UT]
+    counties:
+      UT: [Salt Lake, Utah, Davis, Weber, Tooele, Summit, Wasatch, Morgan, Juab]
+    anchor_cities: [Salt Lake City, West Valley City, Provo, West Jordan, Orem, Sandy, Ogden, Layton]
+    metro_pop: 1200000
+    current_coverage_pct: 0.0
+    priority: 8
+    status: pending
+    notes: "UT has zero coverage from any source"
+
+  - id: memphis
+    name: "Memphis-Southaven"
+    states: [TN, MS, AR]
+    counties:
+      TN: [Shelby, Tipton, Fayette]
+      MS: [DeSoto, Marshall, Tate, Tunica, Benton]
+      AR: [Crittenden]
+    anchor_cities: [Memphis, Southaven, Bartlett, Collierville, Germantown]
+    metro_pop: 1300000
+    current_coverage_pct: 0.0
+    priority: 9
+    status: pending
+
+  - id: oklahoma_city
+    name: "Oklahoma City"
+    states: [OK]
+    counties:
+      OK: [Oklahoma, Cleveland, Canadian, Grady, Lincoln, Logan, McClain]
+    anchor_cities: [Oklahoma City, Norman, Edmond, Moore, Midwest City, Yukon]
+    metro_pop: 1400000
+    current_coverage_pct: 0.0
+    priority: 10
+    status: pending
+
+  - id: new_orleans
+    name: "New Orleans-Metairie"
+    states: [LA]
+    counties:
+      LA: [Orleans, Jefferson, St. Tammany, St. Bernard, St. Charles, St. John the Baptist, Plaquemines, St. James]
+    anchor_cities: [New Orleans, Metairie, Kenner, Slidell, Gretna, Marrero]
+    metro_pop: 1300000
+    current_coverage_pct: 0.0
+    priority: 11
+    status: pending
+
+  - id: providence
+    name: "Providence-Warwick"
+    states: [RI, MA]
+    counties:
+      RI: [Providence, Kent, Washington, Bristol, Newport]
+      MA: [Bristol]
+    anchor_cities: [Providence, Warwick, Cranston, Pawtucket, East Providence, Woonsocket, Fall River]
+    metro_pop: 1600000
+    current_coverage_pct: 0.0
+    priority: 12
+    status: pending
+
+  - id: buffalo
+    name: "Buffalo-Cheektowaga-Rochester"
+    states: [NY]
+    counties:
+      NY: [Erie, Niagara, Monroe, Genesee, Livingston, Ontario, Orleans, Wayne, Wyoming, Yates, Seneca]
+    anchor_cities: [Buffalo, Rochester, Cheektowaga, Tonawanda, Irondequoit]
+    metro_pop: 1500000
+    current_coverage_pct: 0.0
+    priority: 13
+    status: pending
+
+  # --- HIGH: Partial coverage, major utility missing ---
+
+  - id: atlanta
+    name: "Atlanta-Sandy Springs-Alpharetta"
+    states: [GA]
+    counties:
+      GA: [Fulton, DeKalb, Cobb, Gwinnett, Clayton, Cherokee, Forsyth, Henry, Douglas, Paulding, Rockdale, Fayette, Newton, Barrow, Bartow, Butts, Carroll, Coweta, Dawson, Hall, Haralson, Heard, Jasper, Lamar, Meriwether, Morgan, Pickens, Pike, Spalding, Walton]
+    anchor_cities: [Atlanta, Sandy Springs, Roswell, Johns Creek, Alpharetta, Marietta, Smyrna]
+    metro_pop: 6100000
+    current_coverage_pct: 0.0
+    priority: 14
+    status: pending
+    notes: "GA has 83% state coverage but Atlanta primary utility not matched — likely a name matching issue"
+
+  - id: washington_dc
+    name: "Washington-Arlington-Alexandria"
+    states: [DC, VA, MD, WV]
+    counties:
+      DC: [District of Columbia]
+      VA: [Arlington, Fairfax, Loudoun, Prince William, Fauquier, Stafford, Spotsylvania, Warren, Clarke, Culpeper, Rappahannock, Madison]
+      MD: [Montgomery, Prince Georges, Frederick, Charles, Calvert]
+      WV: [Jefferson]
+    anchor_cities: [Washington, Arlington, Alexandria, Fairfax, Reston, Bethesda, Silver Spring, Fredericksburg]
+    metro_pop: 6300000
+    current_coverage_pct: 41.3
+    priority: 15
+    status: pending
+    notes: "VA utilities partially covered from scraping. DC Water is single dominant utility. MD suburbs are the main gap."
+
+  - id: orlando
+    name: "Orlando-Kissimmee-Sanford"
+    states: [FL]
+    counties:
+      FL: [Orange, Seminole, Osceola, Lake]
+    anchor_cities: [Orlando, Kissimmee, Sanford, Altamonte Springs, Apopka, Ocoee, Winter Park]
+    metro_pop: 2700000
+    current_coverage_pct: 0.0
+    priority: 16
+    status: pending
+    notes: "FL has 85% state coverage but OUC (Orlando Utilities Commission) not matched — likely name matching issue"
+
+  - id: kansas_city
+    name: "Kansas City"
+    states: [MO, KS]
+    counties:
+      MO: [Jackson, Clay, Platte, Cass, Ray, Caldwell, Clinton, Lafayette, Bates]
+      KS: [Johnson, Wyandotte, Leavenworth, Miami, Linn, Franklin]
+    anchor_cities: [Kansas City MO, Kansas City KS, Overland Park, Olathe, Independence, Lee Summit]
+    metro_pop: 2200000
+    current_coverage_pct: 24.1
+    priority: 17
+    status: pending
+
+  # --- BONUS: Portland (originally requested) ---
+
+  - id: portland
+    name: "Portland-Vancouver-Hillsboro"
+    states: [OR, WA]
+    counties:
+      OR: [Multnomah, Washington, Clackamas, Columbia, Yamhill]
+      WA: [Clark, Skamania]
+    anchor_cities: [Portland, Beaverton, Hillsboro, Gresham, Lake Oswego, Tigard, Vancouver WA, Oregon City]
+    metro_pop: 2500000
+    current_coverage_pct: 100.0
+    priority: 18
+    status: pending
+    notes: "Portland Water Bureau matched but suburban utilities not. OR has near-zero coverage beyond PWB."
