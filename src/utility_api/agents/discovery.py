@@ -164,7 +164,11 @@ def build_search_queries(
     county: str | None = None,
     owner_type: str | None = None,
 ) -> list[str]:
-    """Generate 3-7 targeted search queries using all available metadata.
+    """Generate targeted search queries using all available metadata.
+
+    Sprint 22: Rebuilt from 9 queries down to 7 max. Removed low-yield CCR
+    query and near-duplicate department fallback. Added year-anchored county
+    fallback and billing-page query.
 
     Parameters
     ----------
@@ -182,60 +186,42 @@ def build_search_queries(
     list[str]
         Up to 7 search query strings for SearXNG.
     """
+    from datetime import date
+    current_year = date.today().year
+
     queries = []
 
     # Expand the SDWIS name using county context
     expanded = expand_utility_name(utility_name, county)
     best_name = expanded if expanded != utility_name else utility_name
 
-    # Query 1: Expanded name + "water rates"
+    # Q1 — Highest precision: quoted expanded name + rates + state
     queries.append(f'"{best_name}" water rates {state}')
 
-    # Query 2: County-based search (if we have county data)
+    # Q2 — Year-anchored county fallback (suppresses stale pages)
     if county:
-        queries.append(f"{county} County water rates {state}")
+        queries.append(f'{county} County water rates fees {current_year}')
 
-    # Query 3: Original SDWIS name (if different from expanded)
-    if expanded != utility_name:
-        queries.append(f'"{utility_name}" water rate schedule')
+    # Q3 — SDWIS original name (catches cases where expansion is wrong)
+    # Only add if SDWIS name differs meaningfully from expanded name
+    if expanded.lower() != utility_name.lower():
+        queries.append(f'"{utility_name}" rate schedule')
 
-    # Query 4: PDF rate schedule search
-    queries.append(f'{best_name} rate schedule {state} filetype:pdf')
+    # Q4 — PDF-specific (rate schedules are commonly PDFs)
+    queries.append(f'"{best_name}" water rate schedule filetype:pdf')
 
-    # Query 5: County government water department (local/mixed owners only)
-    if county and owner_type in ("L", "M", None):
-        queries.append(f"{county} {state} water department rates fees")
+    # Q5 — Billing/payment page (consumer-facing, often contains rates inline)
+    queries.append(f'"{best_name}" billing rates {current_year}')
 
-    # For federal systems (military bases), add installation-specific query
-    if owner_type == "F":
-        queries.append(f'"{utility_name}" utility rates')
+    # Q6 — .gov scope (only for local/state owners — private utilities rarely on .gov)
+    if county and owner_type in ("L", "S"):
+        queries.append(f'site:.gov "{county}" water rates')
 
-    # Query 6: CCR search — Consumer Confidence Reports are often hosted on
-    # utility websites, so finding a CCR reveals the utility's domain.
-    # (Sprint 15 toolkit integration)
-    from datetime import date
-    current_year = date.today().year
-    queries.append(
-        f'"{best_name}" "consumer confidence report" {current_year}'
-    )
-
-    # Query 7: Government site operator — for local/state-owned utilities,
-    # rate pages are often on .gov domains. The site: operator may or may
-    # not work through SearXNG depending on search engine backends.
-    # (Sprint 15 toolkit integration)
-    if owner_type in ("L", "S", "M", None):
-        queries.append(f'site:.gov "{best_name}" water rates')
-
-    # Query 8: County water authority pattern (Sprint 21)
-    # Many gap-state utilities are county water authorities
+    # Q7 — Broad authority/county fallback (always included)
     if county:
-        queries.append(f'{county} County water authority rates {state}')
+        queries.append(f'{county} water authority rates {state}')
 
-    # Query 9: Consumer-oriented "pay your bill" query (Sprint 21)
-    # Some utilities publish rates on billing pages, not formal rate schedules
-    queries.append(f'"{best_name}" monthly water bill {state}')
-
-    return queries[:10]
+    return queries[:7]
 
 
 # --- URL Relevance Scoring (v2 — Sprint 21) ---
@@ -249,6 +235,70 @@ _AGGREGATOR_DOMAINS = frozenset([
 ])
 
 
+def _score_url_path(url: str) -> int:
+    """Score bonus for URL path patterns that indicate a rate page. Max +20.
+
+    Sprint 22: Utility rate pages cluster on predictable URL paths.
+    Recognizing these lifts good URLs out of the ambiguous 30-50 range
+    and into the >50 threshold zone, avoiding unnecessary LLM calls.
+    """
+    from urllib.parse import urlparse
+    from pathlib import PurePosixPath
+
+    parsed = urlparse(url.lower())
+    path = parsed.path
+
+    # High-value path segments — utility rate pages cluster here
+    high_value_segments = {
+        "rates", "rate-schedule", "water-rates", "billing-rates",
+        "fees", "rate-structure", "utility-rates", "water-sewer-rates",
+        "rates-fees", "rates-and-fees", "tariff", "rate-table",
+        "water-and-sewer-rates", "fee-schedule",
+    }
+
+    # Check path segments
+    segments = [s.replace("_", "-").replace("%20", "-")
+                for s in path.split("/") if s]
+    for segment in segments:
+        if segment in high_value_segments:
+            return 20
+
+    # Check filename stem (e.g. rate-schedule.pdf, water-rates.html)
+    stem = PurePosixPath(parsed.path).stem.lower().replace("_", "-")
+    if stem in high_value_segments:
+        return 15
+
+    return 0
+
+
+def _score_url_freshness(title: str, snippet: str, url: str) -> int:
+    """Score bonus/penalty based on year mentions in text. Range: -15 to +10.
+
+    Sprint 22: Current-year pages are actively maintained. Pages mentioning
+    only years >2 old are likely stale and less likely to parse correctly.
+    """
+    from datetime import date
+    current_year = date.today().year
+
+    combined = f"{title} {snippet} {url}".lower()
+    years_found = [int(f"20{m}") for m in re.findall(r"20(1[5-9]|2[0-9])", combined)]
+
+    if not years_found:
+        return 0
+
+    most_recent = max(years_found)
+
+    if most_recent >= current_year:
+        return 10       # Current or future year → actively maintained page
+    elif most_recent == current_year - 1:
+        return 5        # Last year → probably still valid
+    elif most_recent == current_year - 2:
+        return 0        # Two years stale → neutral
+    else:
+        years_stale = current_year - most_recent
+        return max(-5 * (years_stale - 2), -15)  # -5 per stale year, floor at -15
+
+
 def score_url_relevance(
     url: str,
     title: str,
@@ -259,11 +309,16 @@ def score_url_relevance(
 ) -> int:
     """Score 0-100 using layered heuristics. No LLM needed for most cases.
 
+    Sprint 22: Added path-pattern scoring (+20) and freshness scoring (-15 to +10).
+    These lift good URLs above the 50-threshold without LLM, and penalize stale pages.
+
     Layers:
         Base keywords:       0-60  (rate, schedule, tariff, etc.)
         Domain authority:    0-15  (.gov/.org boost, aggregator penalty)
         Utility/city match:  0-25  (utility or city name in domain)
         PDF + rate keyword:  0-20  (PDF with rate-related path/content)
+        URL path pattern:    0-20  (Sprint 22: /rates, /fee-schedule, etc.)
+        Freshness:         -15-10  (Sprint 22: year-based bonus/penalty)
         Negative keywords:   -20 each (meeting, agenda, job, etc.)
     """
     from urllib.parse import urlparse
@@ -317,7 +372,13 @@ def score_url_relevance(
         if any(kw in combined for kw in ["rate", "schedule", "fee", "tariff"]):
             score += 20
 
-    # --- Layer 5: Negative keyword penalties ---
+    # --- Layer 5: URL path pattern bonus (Sprint 22) ---
+    score += _score_url_path(url)
+
+    # --- Layer 6: Freshness bonus/penalty (Sprint 22) ---
+    score += _score_url_freshness(title, snippet, url)
+
+    # --- Layer 7: Negative keyword penalties ---
     for neg in ["meeting", "agenda", "minutes", "news", "press release",
                 "election", "job", "career", "bid", "rfp"]:
         if neg in combined:
@@ -540,8 +601,9 @@ class DiscoveryAgent(BaseAgent):
         near_misses = [c for c in all_candidates if 15 <= c["score"] <= 50]
         below_threshold = [c for c in all_candidates if c["score"] < 15]
 
-        # Sprint 21: Cap at 1 URL per PWSID (top result is almost always correct)
-        top_candidates = above_threshold[:1]
+        # Sprint 22: Take up to 3 URLs above threshold (was 1 in Sprint 21).
+        # Candidates are already scored and in memory — no extra queries needed.
+        top_candidates = above_threshold[:3]
 
         logger.info(
             f"  Funnel: {raw_result_count} raw → {len(seen_urls)} deduped → "
@@ -566,16 +628,17 @@ class DiscoveryAgent(BaseAgent):
                     result = conn.execute(text(f"""
                         INSERT INTO {schema}.scrape_registry
                             (pwsid, url, url_source, discovery_query,
-                             content_type, status)
+                             content_type, status, discovery_score)
                         VALUES
                             (:pwsid, :url, 'searxng', :query,
-                             :ctype, 'pending')
+                             :ctype, 'pending', :score)
                         ON CONFLICT (pwsid, url) DO NOTHING
                     """), {
                         "pwsid": pwsid,
                         "url": c["url"],
                         "query": c["query"],
                         "ctype": content_type,
+                        "score": c["score"],
                     })
                     if result.rowcount > 0:
                         urls_written += 1

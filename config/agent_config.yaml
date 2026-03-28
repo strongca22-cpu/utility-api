@@ -40,4 +40,6 @@ discovery:
   # Max utilities per orchestrator discovery cycle
   max_utilities_per_session: 10
   # Hard cap on total SearXNG queries per session
-  total_query_budget: 60
+  # Sprint 22: was 60, but at ~9 queries/PWSID the budget ran out at 6-7 PWSIDs.
+  # 100 = 10 utilities × ~7 queries + buffer.
+  total_query_budget: 100
