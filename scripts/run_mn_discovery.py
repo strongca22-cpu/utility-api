@@ -9,7 +9,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-28
-Modified: 2026-03-28
+Modified: 2026-03-28 (Sprint 23: use unified chain in scrape cycle)
 
 Dependencies:
     - utility_api (installed in dev mode)
@@ -52,9 +52,10 @@ from utility_api.db import engine
 # --- Configuration ---
 STATE = "MN"
 MIN_POPULATION = 5000
-DISCOVERY_BATCH_SIZE = 10       # PWSIDs per discovery cycle
-PAUSE_BETWEEN_CYCLES = 120      # 2 minutes between cycles (let SearXNG breathe)
-MAX_CYCLES = 20                 # Safety cap: 20 cycles × 10 = 200 PWSIDs max
+DISCOVERY_BATCH_SIZE = 10       # PWSIDs per cycle (10 × ~7 queries = ~70 queries)
+PAUSE_BETWEEN_CYCLES = 7200     # 2 hours between cycles — protect VPS IP
+MAX_CYCLES = 14                 # 14 cycles × 10 = 140 PWSIDs over ~28 hours
+DAILY_QUERY_CAP = 200           # Hard cap: ~200 queries/day (3 cycles worth)
 
 
 def get_mn_candidates(limit: int = 10) -> list[dict]:
@@ -90,9 +91,7 @@ def run_scrape_cycle():
 
     if pending and pending > 0:
         logger.info(f"  Scrape cycle: {pending} pending MN URLs from SearXNG")
-        from utility_api.agents.scrape import ScrapeAgent
-        from utility_api.agents.parse import ParseAgent
-        from utility_api.agents.best_estimate import BestEstimateAgent
+        from utility_api.pipeline.chain import scrape_and_parse
 
         # Process pending URLs
         with engine.connect() as conn:
@@ -107,19 +106,19 @@ def run_scrape_cycle():
 
         for r in rows:
             try:
-                # Scrape
-                scrape_result = ScrapeAgent().run(
-                    registry_id=r.id, pwsid=r.pwsid, url=r.url
+                # Sprint 23: unified chain handles scrape + persist + parse
+                scrape_and_parse(
+                    pwsid=r.pwsid,
+                    registry_id=r.id,
+                    skip_best_estimate=True,
                 )
-                # Parse if scrape succeeded
-                if scrape_result.get("status") == "success":
-                    ParseAgent().run(registry_id=r.id, pwsid=r.pwsid)
             except Exception as e:
                 logger.warning(f"  Scrape/parse error for {r.pwsid}: {e}")
                 continue
 
         # Run best estimates for MN
         try:
+            from utility_api.agents.best_estimate import BestEstimateAgent
             BestEstimateAgent().run(state="MN")
         except Exception as e:
             logger.warning(f"  Best estimate error: {e}")
@@ -131,12 +130,24 @@ def main():
     logger.info(f"=== MN Discovery Batch — Sprint 22 ===")
     logger.info(f"State: {STATE}, min_pop: {MIN_POPULATION}")
     logger.info(f"Batch size: {DISCOVERY_BATCH_SIZE}, max cycles: {MAX_CYCLES}")
+    logger.info(f"Cooldown between cycles: {PAUSE_BETWEEN_CYCLES}s ({PAUSE_BETWEEN_CYCLES//3600}h{(PAUSE_BETWEEN_CYCLES%3600)//60}m)")
+    logger.info(f"Daily query cap: {DAILY_QUERY_CAP}")
 
     discovery = DiscoveryAgent()
     total_discovered = 0
     total_processed = 0
+    daily_queries = 0
 
     for cycle in range(1, MAX_CYCLES + 1):
+        # Daily query budget check
+        if daily_queries >= DAILY_QUERY_CAP:
+            logger.info(
+                f"Daily query cap reached ({daily_queries}/{DAILY_QUERY_CAP}). "
+                f"Sleeping 8 hours before resetting."
+            )
+            time.sleep(8 * 3600)
+            daily_queries = 0
+
         candidates = get_mn_candidates(limit=DISCOVERY_BATCH_SIZE)
         if not candidates:
             logger.info(f"Cycle {cycle}: no more candidates. Done.")
@@ -149,6 +160,7 @@ def main():
         )
 
         cycle_urls = 0
+        cycle_queries = 0
         for i, c in enumerate(candidates, 1):
             logger.info(
                 f"  [{i}/{len(candidates)}] {c['pwsid']} | {c['pws_name']} | "
@@ -162,7 +174,10 @@ def main():
                     skip_domain_guess=True,  # Domain guesser is a separate pipeline
                 )
                 urls_found = result.get("urls_written", 0)
+                queries_sent = len(result.get("queries_sent", []))
                 cycle_urls += urls_found
+                cycle_queries += queries_sent
+                daily_queries += queries_sent
                 total_discovered += urls_found
                 total_processed += 1
                 logger.info(
@@ -175,7 +190,8 @@ def main():
 
         logger.info(
             f"\nCycle {cycle} complete: {cycle_urls} URLs from "
-            f"{len(candidates)} PWSIDs"
+            f"{len(candidates)} PWSIDs, {cycle_queries} queries "
+            f"(daily: {daily_queries}/{DAILY_QUERY_CAP})"
         )
 
         # Run scrape/parse on discovered URLs
@@ -198,7 +214,9 @@ def main():
             )
 
         if cycle < MAX_CYCLES and candidates:
-            logger.info(f"  Pausing {PAUSE_BETWEEN_CYCLES}s before next cycle...")
+            hours = PAUSE_BETWEEN_CYCLES // 3600
+            mins = (PAUSE_BETWEEN_CYCLES % 3600) // 60
+            logger.info(f"  Cooling down {hours}h{mins}m before next cycle...")
             time.sleep(PAUSE_BETWEEN_CYCLES)
 
     logger.info(

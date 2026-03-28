@@ -25,7 +25,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-25 (Sprint 17b: multi-level deep crawl, configurable depth)
+Modified: 2026-03-28 (Sprint 23: persist scraped_text to DB)
 
 Dependencies:
     - sqlalchemy
@@ -44,6 +44,7 @@ Notes:
     - Reuses existing rate_scraper.py functions — does not rewrite them
     - Deep crawl: multi-level, follows 1-3 same-domain links per level
     - Max depth configurable via config/agent_config.yaml or run() kwarg
+    - Sprint 23: persists scraped_text to scrape_registry for decoupled parse
 """
 
 from datetime import datetime, timedelta, timezone
@@ -174,6 +175,7 @@ class ScrapeAgent(BaseAgent):
                         last_http_status = :status,
                         last_content_hash = :hash,
                         last_content_length = :length,
+                        scraped_text = :scraped_text,
                         status = 'active',
                         notes = NULL,
                         updated_at = :now
@@ -183,6 +185,7 @@ class ScrapeAgent(BaseAgent):
                     "status": getattr(scrape_result, "status_code", 200),
                     "hash": content_hash,
                     "length": char_count,
+                    "scraped_text": scrape_result.text,
                     "id": row.id,
                 })
                 conn.commit()
@@ -248,6 +251,24 @@ class ScrapeAgent(BaseAgent):
 
             char_count = len(current_text) if current_text else 0
 
+            # Sprint 23: persist final text (may be from deep crawl) back
+            # to the original registry entry so ParseAgent can read it later
+            if deep_crawled and current_text:
+                with engine.connect() as conn:
+                    conn.execute(text(f"""
+                        UPDATE {schema}.scrape_registry SET
+                            scraped_text = :scraped_text,
+                            last_content_length = :length,
+                            updated_at = :now
+                        WHERE id = :id
+                    """), {
+                        "scraped_text": current_text,
+                        "length": char_count,
+                        "now": datetime.now(timezone.utc),
+                        "id": row.id,
+                    })
+                    conn.commit()
+
             raw_texts.append({
                 "registry_id": row.id,
                 "pwsid": row.pwsid,
@@ -273,6 +294,34 @@ class ScrapeAgent(BaseAgent):
             "succeeded": succeeded,
             "failed": failed,
             "raw_texts": raw_texts,
+        }
+
+    def fetch_single_url(self, url: str) -> dict | None:
+        """Fetch a single URL and return its text content.
+
+        Lightweight fetch for backfill/re-fetch scenarios where we just
+        need the text without registry coordination or deep crawl.
+
+        Returns
+        -------
+        dict or None
+            {'text': str, 'content_type': str, 'status_code': int} on success.
+        """
+        from utility_api.ingest.rate_scraper import scrape_rate_page
+
+        try:
+            result = scrape_rate_page(url)
+        except Exception as e:
+            logger.debug(f"fetch_single_url failed: {e}")
+            return None
+
+        if result.error and not result.text:
+            return None
+
+        return {
+            "text": result.text,
+            "content_type": "pdf" if getattr(result, "is_pdf", False) else "html",
+            "status_code": getattr(result, "status_code", 200),
         }
 
     # --- Deep Crawl Methods ---
@@ -697,16 +746,17 @@ class ScrapeAgent(BaseAgent):
                     INSERT INTO {schema}.scrape_registry
                         (pwsid, url, url_source, content_type, status,
                          last_fetch_at, last_http_status, last_content_hash,
-                         last_content_length, notes)
+                         last_content_length, scraped_text, notes)
                     VALUES
                         (:pwsid, :url, 'deep_crawl', :ctype, 'active',
                          :now, :http_status, :hash, :length,
-                         :notes)
+                         :scraped_text, :notes)
                     ON CONFLICT (pwsid, url) DO UPDATE SET
                         last_fetch_at = EXCLUDED.last_fetch_at,
                         last_http_status = EXCLUDED.last_http_status,
                         last_content_hash = EXCLUDED.last_content_hash,
                         last_content_length = EXCLUDED.last_content_length,
+                        scraped_text = EXCLUDED.scraped_text,
                         status = 'active',
                         updated_at = NOW()
                 """), {
@@ -717,6 +767,7 @@ class ScrapeAgent(BaseAgent):
                     "http_status": getattr(result, "status_code", 200),
                     "hash": content_hash,
                     "length": char_count,
+                    "scraped_text": result.text if result.text else None,
                     "notes": f"Deep crawl from {original_url[:120]}",
                 })
                 conn.commit()

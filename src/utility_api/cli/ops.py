@@ -645,6 +645,29 @@ def pipeline_health():
             typer.echo(f"  {r.status:20s} {r.cnt:>6,}")
         typer.echo(f"  {'TOTAL':20s} {total:>6,}")
 
+        # --- URL Quality Distribution (Sprint 23) ---
+        typer.echo("\n── URL Quality ──")
+        quality_rows = conn.execute(text(f"""
+            SELECT COALESCE(url_quality, 'unknown') as quality, COUNT(*) as cnt
+            FROM {schema}.scrape_registry
+            GROUP BY COALESCE(url_quality, 'unknown')
+            ORDER BY cnt DESC
+        """)).fetchall()
+        for r in quality_rows:
+            typer.echo(f"  {r.quality:22s} {r.cnt:>6,}")
+
+        # Unparsed with text in DB (ready for sweep)
+        sweep_ready = conn.execute(text(f"""
+            SELECT count(*)
+            FROM {schema}.scrape_registry
+            WHERE status = 'active'
+              AND last_parse_result IS NULL
+              AND scraped_text IS NOT NULL
+              AND last_content_length > 500
+              AND COALESCE(url_quality, 'unknown') NOT IN ('blacklisted', 'probable_junk')
+        """)).scalar()
+        typer.echo(f"  {'sweep-ready (text in DB)':22s} {sweep_ready:>6,}")
+
         # --- Last 7 Days Activity ---
         typer.echo("\n── Last 7 Days ──")
         activity = conn.execute(text(f"""
@@ -964,6 +987,149 @@ def ingest_ccr_links(
             typer.echo(f"    {c['pwsid']} → {c['url']}")
 
 
+@app.command("triage-backlog")
+def triage_backlog(
+    dry_run: bool = typer.Option(True, "--dry-run/--execute", help="Preview vs execute"),
+    url_source: str = typer.Option(None, "--source", "-S", help="Filter by url_source"),
+    state: str = typer.Option(None, "--state", "-s", help="Filter by state code"),
+):
+    """Triage unparsed scrape_registry entries — classify and blacklist junk.
+
+    Analyzes the backlog of entries with content but no parse result. Shows
+    a breakdown of rate-relevant vs obvious junk, and optionally blacklists
+    irrelevant entries so they're skipped by future sweeps.
+
+    This is a recurring pattern — run this after any bulk import from a new
+    source before processing the backlog.
+
+    Examples:
+        ua-ops triage-backlog                     # Preview (dry run, default)
+        ua-ops triage-backlog --execute            # Actually blacklist junk
+        ua-ops triage-backlog --source deep_crawl  # Only deep crawl entries
+        ua-ops triage-backlog --state TX           # Only TX entries
+    """
+    from utility_api.config import settings
+    from utility_api.db import engine
+
+    schema = settings.utility_schema
+
+    # Step 1: Classify the backlog
+    base_filter = """
+        WHERE sr.status = 'active'
+          AND sr.last_parse_result IS NULL
+          AND sr.last_content_length > 500
+          AND sr.url LIKE 'http%%'
+          AND COALESCE(sr.url_quality, 'unknown') NOT IN ('blacklisted')
+    """
+    params: dict = {}
+    if url_source:
+        base_filter += " AND sr.url_source = :url_source"
+        params["url_source"] = url_source
+    if state:
+        base_filter += " AND sr.pwsid LIKE :prefix"
+        params["prefix"] = f"{state.upper()}%"
+
+    with engine.connect() as conn:
+        # Summary by source
+        summary = conn.execute(text(f"""
+            SELECT
+                sr.url_source,
+                count(*) as total,
+                count(*) FILTER (WHERE sr.url ~* '(rate|fee|tariff|billing|water|utility|schedule|charge)') as rate_relevant,
+                count(*) FILTER (WHERE sr.url ~* '(norton|facebook|amazon|google|youtube|twitter|linkedin|wikipedia|reddit|yelp|patch\\.com|nextdoor)') as external_junk,
+                count(*) FILTER (WHERE sr.url ~* '(/about|/contact|/career|/job|/news|/press|/blog|/event|/meeting|/agenda|/bid|/rfp)') as nav_junk
+            FROM {schema}.scrape_registry sr
+            {base_filter}
+            GROUP BY sr.url_source
+            ORDER BY total DESC
+        """), params).fetchall()
+
+        typer.echo("\n  Backlog Triage Report")
+        typer.echo("=" * 75)
+        typer.echo(f"  {'Source':20s} {'Total':>7s} {'Rate-Rel':>10s} {'Ext Junk':>10s} {'Nav Junk':>10s}")
+        typer.echo("-" * 75)
+        grand_total = 0
+        grand_relevant = 0
+        grand_ext_junk = 0
+        grand_nav_junk = 0
+        for r in summary:
+            typer.echo(
+                f"  {r[0]:20s} {r[1]:>7,} {r[2]:>10,} {r[3]:>10,} {r[4]:>10,}"
+            )
+            grand_total += r[1]
+            grand_relevant += r[2]
+            grand_ext_junk += r[3]
+            grand_nav_junk += r[4]
+        typer.echo("-" * 75)
+        typer.echo(
+            f"  {'TOTAL':20s} {grand_total:>7,} {grand_relevant:>10,} "
+            f"{grand_ext_junk:>10,} {grand_nav_junk:>10,}"
+        )
+
+        # Build the blacklist criteria (same as Sprint 23 spec)
+        blacklist_condition = f"""
+            sr.status = 'active'
+            AND sr.last_parse_result IS NULL
+            AND COALESCE(sr.url_quality, 'unknown') NOT IN ('blacklisted')
+            AND NOT (sr.url ~* '(rate|fee|tariff|billing|water|utility|schedule|charge|service|customer)')
+            AND (
+                sr.url ~* '(norton|facebook|amazon|google|youtube|twitter|linkedin|wikipedia|reddit|yelp|patch\\.com|nextdoor)'
+                OR
+                sr.url ~* '(/about|/contact|/career|/job|/news|/press|/blog|/event|/meeting|/agenda|/bid|/rfp)'
+            )
+        """
+        source_filter = ""
+        if url_source:
+            source_filter += " AND sr.url_source = :url_source"
+        if state:
+            source_filter += " AND sr.pwsid LIKE :prefix"
+
+        # Count what would be blacklisted
+        blacklist_count = conn.execute(text(f"""
+            SELECT count(*)
+            FROM {schema}.scrape_registry sr
+            WHERE {blacklist_condition} {source_filter}
+        """), params).scalar()
+
+        typer.echo(f"\n  Entries matching blacklist criteria: {blacklist_count:,}")
+
+        if blacklist_count == 0:
+            typer.echo("  Nothing to blacklist.")
+            return
+
+        if dry_run:
+            # Show sample of what would be blacklisted
+            samples = conn.execute(text(f"""
+                SELECT sr.pwsid, sr.url_source, sr.url
+                FROM {schema}.scrape_registry sr
+                WHERE {blacklist_condition} {source_filter}
+                ORDER BY sr.url_source, sr.url
+                LIMIT 15
+            """), params).fetchall()
+            typer.echo("\n  Sample entries to blacklist:")
+            for s in samples:
+                typer.echo(f"    {s[0]} | {s[1]:15s} | {s[2][:65]}")
+            if blacklist_count > 15:
+                typer.echo(f"    ... {blacklist_count} total")
+            typer.echo("\n  Run with --execute to apply.")
+            return
+
+        # Execute blacklisting
+        affected = conn.execute(text(f"""
+            UPDATE {schema}.scrape_registry sr SET
+                status = 'dead',
+                url_quality = 'blacklisted',
+                notes = COALESCE(sr.notes, '') || ' | TRIAGE: blacklisted by ua-ops triage-backlog',
+                updated_at = NOW()
+            WHERE {blacklist_condition} {source_filter}
+        """), params).rowcount
+        conn.commit()
+
+        typer.echo(f"\n  Blacklisted {affected:,} entries.")
+        typer.echo(f"  Remaining backlog: {grand_total - affected:,} entries")
+        typer.echo(f"  Run `ua-ops process-backlog` to parse the survivors.")
+
+
 @app.command("process-backlog")
 def process_backlog(
     max_count: int = typer.Option(50, "--max", "-n", help="Maximum entries to process"),
@@ -991,7 +1157,7 @@ def process_backlog(
     from utility_api.config import settings
     from utility_api.db import engine
     from utility_api.agents.parse import ParseAgent
-    from utility_api.ingest.rate_scraper import scrape_rate_page
+    from utility_api.pipeline.chain import scrape_and_parse
 
     schema = settings.utility_schema
     started = datetime.now(timezone.utc)
@@ -1000,7 +1166,8 @@ def process_backlog(
     query = f"""
         SELECT sr.id, sr.pwsid, sr.url, sr.url_source,
                sr.last_content_length, sr.content_type,
-               s.pws_name
+               s.pws_name, sr.scraped_text IS NOT NULL as has_text,
+               COALESCE(sr.url_quality, 'unknown') as url_quality
         FROM {schema}.scrape_registry sr
         LEFT JOIN {schema}.sdwis_systems s ON s.pwsid = sr.pwsid
         WHERE sr.status IN ('active', 'pending')
@@ -1009,6 +1176,7 @@ def process_backlog(
           AND (sr.last_parse_result IS NULL
                OR sr.last_parse_result NOT IN ('success', 'skipped'))
           AND sr.url LIKE 'http%%'
+          AND COALESCE(sr.url_quality, 'unknown') NOT IN ('blacklisted', 'probable_junk')
     """
     params: dict = {}
 
@@ -1041,9 +1209,10 @@ def process_backlog(
     if dry_run:
         for r in rows[:25]:
             name = r[6][:30] if r[6] else "?"
+            has_text_icon = "T" if r[7] else " "
             typer.echo(
                 f"  {r[1]} | {name:30s} | {r[3]:15s} | "
-                f"{r[4]:>6} chars | {r[2][:55]}"
+                f"{r[4]:>6} chars | [{has_text_icon}] {r[8]:18s} | {r[2][:45]}"
             )
         if len(rows) > 25:
             typer.echo(f"  ... {len(rows)} total")
@@ -1057,7 +1226,10 @@ def process_backlog(
     api_cost = 0.0
     affected_states: set[str] = set()
 
-    for i, (reg_id, pwsid, url, src, prev_len, ctype, name) in enumerate(rows):
+    for i, row in enumerate(rows):
+        reg_id, pwsid, url = row[0], row[1], row[2]
+        name = row[6]
+
         if i % 50 == 0 and i > 0:
             logger.info(
                 f"--- Progress: {i}/{len(rows)} | success={successes} "
@@ -1065,47 +1237,72 @@ def process_backlog(
             )
 
         try:
-            result = scrape_rate_page(url)
+            has_text = row[7]
 
-            if result is None or not getattr(result, "text", None):
-                fetch_fails += 1
-                continue
-
-            raw_text = result.text
-            if len(raw_text) < 100:
-                fetch_fails += 1
-                continue
-
-            content_type = "pdf" if getattr(result, "is_pdf", False) else "html"
-
-            parse_result = parser.run(
-                pwsid=pwsid,
-                raw_text=raw_text,
-                content_type=content_type,
-                source_url=url,
-                registry_id=reg_id,
-                skip_best_estimate=True,
-            )
-
-            if parse_result is None:
-                skipped += 1
-                continue
-
-            conf = parse_result.get("confidence", "failed")
-            cost = parse_result.get("cost_usd", 0) or 0
-            api_cost += cost
-
-            if conf in ("high", "medium"):
-                successes += 1
-                affected_states.add(pwsid[:2])
-                bill = parse_result.get("bill_10ccf", "?")
-                display_name = (name or "?")[:30]
-                logger.info(
-                    f"  [{i+1}] SUCCESS {pwsid} | {display_name} | "
-                    f"{conf} | @10CCF=${bill} | ${cost:.4f}"
+            if has_text:
+                # Sprint 23: text already in DB — parse directly (no re-fetch)
+                parse_result = parser.run(
+                    pwsid=pwsid,
+                    registry_id=reg_id,
+                    source_url=url,
+                    skip_best_estimate=True,
                 )
+
+                if parse_result is None:
+                    skipped += 1
+                    continue
+
+                conf = parse_result.get("confidence", "failed")
+                cost = parse_result.get("cost_usd", 0) or 0
+                api_cost += cost
+
+                if parse_result.get("skipped"):
+                    skipped += 1
+                elif conf in ("high", "medium"):
+                    successes += 1
+                    affected_states.add(pwsid[:2])
+                    bill = parse_result.get("bill_10ccf", "?")
+                    display_name = (name or "?")[:30]
+                    logger.info(
+                        f"  [{i+1}] SUCCESS {pwsid} | {display_name} | "
+                        f"{conf} | @10CCF=${bill} | ${cost:.4f}"
+                    )
+                else:
+                    failures += 1
             else:
-                failures += 1
+                # No persisted text — use unified chain to re-fetch + parse
+                result = scrape_and_parse(
+                    pwsid=pwsid,
+                    registry_id=reg_id,
+                    skip_best_estimate=True,
+                )
+
+                if result.get("error") == "scrape_failed":
+                    fetch_fails += 1
+                    continue
+
+                for parse_result in result.get("parse_results", []):
+                    if parse_result is None:
+                        skipped += 1
+                        continue
+
+                    conf = parse_result.get("confidence", "failed")
+                    cost = parse_result.get("cost_usd", 0) or 0
+                    api_cost += cost
+
+                    if parse_result.get("skipped"):
+                        skipped += 1
+                    elif conf in ("high", "medium"):
+                        successes += 1
+                        affected_states.add(pwsid[:2])
+                        bill = parse_result.get("bill_10ccf", "?")
+                        display_name = (name or "?")[:30]
+                        logger.info(
+                            f"  [{i+1}] SUCCESS {pwsid} | {display_name} | "
+                            f"{conf} | @10CCF=${bill} | ${cost:.4f}"
+                        )
+                    else:
+                        failures += 1
 
         except Exception as e:
             failures += 1

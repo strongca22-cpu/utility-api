@@ -12,7 +12,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-25 (Sprint 17b: pre-parse content filter)
+Modified: 2026-03-28 (Sprint 23: DB text fallback, url_quality classification)
 
 Dependencies:
     - anthropic
@@ -29,6 +29,8 @@ Notes:
     - Complexity routing: Sonnet for complex structures, Haiku for simple
     - After success: triggers BestEstimateAgent for the PWSID
     - Cost tracking: input/output tokens + computed cost logged
+    - Sprint 23: reads scraped_text from DB when raw_text not provided
+    - Sprint 23: auto-classifies url_quality after parse attempt
 """
 
 import json
@@ -195,7 +197,7 @@ class ParseAgent(BaseAgent):
     def run(
         self,
         pwsid: str,
-        raw_text: str,
+        raw_text: str | None = None,
         content_type: str = "html",
         source_url: str | None = None,
         registry_id: int | None = None,
@@ -208,8 +210,9 @@ class ParseAgent(BaseAgent):
         ----------
         pwsid : str
             PWSID being parsed.
-        raw_text : str
-            Raw scraped text content.
+        raw_text : str, optional
+            Raw scraped text content. If not provided, reads from
+            scrape_registry.scraped_text (Sprint 23 DB fallback).
         content_type : str
             html or pdf.
         source_url : str, optional
@@ -222,6 +225,17 @@ class ParseAgent(BaseAgent):
         dict
             pwsid, success, model, cost_usd, confidence, tiers_found.
         """
+        # === Sprint 23: DB text fallback ===
+        if raw_text is None and registry_id is not None:
+            raw_text, source_url = self._load_scraped_text(registry_id, source_url)
+
+        if raw_text is None and pwsid is not None:
+            raw_text, registry_id, source_url = self._load_best_text_for_pwsid(pwsid)
+
+        if not raw_text:
+            logger.warning(f"  ParseAgent: {pwsid} — no raw_text available (memory or DB)")
+            return {"pwsid": pwsid, "success": False, "error": "no_text_available"}
+
         # === PRE-PARSE FILTER ===
         skip_reason = self._should_skip_parse(raw_text)
         if skip_reason:
@@ -469,6 +483,46 @@ class ParseAgent(BaseAgent):
             "issues": issues if not valid else [],
         }
 
+    def _load_scraped_text(
+        self, registry_id: int, existing_url: str | None = None,
+    ) -> tuple[str | None, str | None]:
+        """Load persisted scraped text from scrape_registry.
+
+        Returns (raw_text, source_url).
+        """
+        schema = settings.utility_schema
+        with engine.connect() as conn:
+            result = conn.execute(text(f"""
+                SELECT scraped_text, url
+                FROM {schema}.scrape_registry
+                WHERE id = :id AND scraped_text IS NOT NULL
+            """), {"id": registry_id}).fetchone()
+        if result and result.scraped_text:
+            return result.scraped_text, existing_url or result.url
+        return None, existing_url
+
+    def _load_best_text_for_pwsid(self, pwsid: str) -> tuple[str | None, int | None, str | None]:
+        """Find the best available scraped text for a PWSID.
+
+        Returns (raw_text, registry_id, source_url).
+        """
+        schema = settings.utility_schema
+        with engine.connect() as conn:
+            result = conn.execute(text(f"""
+                SELECT id, scraped_text, url
+                FROM {schema}.scrape_registry
+                WHERE pwsid = :pwsid
+                  AND scraped_text IS NOT NULL
+                  AND last_content_length > 500
+                  AND status = 'active'
+                  AND last_parse_result IS NULL
+                ORDER BY last_content_length DESC
+                LIMIT 1
+            """), {"pwsid": pwsid}).fetchone()
+        if result:
+            return result.scraped_text, result.id, result.url
+        return None, None, None
+
     @staticmethod
     def _should_skip_parse(text: str) -> str | None:
         """Check if content is worth sending to the LLM for rate parsing.
@@ -538,10 +592,21 @@ class ParseAgent(BaseAgent):
         self, registry_id: int | None, parse_result: str,
         confidence: str, cost: float, model: str,
     ) -> None:
-        """Update scrape_registry with parse outcome."""
+        """Update scrape_registry with parse outcome and url_quality tier."""
         if registry_id is None:
             return
         schema = settings.utility_schema
+
+        # Sprint 23: auto-classify url_quality based on parse outcome
+        if parse_result == "success":
+            url_quality = "confirmed_rate_page"
+        elif parse_result == "skipped":
+            url_quality = "probable_junk"
+        elif parse_result == "failed":
+            url_quality = "parse_failed"
+        else:
+            url_quality = "unknown"
+
         try:
             now = datetime.now(timezone.utc)
             new_status = "active" if parse_result == "success" else None
@@ -552,11 +617,13 @@ class ParseAgent(BaseAgent):
                         last_parse_result = :result,
                         last_parse_confidence = :confidence,
                         last_parse_cost_usd = :cost,
+                        url_quality = :url_quality,
                         updated_at = :now
                     WHERE id = :id
                 """), {
                     "now": now, "result": parse_result,
-                    "confidence": confidence, "cost": cost, "id": registry_id,
+                    "confidence": confidence, "cost": cost,
+                    "url_quality": url_quality, "id": registry_id,
                 })
                 if new_status:
                     conn.execute(text(f"""

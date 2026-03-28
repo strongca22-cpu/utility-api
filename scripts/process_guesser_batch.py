@@ -10,7 +10,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-25
-Modified: 2026-03-25
+Modified: 2026-03-28 (Sprint 23: use unified chain)
 
 Dependencies:
     - sqlalchemy
@@ -40,10 +40,10 @@ from sqlalchemy import text
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from utility_api.agents.parse import ParseAgent
 from utility_api.agents.scrape import ScrapeAgent
 from utility_api.config import settings
 from utility_api.db import engine
+from utility_api.pipeline.chain import scrape_and_parse
 
 # Lazy import — only needed in --batch mode
 # from utility_api.agents.batch import BatchAgent
@@ -120,8 +120,6 @@ def process_batch(
             logger.info(f"  ... +{len(pending) - 20} more")
         return {"processed": 0, "dry_run": True}
 
-    scrape = ScrapeAgent()
-
     stats = {
         "processed": 0,
         "scrape_ok": 0,
@@ -132,27 +130,26 @@ def process_batch(
         "total_cost": 0.0,
     }
 
-    # In batch mode, collect parse tasks; in immediate mode, parse inline
+    # In batch mode, collect parse tasks after scrape; in immediate mode,
+    # use the unified chain (Sprint 23)
     pending_parse_tasks = []
-    parse = None if use_batch_api else ParseAgent()
 
     for item in pending:
         pwsid = item["pwsid"]
         stats["processed"] += 1
 
         try:
-            # Scrape (free — just HTTP)
-            scrape_result = scrape.run(pwsid=pwsid)
-
-            if not scrape_result.get("raw_texts"):
-                stats["scrape_failed"] += 1
-                continue
-
-            stats["scrape_ok"] += 1
-            text_entry = scrape_result["raw_texts"][0]
-
             if use_batch_api:
-                # Collect for batch submission
+                # Batch mode: scrape first, collect texts for batch parse
+                scrape = ScrapeAgent()
+                scrape_result = scrape.run(pwsid=pwsid)
+
+                if not scrape_result.get("raw_texts"):
+                    stats["scrape_failed"] += 1
+                    continue
+
+                stats["scrape_ok"] += 1
+                text_entry = scrape_result["raw_texts"][0]
                 pending_parse_tasks.append({
                     "pwsid": pwsid,
                     "raw_text": text_entry["text"],
@@ -161,30 +158,33 @@ def process_batch(
                     "registry_id": text_entry.get("registry_id", item["registry_id"]),
                 })
             else:
-                # Parse immediately
-                parse_result = parse.run(
+                # Immediate mode: unified chain (Sprint 23 Fix 5)
+                result = scrape_and_parse(
                     pwsid=pwsid,
-                    raw_text=text_entry["text"],
-                    content_type=text_entry["content_type"],
-                    source_url=text_entry["url"],
-                    registry_id=text_entry.get("registry_id", item["registry_id"]),
+                    skip_best_estimate=True,
                 )
 
-                cost = parse_result.get("cost_usd", 0)
-                stats["total_cost"] += cost
+                if result.get("error") == "scrape_failed":
+                    stats["scrape_failed"] += 1
+                    continue
 
-                if parse_result.get("skipped"):
-                    stats["filtered"] += 1
-                elif parse_result.get("success"):
-                    stats["parse_ok"] += 1
-                    bill = parse_result.get("bill_10ccf")
-                    bill_str = f"${bill:.2f}" if bill else "N/A"
-                    logger.info(
-                        f"  \u2713 {pwsid} | {item['pws_name'][:30]} | "
-                        f"bill@10CCF={bill_str}"
-                    )
-                else:
-                    stats["parse_failed"] += 1
+                stats["scrape_ok"] += 1
+                for parse_result in result.get("parse_results", []):
+                    cost = parse_result.get("cost_usd", 0)
+                    stats["total_cost"] += cost
+
+                    if parse_result.get("skipped"):
+                        stats["filtered"] += 1
+                    elif parse_result.get("success"):
+                        stats["parse_ok"] += 1
+                        bill = parse_result.get("bill_10ccf")
+                        bill_str = f"${bill:.2f}" if bill else "N/A"
+                        logger.info(
+                            f"  \u2713 {pwsid} | {item['pws_name'][:30]} | "
+                            f"bill@10CCF={bill_str}"
+                        )
+                    else:
+                        stats["parse_failed"] += 1
 
         except Exception as e:
             logger.error(f"  Error processing {pwsid}: {e}")
