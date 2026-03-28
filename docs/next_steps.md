@@ -1190,8 +1190,24 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Gap-state targeting:** orchestrator focuses on states with <20% coverage, skips recently-searched
 - [x] **Query improvements:** added county water authority + consumer billing query templates
 - [ ] Run scoring diagnostic for 1 week, then tune threshold based on near-miss data
-- [ ] Consider content caching (persist fetched text to disk/DB to avoid re-fetching on re-parse)
+- [x] Consider content caching (persist fetched text to disk/DB to avoid re-fetching on re-parse) → **Done in Sprint 23**
 - [ ] Investigate 15K char truncation — targeted extraction for large tariff PDFs
+
+### Sprint 23: Pipeline Flow Fix & Scraped Content Persistence (2026-03-28)
+- [x] **Migration 018:** `scraped_text TEXT` + `url_quality VARCHAR(20)` on scrape_registry (one migration, both columns)
+- [x] **Fix 1 — Text persistence:** ScrapeAgent persists raw text to DB on every fetch (initial + deep crawl). ParseAgent reads from DB when raw_text not passed in memory. Eliminates data loss between scrape and parse.
+- [x] **Fix 3 — URL quality:** Auto-classified after parse: confirmed_rate_page, parse_failed, probable_junk, blacklisted, unknown. Backfilled from existing parse results. Sweeps skip blacklisted/probable_junk.
+- [x] **Fix 5 — Unified chain:** `src/utility_api/pipeline/chain.py` with `scrape_and_parse()`. All callers updated: process_guesser_batch.py, parse_deep_crawl_backlog.py, process-backlog CLI, run_mn_discovery.py.
+- [x] **Fix 2 — Triage CLI:** `ua-ops triage-backlog` — classifies backlog, shows rate-relevant vs junk breakdown, --execute to blacklist. Reusable after any bulk import.
+- [x] **Fix 4 — Parse sweep daemon:** `scripts/parse_sweep.py` — polls every 30 min, parses unparsed entries with text in DB, batches BestEstimate per state. Run in tmux.
+- [x] **Fix 6 — Logging:** URL quality distribution added to `ua-ops pipeline-health`. `process-backlog --dry-run` shows text availability and url_quality.
+
+**Immediate next steps (post-Sprint 23):**
+- [ ] Run migration: `alembic -c migrations/alembic.ini upgrade head`
+- [ ] Run triage: `ua-ops triage-backlog` (preview), then `ua-ops triage-backlog --execute`
+- [ ] Process backlog: `ua-ops process-backlog --max 120 --source searxng` (highest yield first)
+- [ ] Start sweep daemon: `tmux new-session -d -s parse_sweep "cd ~/projects/utility-api && python scripts/parse_sweep.py --interval 1800 --max-per-sweep 25 2>&1 | tee -a logs/parse_sweep.log"`
+- [ ] Verify pipeline health: `ua-ops pipeline-health` (check url_quality distribution)
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
