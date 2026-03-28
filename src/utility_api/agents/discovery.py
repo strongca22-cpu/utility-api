@@ -500,6 +500,8 @@ class DiscoveryAgent(BaseAgent):
 
         # Sprint 16: domain_guess_only flag skips SearXNG entirely
         domain_guess_only = kwargs.get("domain_guess_only", False)
+        # Sprint 22: skip_domain_guess flag — domain guesser is a separate pipeline
+        skip_domain_guess = kwargs.get("skip_domain_guess", False)
 
         # Log the expanded name for debugging
         expanded = expand_utility_name(utility_name, county)
@@ -509,8 +511,9 @@ class DiscoveryAgent(BaseAgent):
             logger.info(f"DiscoveryAgent: {utility_name} ({pwsid}, {state}, county={county})")
 
         # Sprint 16: Try domain guessing first (free, instant, no rate limit)
+        # Sprint 22: skip if domain guesser already ran (separate pipeline)
         domain_guess_urls = 0
-        if county:
+        if county and not skip_domain_guess:
             from utility_api.ops.domain_guesser import DomainGuesser
             guesser = DomainGuesser()
             guesses = guesser.guess_urls(pwsid, utility_name, county, state, owner_type)
@@ -644,14 +647,24 @@ class DiscoveryAgent(BaseAgent):
                         urls_written += 1
                         logger.info(f"  → [{c['score']}] {c['url'][:80]}")
 
-                # Update pwsid_coverage.scrape_status
+                # Sprint 22: Update searxng_status independently of scrape_status.
+                # scrape_status tracks domain guesser; searxng_status tracks SearXNG.
                 if urls_written > 0:
                     conn.execute(text(f"""
                         UPDATE {schema}.pwsid_coverage
-                        SET scrape_status = 'url_discovered'
-                        WHERE pwsid = :pwsid AND scrape_status = 'not_attempted'
+                        SET searxng_status = 'url_found'
+                        WHERE pwsid = :pwsid
                     """), {"pwsid": pwsid})
 
+                conn.commit()
+        else:
+            # No URLs above threshold — mark as searched with no hits
+            with engine.connect() as conn:
+                conn.execute(text(f"""
+                    UPDATE {schema}.pwsid_coverage
+                    SET searxng_status = 'searched_no_hits'
+                    WHERE pwsid = :pwsid AND searxng_status = 'not_attempted'
+                """), {"pwsid": pwsid})
                 conn.commit()
 
         # Fix 2: Always mark search attempted (prevents infinite re-queuing)
