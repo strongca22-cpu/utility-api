@@ -25,7 +25,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-28 (Sprint 23: persist scraped_text to DB)
+Modified: 2026-03-30 (Sprint 24b: Playwright escalation for thin high-confidence pages)
 
 Dependencies:
     - sqlalchemy
@@ -112,13 +112,15 @@ class ScrapeAgent(BaseAgent):
         with engine.connect() as conn:
             if registry_id:
                 rows = conn.execute(text(f"""
-                    SELECT id, pwsid, url, content_type, last_content_hash, retry_count
+                    SELECT id, pwsid, url, content_type, last_content_hash,
+                           retry_count, url_source
                     FROM {schema}.scrape_registry
                     WHERE id = :id
                 """), {"id": registry_id}).fetchall()
             elif pwsid:
                 rows = conn.execute(text(f"""
-                    SELECT id, pwsid, url, content_type, last_content_hash, retry_count
+                    SELECT id, pwsid, url, content_type, last_content_hash,
+                           retry_count, url_source
                     FROM {schema}.scrape_registry
                     WHERE pwsid = :pwsid
                       AND status IN ('pending', 'pending_retry')
@@ -195,6 +197,160 @@ class ScrapeAgent(BaseAgent):
                     "id": row.id,
                 })
                 conn.commit()
+
+            # --- Playwright escalation for thin high-confidence pages ---
+            # If httpx returned HTTP 200 but thin content (<2000 chars) on a
+            # high-confidence URL (Serper, curated, metro_research), retry with
+            # Playwright in case JS rendering was needed. If still thin after
+            # Playwright, extract rate-relevant links and follow the best one.
+            http_status = getattr(scrape_result, "status_code", 200)
+            is_pdf = getattr(scrape_result, "is_pdf", False)
+            url_source = getattr(row, "url_source", None)
+            escalation_note = None
+
+            if (
+                not is_pdf
+                and http_status == 200
+                and char_count < 2000
+                and char_count > 0
+                and self._is_high_confidence_url(url_source)
+            ):
+                from utility_api.ingest.rate_scraper import _scrape_with_playwright
+
+                logger.info(
+                    f"  Thin content ({char_count} chars) on high-confidence "
+                    f"URL ({url_source}) — retrying with Playwright"
+                )
+
+                try:
+                    pw_result = _scrape_with_playwright(url)
+                    pw_text = pw_result.text or ""
+                    pw_html = getattr(pw_result, "raw_html", None) or pw_text
+
+                    if len(pw_text) > char_count * 1.5 and len(pw_text) > 500:
+                        # Playwright recovered JS content
+                        logger.info(
+                            f"  Playwright recovered {len(pw_text):,} chars "
+                            f"(was {char_count})"
+                        )
+                        scrape_result = pw_result
+                        char_count = len(pw_text)
+                        escalation_note = "playwright_reason=thin_js_recovered"
+
+                        # Persist the better content
+                        with engine.connect() as conn:
+                            conn.execute(text(f"""
+                                UPDATE {schema}.scrape_registry SET
+                                    scraped_text = :text,
+                                    last_content_length = :length,
+                                    notes = COALESCE(notes, '') || ' ' || :note,
+                                    updated_at = :now
+                                WHERE id = :id
+                            """), {
+                                "text": pw_text,
+                                "length": char_count,
+                                "note": escalation_note,
+                                "now": datetime.now(timezone.utc),
+                                "id": row.id,
+                            })
+                            conn.commit()
+                    else:
+                        # Still thin after Playwright — try navigation links
+                        logger.info(
+                            f"  Still thin after Playwright "
+                            f"({len(pw_text)} chars) — checking for nav links"
+                        )
+                        escalation_note = "playwright_reason=thin_still_thin"
+
+                        # Use the better HTML source for link extraction
+                        nav_html = pw_html if len(pw_html) > len(
+                            getattr(scrape_result, "raw_html", "") or ""
+                        ) else (getattr(scrape_result, "raw_html", None) or "")
+
+                        rate_links = self._extract_rate_links(nav_html, url)
+                        if rate_links:
+                            logger.info(
+                                f"  Found {len(rate_links)} rate-relevant "
+                                f"links — following best"
+                            )
+                            best_link = rate_links[0]
+                            logger.info(
+                                f"    -> {best_link['text'][:40]} "
+                                f"({best_link['url'][:60]})"
+                            )
+
+                            from utility_api.ingest.rate_scraper import scrape_rate_page as _fetch
+                            try:
+                                nav_result = _fetch(best_link["url"])
+                                nav_text = nav_result.text or ""
+                                if len(nav_text) > 500:
+                                    logger.info(
+                                        f"  Nav crawl recovered "
+                                        f"{len(nav_text):,} chars"
+                                    )
+                                    scrape_result = nav_result
+                                    char_count = len(nav_text)
+                                    escalation_note = (
+                                        f"nav_crawl={best_link['url'][:80]} "
+                                        f"nav_crawl_success=true"
+                                    )
+
+                                    # Persist nav-crawled content
+                                    with engine.connect() as conn:
+                                        conn.execute(text(f"""
+                                            UPDATE {schema}.scrape_registry SET
+                                                scraped_text = :text,
+                                                last_content_length = :length,
+                                                notes = COALESCE(notes, '') || ' ' || :note,
+                                                updated_at = :now
+                                            WHERE id = :id
+                                        """), {
+                                            "text": nav_text,
+                                            "length": char_count,
+                                            "note": escalation_note,
+                                            "now": datetime.now(timezone.utc),
+                                            "id": row.id,
+                                        })
+                                        conn.commit()
+
+                                    # Register the child URL
+                                    self._register_nav_crawl_url(
+                                        pwsid=row.pwsid,
+                                        url=best_link["url"],
+                                        parent_registry_id=row.id,
+                                    )
+                                else:
+                                    logger.debug(
+                                        f"    Nav link also thin "
+                                        f"({len(nav_text)} chars)"
+                                    )
+                                    escalation_note = (
+                                        f"nav_crawl={best_link['url'][:80]} "
+                                        f"nav_crawl_success=false"
+                                    )
+                            except Exception as e:
+                                logger.debug(f"    Nav crawl fetch error: {e}")
+                        else:
+                            logger.debug("  No rate-relevant links found on thin page")
+
+                except Exception as e:
+                    logger.debug(f"  Playwright escalation error: {e}")
+                    escalation_note = f"playwright_reason=error:{str(e)[:50]}"
+
+                # Persist escalation note if not already done
+                if escalation_note and "nav_crawl_success" not in (escalation_note or "") and "recovered" not in (escalation_note or ""):
+                    with engine.connect() as conn:
+                        conn.execute(text(f"""
+                            UPDATE {schema}.scrape_registry SET
+                                notes = COALESCE(notes, '') || ' ' || :note,
+                                updated_at = :now
+                            WHERE id = :id
+                        """), {
+                            "note": escalation_note,
+                            "now": datetime.now(timezone.utc),
+                            "id": row.id,
+                        })
+                        conn.commit()
 
             # --- Multi-level deep crawl ---
             # Start with the initial page. If thin, crawl deeper up to max_depth.
@@ -829,3 +985,110 @@ class ScrapeAgent(BaseAgent):
                 conn.commit()
         except Exception as e:
             logger.debug(f"Registry failure update failed: {e}")
+
+    @staticmethod
+    def _is_high_confidence_url(url_source: str | None) -> bool:
+        """Is this URL from a source that warrants Playwright escalation?
+
+        Serper, curated, and metro_research URLs are high-confidence — Google
+        or a human thinks this is a rate page. Domain-guessed and deep_crawl
+        URLs are speculative and don't warrant the extra fetch.
+        """
+        return url_source in (
+            "serper", "curated", "curated_portland", "metro_research",
+            "searxng", "state_directory",
+        )
+
+    def _extract_rate_links(self, html: str, base_url: str) -> list[dict]:
+        """Find links on a thin page that point to rate-related content.
+
+        Returns up to 3 rate-relevant links, sorted by score descending.
+        """
+        from urllib.parse import urljoin
+
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            return []
+
+        if not html or len(html) < 50:
+            return []
+
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+        except Exception:
+            return []
+
+        base_domain = self._get_base_domain(base_url)
+
+        rate_keywords = [
+            "rate", "fee", "tariff", "schedule", "billing",
+            "charge", "price", "cost", "water bill",
+        ]
+
+        candidates = []
+        for link in soup.find_all("a", href=True):
+            href = link.get("href", "")
+            link_text = link.get_text(strip=True).lower()
+            href_lower = href.lower()
+
+            full_url = urljoin(base_url, href)
+
+            # Must be same domain
+            if self._get_base_domain(full_url) != base_domain:
+                continue
+
+            # Skip anchors, mailto, tel
+            if href.startswith(("#", "mailto:", "tel:", "javascript:")):
+                continue
+
+            # Score by rate-keyword presence
+            link_score = 0
+            for kw in rate_keywords:
+                if kw in link_text:
+                    link_score += 20
+                if kw in href_lower:
+                    link_score += 15
+
+            # PDF bonus
+            if href_lower.endswith(".pdf") and link_score > 0:
+                link_score += 10
+
+            if link_score > 0:
+                candidates.append({
+                    "url": full_url,
+                    "text": link_text[:100],
+                    "score": link_score,
+                })
+
+        # Deduplicate by URL
+        seen = set()
+        unique = []
+        for c in candidates:
+            if c["url"] not in seen:
+                seen.add(c["url"])
+                unique.append(c)
+
+        unique.sort(key=lambda c: c["score"], reverse=True)
+        return unique[:3]
+
+    def _register_nav_crawl_url(
+        self, pwsid: str, url: str, parent_registry_id: int
+    ):
+        """Register a URL found via navigation link extraction."""
+        schema = settings.utility_schema
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(f"""
+                    INSERT INTO {schema}.scrape_registry
+                        (pwsid, url, url_source, status, notes)
+                    VALUES (:pwsid, :url, 'nav_crawl', 'active', :notes)
+                    ON CONFLICT (pwsid, url) DO NOTHING
+                """), {
+                    "pwsid": pwsid,
+                    "url": url,
+                    "notes": f"Nav crawl from registry_id={parent_registry_id}",
+                })
+                conn.commit()
+        except Exception as e:
+            logger.debug(f"Nav crawl URL registration failed: {e}")
