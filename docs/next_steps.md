@@ -1251,6 +1251,11 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] Remove SearXNG (deliverable 5): code removal + Docker cleanup
 - [ ] Full gap-state sweep: ~440 PWSIDs with reactive cascade + Playwright (~1,756 free queries remaining)
 
+### Sprint 25 — Completed (2026-03-30)
+- [x] **source_url propagation:** Added `source_url` column to `rate_best_estimate` (migration 021). Threaded through `best_estimate.py` — scraped_llm rows now carry the original utility rate page URL for spot-checking. 3,852 rows with URLs, 5,810 properly NULL.
+- [x] **Tier label backfill:** EFC/SWRCB/OWRS → `bulk`, scraped_llm → `premium`, Duke rationale updated. `source_catalog.tier` comment updated.
+- [x] **Duke language cleanup:** Removed "INTERNAL REFERENCE ONLY" framing from `duke_reference_ingest.py`. Duke is a free-tier attributed source with usable 10CCF rates.
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
