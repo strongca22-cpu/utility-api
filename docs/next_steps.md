@@ -1255,6 +1255,19 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **source_url propagation:** Added `source_url` column to `rate_best_estimate` (migration 021). Threaded through `best_estimate.py` — scraped_llm rows now carry the original utility rate page URL for spot-checking. 3,852 rows with URLs, 5,810 properly NULL.
 - [x] **Tier label backfill:** EFC/SWRCB/OWRS → `bulk`, scraped_llm → `premium`, Duke rationale updated. `source_catalog.tier` comment updated.
 - [x] **Duke language cleanup:** Removed "INTERNAL REFERENCE ONLY" framing from `duke_reference_ingest.py`. Duke is a free-tier attributed source with usable 10CCF rates.
+- [x] **Score threshold lowered 50→45:** Config-driven (was hardcoded). 1,219 near-miss URLs in 440 sweep would now qualify.
+- [x] **Sprint 25 validation runs:** 440 gap-state sweep (64% success), ND 119 (62%), SD 141 (67%). ND went 2%→21%, SD 1%→21%.
+- [x] **Coverage strategy report:** `docs/coverage_strategy_sprint25.md` — scenarios, state priorities, cost projections.
+- [x] **Pipeline failure analysis updated:** `docs/pipeline_failure_analysis.md` — three-run comparison added.
+
+### Sprint 25b — In Progress (Scenario A)
+- [x] **Scenario A script:** `scripts/run_scenario_a.py` — batch API sweep for all gap >=3k
+- [ ] **Scenario A running:** `tmux attach -t scenario_a` — 4,912 PWSIDs (4,904 gap + 8 retries), ~19.6k Serper queries, ~$28 Anthropic batch cost
+  - Discovery + scrape phase: ~27 hours (started 2026-03-30 14:10 UTC)
+  - Batch submit: automatic at end of discovery
+  - Process results: `python scripts/run_scenario_a.py --process-batch` (run after ~24hr batch processing)
+  - Expected yield: ~3,000 new rates, coverage 73%→86% pop
+- [ ] **Duke-only sweep:** 963 PWSIDs where Duke is sole source (>=3k pop). Separate script, not yet built. States: TX 221, CA 167, PA 158, WA 123, NJ 108.
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
