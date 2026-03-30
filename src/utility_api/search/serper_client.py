@@ -87,10 +87,10 @@ class SerperSearchClient:
         paid_mode : bool, optional
             Override for paid mode. If None, reads from SERPER_PAID_MODE env var.
         """
-        self.api_key = getattr(settings, "serper_api_key", "") or ""
+        self.api_key = getattr(settings, "serper_utility_api_key", "") or ""
         if not self.api_key:
             raise SerperError(
-                "SERPER_API_KEY not configured. Add it to .env file."
+                "SERPER_UTILITY_API_KEY not configured. Add it to .env file."
             )
 
         if paid_mode is not None:

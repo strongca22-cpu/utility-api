@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     )
 
     # Serper.dev search API (Sprint 24)
-    serper_api_key: str = ""
+    serper_utility_api_key: str = ""
     serper_paid_mode: bool = False
 
     model_config = {
