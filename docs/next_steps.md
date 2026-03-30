@@ -1243,9 +1243,13 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
   - **Cascade:** Keep 3-attempt cascade — rescued 30/87 (34%) that would have failed with single-parse
   - **CO analysis:** 12/16 failures from overlapping special districts, JS-heavy sites, .colorado.gov blocking. Hard state.
 - [x] Reactive deep crawl implemented in `process_pwsid()` — crawl only if all 3 Serper URLs fail
+- [x] Playwright escalation for thin high-confidence pages in ScrapeAgent
+  - Thin (<2000 chars) + high-confidence URL → Playwright retry → nav link extraction → follow best link
+  - Validated: fclwd.com 495 chars → nav crawl → recovered 8,637 char PDF
+  - Monitoring: `notes LIKE '%playwright_reason%'` and `notes LIKE '%nav_crawl%'` on scrape_registry
 - [ ] Address false PWSID-URL match issue (NYC → Richmondville Village, CO special districts)
 - [ ] Remove SearXNG (deliverable 5): code removal + Docker cleanup
-- [ ] Full gap-state sweep: ~600 PWSIDs with reactive cascade (~1,768 free queries remaining)
+- [ ] Full gap-state sweep: ~440 PWSIDs with reactive cascade + Playwright (~1,756 free queries remaining)
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
