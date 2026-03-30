@@ -1209,6 +1209,25 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] Start sweep daemon: `tmux new-session -d -s parse_sweep "cd ~/projects/utility-api && python scripts/parse_sweep.py --interval 1800 --max-per-sweep 25 2>&1 | tee -a logs/parse_sweep.log"`
 - [ ] Verify pipeline health: `ua-ops pipeline-health` (check url_quality distribution)
 
+### Sprint 24: Serper Integration — Replace SearXNG (2026-03-29)
+- [x] **SerperSearchClient** (`src/utility_api/search/serper_client.py`): Thin API wrapper with usage tracking (per-query to `search_queries` table), budget guard (2,400 warning, 2,500 hard stop on free tier), retry logic (429/401), cost reporting.
+- [x] **Migration 019:** `search_engine` column on `search_log`, ranked URL columns (`url_rank_1/2/3`, `score_rank_1/2/3`), new `search_queries` table (billing audit trail), `discovery_rank` + `discovery_score` on `scrape_registry`.
+- [x] **DiscoveryAgent updated:** SearXNG replaced with Serper. LLM fallback scoring removed (Google results are high enough quality for keyword-only scoring). Query count reduced from 7 to 4. Top 3 URLs written with `discovery_rank` tagging. `url_source='serper'`. Inter-query delay reduced from 8s to 0.2s.
+- [x] **Bulk discovery CLI:** `scripts/serper_bulk_discovery.py` + `ua-ops serper-discover`. Gap-state targeting, population sorting, budget guards, dry-run mode, progress logging.
+- [x] **Monitoring:** `ua-ops serper-status` command — query usage, cost tracking, parse success by discovery rank, search funnel summary.
+- [x] **Config:** `SERPER_API_KEY` + `SERPER_PAID_MODE` env vars in Settings. `agent_config.yaml` updated with Serper discovery block (4 queries/PWSID, 0.2s delay, top 3 URLs).
+
+**Immediate next steps (pre-validation session):**
+- [ ] Add `SERPER_API_KEY=<key>` to `.env`
+- [ ] Run migration: `alembic -c migrations/alembic.ini upgrade head`
+- [ ] Dry run: `python scripts/serper_bulk_discovery.py --max-pwsids 625 --dry-run`
+- [ ] Small validation (25 PWSIDs): `python scripts/serper_bulk_discovery.py --max-pwsids 25`
+- [ ] Check results: `ua-ops serper-status`
+- [ ] If scoring looks good: full free-tier sweep (`--max-pwsids 625`)
+- [ ] Process found URLs: `ua-ops process-backlog --max 50`
+- [ ] Evaluate rank 2-3 value: query parse success by `discovery_rank`
+- [ ] Remove SearXNG (deliverable 5): code removal + Docker cleanup
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers

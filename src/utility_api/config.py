@@ -64,6 +64,10 @@ class Settings(BaseSettings):
         / "Aqueduct40_waterrisk_download_Y2023M07D05/GDB/Aq40_Y2023D07M05.gdb"
     )
 
+    # Serper.dev search API (Sprint 24)
+    serper_api_key: str = ""
+    serper_paid_mode: bool = False
+
     model_config = {
         "env_file": str(PROJECT_ROOT / ".env"),
         "env_file_encoding": "utf-8",

@@ -4,19 +4,20 @@ Discovery Agent
 
 Purpose:
     Finds rate page URLs for PWSIDs that have no known URL. Searches
-    via SearXNG, scores results for relevance (keyword heuristic first,
-    optional Haiku fallback for ambiguous cases), and writes candidates
-    to scrape_registry.
+    via Serper.dev (Google Search API), scores results for relevance
+    using layered keyword heuristics, and writes top 3 candidates
+    to scrape_registry with rank tagging.
 
-    LLM usage: optional, ~20% of calls (Haiku for ambiguous scores only).
+    Sprint 24: Replaced SearXNG with Serper. Removed LLM fallback scoring
+    (Google results are higher quality than SearXNG's Bing/Yahoo mix, so
+    the keyword heuristic is sufficient). Added discovery_rank tracking.
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-25 (Sprint 14.5: configurable SearXNG URL, VPS-based discovery)
+Modified: 2026-03-29 (Sprint 24: Serper integration, rank tagging, remove LLM scoring)
 
 Dependencies:
-    - requests (SearXNG API)
-    - anthropic (optional, Haiku for ambiguous URL scoring)
+    - requests (via SerperSearchClient)
     - sqlalchemy
 
 Usage:
@@ -25,9 +26,9 @@ Usage:
 
 Notes:
     - Does NOT scrape or parse — only discovers and records URLs
-    - Writes to scrape_registry with status='pending'
+    - Writes to scrape_registry with status='pending' and discovery_rank=1/2/3
     - Updates pwsid_coverage.scrape_status to 'url_discovered'
-    - Keyword heuristic handles ~80% of cases without LLM
+    - Keyword heuristic handles scoring (no LLM calls)
     - Query builder uses SDWIS metadata (county, owner_type) for better queries
 """
 
@@ -166,9 +167,8 @@ def build_search_queries(
 ) -> list[str]:
     """Generate targeted search queries using all available metadata.
 
-    Sprint 22: Rebuilt from 9 queries down to 7 max. Removed low-yield CCR
-    query and near-duplicate department fallback. Added year-anchored county
-    fallback and billing-page query.
+    Sprint 24: Reduced from 7 queries (SearXNG) to 4 (Serper). Google results
+    are higher quality per query, so fewer queries cover more ground.
 
     Parameters
     ----------
@@ -184,11 +184,8 @@ def build_search_queries(
     Returns
     -------
     list[str]
-        Up to 7 search query strings for SearXNG.
+        Up to 4 search query strings for Serper.
     """
-    from datetime import date
-    current_year = date.today().year
-
     queries = []
 
     # Expand the SDWIS name using county context
@@ -198,33 +195,40 @@ def build_search_queries(
     # Q1 — Highest precision: quoted expanded name + rates + state
     queries.append(f'"{best_name}" water rates {state}')
 
-    # Q2 — Year-anchored county fallback (suppresses stale pages)
-    if county:
-        queries.append(f'{county} County water rates fees {current_year}')
+    # Q2 — City + state + rate schedule (catches different naming)
+    city_meta = _get_city_from_name(utility_name, county)
+    if city_meta:
+        queries.append(f'{city_meta} {state} water rate schedule')
+    elif county:
+        queries.append(f'{county} County {state} water rate schedule')
 
-    # Q3 — SDWIS original name (catches cases where expansion is wrong)
-    # Only add if SDWIS name differs meaningfully from expanded name
-    if expanded.lower() != utility_name.lower():
-        queries.append(f'"{utility_name}" rate schedule')
+    # Q3 — Broader utility + fees query
+    queries.append(f'{best_name} water utility rates fees {state}')
 
-    # Q4 — PDF-specific (rate schedules are commonly PDFs)
-    queries.append(f'"{best_name}" water rate schedule filetype:pdf')
+    # Q4 — Varies by owner type for targeted results
+    if owner_type == "P":  # private/IOU
+        queries.append(f'"{best_name}" tariff rate schedule filetype:pdf')
+    elif county:
+        queries.append(f'{county} county {state} water rates')
+    else:
+        queries.append(f'{best_name} water department rates {state}')
 
-    # Q5 — Billing/payment page (consumer-facing, often contains rates inline)
-    queries.append(f'"{best_name}" billing rates {current_year}')
-
-    # Q6 — .gov scope (only for local/state owners — private utilities rarely on .gov)
-    if county and owner_type in ("L", "S"):
-        queries.append(f'site:.gov "{county}" water rates')
-
-    # Q7 — Broad authority/county fallback (always included)
-    if county:
-        queries.append(f'{county} water authority rates {state}')
-
-    return queries[:7]
+    return queries[:4]
 
 
-# --- URL Relevance Scoring (v2 — Sprint 21) ---
+def _get_city_from_name(utility_name: str, county: str | None) -> str | None:
+    """Extract a city-like name from the utility name for query diversification.
+
+    Returns None if we can't confidently extract a city name.
+    """
+    # If name starts with "CITY OF X" or "TOWN OF X", extract X
+    m = re.match(r"(?:CITY|TOWN|VILLAGE)\s+OF\s+(.+?)(?:\s*[-,]|$)", utility_name, re.IGNORECASE)
+    if m:
+        return m.group(1).strip().title()
+    return None
+
+
+# --- URL Relevance Scoring (v2 — Sprint 21, updated Sprint 24) ---
 
 # Domains that are never water utility rate pages
 _AGGREGATOR_DOMAINS = frozenset([
@@ -307,10 +311,11 @@ def score_url_relevance(
     city: str = "",
     state: str = "",
 ) -> int:
-    """Score 0-100 using layered heuristics. No LLM needed for most cases.
+    """Score 0-100 using layered heuristics. No LLM needed.
 
-    Sprint 22: Added path-pattern scoring (+20) and freshness scoring (-15 to +10).
-    These lift good URLs above the 50-threshold without LLM, and penalize stale pages.
+    Sprint 24: LLM fallback removed. Serper returns Google results which are
+    higher quality than SearXNG's Bing/Yahoo mix. The keyword heuristic is
+    sufficient for scoring. Thresholds unchanged (>50 = import).
 
     Layers:
         Base keywords:       0-60  (rate, schedule, tariff, etc.)
@@ -387,83 +392,31 @@ def score_url_relevance(
     return max(0, min(100, score))
 
 
-def score_with_llm_fallback(
-    url: str, title: str, snippet: str,
-    utility_name: str, state: str,
-    city: str = "",
-) -> int:
-    """Keyword score first. Haiku for anything in the ambiguous zone (15-60)."""
-    keyword_score = score_url_relevance(
-        url, title, snippet, utility_name, city, state
-    )
-
-    if keyword_score > 60 or keyword_score < 15:
-        return keyword_score  # confident high or clearly irrelevant
-
-    # Ambiguous — ask Haiku
-    try:
-        from anthropic import Anthropic
-        client = Anthropic()
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=100,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Score this URL's relevance as a water utility rate page (0-100).\n"
-                    f"Utility: {utility_name}, {state}\n"
-                    f"URL: {url}\n"
-                    f"Title: {title}\n"
-                    f"Snippet: {snippet}\n\n"
-                    f"Respond with ONLY a number 0-100."
-                ),
-            }],
-        )
-        return int(response.content[0].text.strip())
-    except Exception:
-        return keyword_score  # fallback to keyword on any error
-
-
-# --- SearXNG Search ---
-
-def _searxng_search(query: str, max_results: int = 10) -> list[dict]:
-    """Run a SearXNG search and return results.
-
-    Uses the searxng_url from config/agent_config.yaml (discovery section).
-    Defaults to http://localhost:8889/search (VPS via SSH tunnel).
-    """
-    import requests
-
-    searxng_url = _DISCOVERY_CONFIG.get("searxng_url", "http://localhost:8889/search")
-    timeout = 15
-
-    try:
-        r = requests.get(
-            searxng_url,
-            params={"q": query, "format": "json", "categories": "general"},
-            timeout=timeout,
-        )
-        r.raise_for_status()
-        data = r.json()
-        results = data.get("results", [])[:max_results]
-        return [{"url": r.get("url", ""), "title": r.get("title", ""),
-                 "snippet": r.get("content", "")} for r in results]
-    except Exception as e:
-        logger.debug(f"SearXNG search failed for '{query}': {e}")
-        return []
-
-
 class DiscoveryAgent(BaseAgent):
-    """Discovers water rate page URLs for PWSIDs."""
+    """Discovers water rate page URLs for PWSIDs.
+
+    Sprint 24: Uses Serper.dev (Google Search API) instead of SearXNG.
+    Writes top 3 candidates with discovery_rank tagging. No LLM scoring.
+    """
 
     agent_name = "discovery"
+
+    def __init__(self):
+        """Initialize with Serper client (lazy — created on first search)."""
+        self._serper_client = None
+
+    def _get_serper_client(self):
+        """Lazy-init the Serper client (avoids import errors when key is missing)."""
+        if self._serper_client is None:
+            from utility_api.search.serper_client import SerperSearchClient
+            self._serper_client = SerperSearchClient()
+        return self._serper_client
 
     def run(
         self,
         pwsid: str,
         utility_name: str | None = None,
         state: str | None = None,
-        use_llm: bool = True,
         search_delay: float | None = None,
         **kwargs,
     ) -> dict:
@@ -477,18 +430,16 @@ class DiscoveryAgent(BaseAgent):
             Utility name (looked up from SDWIS if not provided).
         state : str, optional
             State code (derived from PWSID if not provided).
-        use_llm : bool
-            Whether to use Haiku for ambiguous URL scoring.
         search_delay : float, optional
-            Seconds between search queries. Defaults to config value (8s).
+            Seconds between search queries. Defaults to config value (0.2s).
 
         Returns
         -------
         dict
-            pwsid, urls_found, urls_written.
+            pwsid, urls_found, urls_written, top_candidates, queries_sent.
         """
         if search_delay is None:
-            search_delay = _DISCOVERY_CONFIG.get("delay_between_queries", 8.0)
+            search_delay = _DISCOVERY_CONFIG.get("inter_query_delay", 0.2)
         schema = settings.utility_schema
 
         # Fetch full metadata from SDWIS + CWS
@@ -498,7 +449,7 @@ class DiscoveryAgent(BaseAgent):
         county = meta.get("county")
         owner_type = meta.get("owner_type")
 
-        # Sprint 16: domain_guess_only flag skips SearXNG entirely
+        # Sprint 16: domain_guess_only flag skips search entirely
         domain_guess_only = kwargs.get("domain_guess_only", False)
         # Sprint 22: skip_domain_guess flag — domain guesser is a separate pipeline
         skip_domain_guess = kwargs.get("skip_domain_guess", False)
@@ -560,7 +511,7 @@ class DiscoveryAgent(BaseAgent):
                 "method": "domain_guess_only",
             }
 
-        # Build and run search queries (SearXNG)
+        # Build and run search queries (Serper)
         queries = build_search_queries(utility_name, state, county, owner_type)
         all_candidates = []
         seen_urls = set()
@@ -568,8 +519,15 @@ class DiscoveryAgent(BaseAgent):
         city = meta.get("city") or ""
         diagnostic = kwargs.get("diagnostic", False)
 
+        client = self._get_serper_client()
+
         for query in queries:
-            results = _searxng_search(query)
+            try:
+                results = client.search(query, num_results=10, pwsid=pwsid)
+            except Exception as e:
+                logger.warning(f"  Serper search failed for '{query}': {e}")
+                results = []
+
             raw_result_count += len(results)
             for r in results:
                 url = r["url"]
@@ -577,16 +535,10 @@ class DiscoveryAgent(BaseAgent):
                     continue
                 seen_urls.add(url)
 
-                if use_llm:
-                    score = score_with_llm_fallback(
-                        url, r["title"], r["snippet"],
-                        utility_name, state, city,
-                    )
-                else:
-                    score = score_url_relevance(
-                        url, r["title"], r["snippet"],
-                        utility_name, city, state,
-                    )
+                score = score_url_relevance(
+                    url, r["title"], r["snippet"],
+                    utility_name, city, state,
+                )
 
                 all_candidates.append({
                     "url": url,
@@ -604,9 +556,9 @@ class DiscoveryAgent(BaseAgent):
         near_misses = [c for c in all_candidates if 15 <= c["score"] <= 50]
         below_threshold = [c for c in all_candidates if c["score"] < 15]
 
-        # Sprint 22: Take up to 3 URLs above threshold (was 1 in Sprint 21).
-        # Candidates are already scored and in memory — no extra queries needed.
-        top_candidates = above_threshold[:3]
+        # Take up to 3 URLs above threshold with rank tagging
+        urls_per = _DISCOVERY_CONFIG.get("urls_per_pwsid", 3)
+        top_candidates = above_threshold[:urls_per]
 
         logger.info(
             f"  Funnel: {raw_result_count} raw → {len(seen_urls)} deduped → "
@@ -622,19 +574,21 @@ class DiscoveryAgent(BaseAgent):
                     f"{nm['title'][:50]} → {nm['url'][:60]}"
                 )
 
-        # Write to scrape_registry
+        # Write to scrape_registry with rank tagging
         urls_written = 0
         if top_candidates:
             with engine.connect() as conn:
-                for c in top_candidates:
+                for rank_idx, c in enumerate(top_candidates, start=1):
                     content_type = "pdf" if c["url"].lower().endswith(".pdf") else "html"
                     result = conn.execute(text(f"""
                         INSERT INTO {schema}.scrape_registry
                             (pwsid, url, url_source, discovery_query,
-                             content_type, status, discovery_score)
+                             content_type, status, discovery_score,
+                             discovery_rank)
                         VALUES
-                            (:pwsid, :url, 'searxng', :query,
-                             :ctype, 'pending', :score)
+                            (:pwsid, :url, 'serper', :query,
+                             :ctype, 'pending', :score,
+                             :rank)
                         ON CONFLICT (pwsid, url) DO NOTHING
                     """), {
                         "pwsid": pwsid,
@@ -642,13 +596,14 @@ class DiscoveryAgent(BaseAgent):
                         "query": c["query"],
                         "ctype": content_type,
                         "score": c["score"],
+                        "rank": rank_idx,
                     })
                     if result.rowcount > 0:
                         urls_written += 1
-                        logger.info(f"  → [{c['score']}] {c['url'][:80]}")
+                        logger.info(f"  → [rank={rank_idx} score={c['score']}] {c['url'][:80]}")
 
-                # Sprint 22: Update searxng_status independently of scrape_status.
-                # scrape_status tracks domain guesser; searxng_status tracks SearXNG.
+                # Update searxng_status (column name retained for compatibility;
+                # tracks "has been searched via any search engine")
                 if urls_written > 0:
                     conn.execute(text(f"""
                         UPDATE {schema}.pwsid_coverage
@@ -667,13 +622,14 @@ class DiscoveryAgent(BaseAgent):
                 """), {"pwsid": pwsid})
                 conn.commit()
 
-        # Fix 2: Always mark search attempted (prevents infinite re-queuing)
+        # Always mark search attempted (prevents infinite re-queuing)
         self._mark_searched(pwsid, schema)
 
-        # Fix 10: Log full scoring funnel to search_log
+        # Log full scoring funnel to search_log with ranked URLs
         self._log_search(
             pwsid=pwsid,
             schema=schema,
+            search_engine="serper",
             queries_run=len(queries),
             raw_results_count=raw_result_count,
             deduped_count=len(seen_urls),
@@ -683,9 +639,10 @@ class DiscoveryAgent(BaseAgent):
             written_count=urls_written,
             best_score=top_candidates[0]["score"] if top_candidates else 0,
             best_url=top_candidates[0]["url"] if top_candidates else None,
+            top_candidates=top_candidates,
         )
 
-        # Fix 3: Log to pipeline_runs for visibility
+        # Log to pipeline_runs for visibility
         self.log_run(
             status="success" if urls_written > 0 else "no_results",
             rows_affected=urls_written,
@@ -726,6 +683,7 @@ class DiscoveryAgent(BaseAgent):
     def _log_search(
         pwsid: str,
         schema: str,
+        search_engine: str,
         queries_run: int,
         raw_results_count: int,
         deduped_count: int,
@@ -735,22 +693,45 @@ class DiscoveryAgent(BaseAgent):
         written_count: int,
         best_score: float,
         best_url: str | None,
+        top_candidates: list[dict] | None = None,
     ) -> None:
-        """Log the full scoring funnel to search_log for threshold tuning."""
+        """Log the full scoring funnel to search_log with ranked URL tracking.
+
+        Sprint 24: Added search_engine, url_rank_1/2/3, score_rank_1/2/3
+        for per-rank parse success analysis.
+        """
+        # Extract ranked URLs for the search_log row
+        candidates = top_candidates or []
+        rank_data = {}
+        for i in range(1, 4):
+            if i <= len(candidates):
+                rank_data[f"url_rank_{i}"] = candidates[i - 1]["url"]
+                rank_data[f"score_rank_{i}"] = candidates[i - 1]["score"]
+            else:
+                rank_data[f"url_rank_{i}"] = None
+                rank_data[f"score_rank_{i}"] = None
+
         try:
             with engine.connect() as conn:
                 conn.execute(text(f"""
                     INSERT INTO {schema}.search_log
-                        (pwsid, queries_run, raw_results_count, deduped_count,
-                         above_threshold_count, near_miss_count,
+                        (pwsid, search_engine, queries_run, raw_results_count,
+                         deduped_count, above_threshold_count, near_miss_count,
                          below_threshold_count, written_count,
-                         best_score, best_url)
+                         best_score, best_url,
+                         url_rank_1, score_rank_1,
+                         url_rank_2, score_rank_2,
+                         url_rank_3, score_rank_3)
                     VALUES
-                        (:pwsid, :queries, :raw, :dedup,
+                        (:pwsid, :engine, :queries, :raw, :dedup,
                          :above, :near, :below, :written,
-                         :score, :url)
+                         :score, :url,
+                         :url_rank_1, :score_rank_1,
+                         :url_rank_2, :score_rank_2,
+                         :url_rank_3, :score_rank_3)
                 """), {
                     "pwsid": pwsid,
+                    "engine": search_engine,
                     "queries": queries_run,
                     "raw": raw_results_count,
                     "dedup": deduped_count,
@@ -760,6 +741,7 @@ class DiscoveryAgent(BaseAgent):
                     "written": written_count,
                     "score": best_score,
                     "url": best_url,
+                    **rank_data,
                 })
                 conn.commit()
         except Exception as e:

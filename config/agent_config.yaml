@@ -30,16 +30,16 @@ scrape:
   deep_crawl_max_depth: 3
 
 discovery:
-  # SearXNG instance URL — VPS via SSH tunnel or direct
-  # Desktop IP is burned; always use VPS SearXNG for discovery
-  searxng_url: "http://localhost:8889/search"
-  # Seconds between individual SearXNG queries (within one utility)
-  delay_between_queries: 8
-  # Seconds between utilities (between PWSID discovery runs)
-  delay_between_utilities: 15
-  # Max utilities per orchestrator discovery cycle
-  max_utilities_per_session: 10
-  # Hard cap on total SearXNG queries per session
-  # Sprint 22: was 60, but at ~9 queries/PWSID the budget ran out at 6-7 PWSIDs.
-  # 100 = 10 utilities × ~7 queries + buffer.
-  total_query_budget: 100
+  # Sprint 24: Serper.dev replaces SearXNG as the search backend.
+  # Serper API key is in .env (SERPER_API_KEY). Never commit the key.
+  search_backend: serper               # serper (active) | searxng (removed Sprint 24)
+  queries_per_pwsid: 4                 # optimized for Google quality (was 7 for SearXNG)
+  inter_query_delay: 0.2               # seconds between Serper queries (was 8 for SearXNG)
+  delay_between_utilities: 2           # seconds between PWSIDs (was 15 for SearXNG)
+  max_utilities_per_session: 100       # Serper can handle much higher throughput
+  max_queries_per_run: 2500            # matches free tier cap
+  url_score_threshold: 50              # minimum score to import to scrape_registry
+  urls_per_pwsid: 3                    # top 3 with rank tagging (evaluate rank 2-3 value)
+  gap_state_threshold_pct: 20          # states below this % coverage are targeted
+  min_population: 3000                 # skip tiny systems
+  search_cooldown_days: 30             # don't re-search within this window

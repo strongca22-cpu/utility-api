@@ -29,6 +29,8 @@ Usage:
     ua-ops build-best-estimate --dry-run  # Preview
 """
 
+from pathlib import Path
+
 import typer
 from loguru import logger
 from sqlalchemy import text
@@ -724,6 +726,141 @@ def pipeline_health():
         typer.echo("\n" + "=" * 65)
 
 
+@app.command("serper-status")
+def serper_status():
+    """Serper.dev usage, budget, and discovery results.
+
+    Shows query usage (total, today, this week), estimated cost,
+    free-tier budget remaining, and breakdown of Serper-discovered
+    URLs by parse result and rank position.
+
+    Sprint 24: Added for Serper integration monitoring.
+    """
+    from utility_api.config import settings
+    from utility_api.db import engine
+
+    schema = settings.utility_schema
+
+    with engine.connect() as conn:
+        typer.echo("\nSerper.dev Discovery Status")
+        typer.echo("=" * 60)
+
+        # --- Query Usage ---
+        typer.echo("\n── Query Usage ──")
+        try:
+            usage = conn.execute(text(f"""
+                SELECT
+                    count(*) as total,
+                    count(*) FILTER (WHERE queried_at > CURRENT_DATE) as today,
+                    count(*) FILTER (
+                        WHERE queried_at > CURRENT_DATE - INTERVAL '7 days'
+                    ) as week
+                FROM {schema}.search_queries
+                WHERE search_engine = 'serper'
+            """)).fetchone()
+            total = usage.total or 0
+            free_remaining = max(0, 2500 - total)
+            typer.echo(f"  Total queries:       {total:>6,}")
+            typer.echo(f"  Today:               {usage.today or 0:>6,}")
+            typer.echo(f"  This week:           {usage.week or 0:>6,}")
+            typer.echo(f"  Estimated cost:      ${total / 1000:>.2f}")
+            typer.echo(f"  Free tier remaining: {free_remaining:>6,} / 2,500")
+        except Exception as e:
+            typer.echo(f"  (search_queries not available: {e})")
+
+        # --- Discovery Results ---
+        typer.echo("\n── Serper Discovery Results ──")
+        try:
+            results = conn.execute(text(f"""
+                SELECT
+                    count(*) as total_urls,
+                    count(*) FILTER (
+                        WHERE last_parse_result = 'success'
+                    ) as parsed_success,
+                    count(*) FILTER (
+                        WHERE last_parse_result = 'failed'
+                    ) as parsed_failed,
+                    count(*) FILTER (
+                        WHERE last_parse_result IS NULL
+                    ) as pending_parse,
+                    count(*) FILTER (
+                        WHERE COALESCE(url_quality, 'unknown') = 'blacklisted'
+                    ) as blacklisted
+                FROM {schema}.scrape_registry
+                WHERE url_source = 'serper'
+            """)).fetchone()
+            typer.echo(f"  URLs found:          {results.total_urls:>6,}")
+            typer.echo(f"  Parsed success:      {results.parsed_success:>6,}")
+            typer.echo(f"  Parsed failed:       {results.parsed_failed:>6,}")
+            typer.echo(f"  Pending parse:       {results.pending_parse:>6,}")
+            typer.echo(f"  Blacklisted:         {results.blacklisted:>6,}")
+        except Exception as e:
+            typer.echo(f"  (scrape_registry query failed: {e})")
+
+        # --- Parse Success by Rank ---
+        typer.echo("\n── Parse Success by Discovery Rank ──")
+        try:
+            rank_rows = conn.execute(text(f"""
+                SELECT
+                    discovery_rank,
+                    count(*) as total,
+                    count(*) FILTER (
+                        WHERE last_parse_result = 'success'
+                    ) as success,
+                    round(100.0 * count(*) FILTER (
+                        WHERE last_parse_result = 'success'
+                    ) / NULLIF(count(*) FILTER (
+                        WHERE last_parse_result IS NOT NULL
+                    ), 0), 1) as success_pct
+                FROM {schema}.scrape_registry
+                WHERE url_source = 'serper'
+                  AND discovery_rank IS NOT NULL
+                GROUP BY discovery_rank
+                ORDER BY discovery_rank
+            """)).fetchall()
+            if rank_rows:
+                typer.echo(f"  {'Rank':>6s} {'Total':>8s} {'Success':>9s} {'Rate':>8s}")
+                typer.echo(f"  {'─'*6} {'─'*8} {'─'*9} {'─'*8}")
+                for r in rank_rows:
+                    pct = f"{r.success_pct:.1f}%" if r.success_pct is not None else "N/A"
+                    typer.echo(
+                        f"  {r.discovery_rank:>6d} {r.total:>8,} "
+                        f"{r.success:>9,} {pct:>8s}"
+                    )
+            else:
+                typer.echo("  No ranked discovery data yet.")
+        except Exception as e:
+            typer.echo(f"  (rank query failed: {e})")
+
+        # --- Search Funnel Summary ---
+        typer.echo("\n── Search Funnel (Serper runs) ──")
+        try:
+            funnel = conn.execute(text(f"""
+                SELECT
+                    count(*) as pwsids_searched,
+                    round(avg(raw_results_count), 1) as avg_raw,
+                    round(avg(deduped_count), 1) as avg_dedup,
+                    round(avg(above_threshold_count), 1) as avg_above,
+                    count(*) FILTER (WHERE written_count > 0) as with_urls,
+                    count(*) FILTER (WHERE written_count = 0) as no_urls
+                FROM {schema}.search_log
+                WHERE search_engine = 'serper'
+            """)).fetchone()
+            typer.echo(f"  PWSIDs searched:     {funnel.pwsids_searched:>6,}")
+            typer.echo(f"  With URLs (>50):     {funnel.with_urls:>6,}")
+            typer.echo(f"  No URLs found:       {funnel.no_urls:>6,}")
+            if funnel.pwsids_searched:
+                hit_rate = 100 * funnel.with_urls / funnel.pwsids_searched
+                typer.echo(f"  Hit rate:            {hit_rate:>5.1f}%")
+            typer.echo(f"  Avg raw results:     {funnel.avg_raw or 0:>6}")
+            typer.echo(f"  Avg deduped:         {funnel.avg_dedup or 0:>6}")
+            typer.echo(f"  Avg above threshold: {funnel.avg_above or 0:>6}")
+        except Exception as e:
+            typer.echo(f"  (search_log query failed: {e})")
+
+        typer.echo("\n" + "=" * 60)
+
+
 @app.command("batch-status")
 def batch_status(
     batch_id: str = typer.Argument(None, help="Specific batch ID to check (default: all pending)"),
@@ -1363,6 +1500,54 @@ def process_backlog(
             conn.commit()
     except Exception as e:
         logger.debug(f"Pipeline run log failed: {e}")
+
+
+@app.command("serper-discover")
+def serper_discover(
+    scope: str = typer.Option("gap_states", help="gap_states | all_uncovered | specific_state"),
+    state: str = typer.Option(None, help="Two-letter state code"),
+    pop_min: int = typer.Option(3000, help="Minimum population served"),
+    max_pwsids: int = typer.Option(None, help="Hard cap on PWSIDs to search"),
+    max_queries: int = typer.Option(2400, help="Hard cap on Serper queries"),
+    delay: float = typer.Option(0.2, help="Seconds between queries"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview only, no API calls"),
+    usage: bool = typer.Option(False, "--usage", help="Show usage stats and exit"),
+    diagnostic: bool = typer.Option(False, help="Log near-miss URLs"),
+):
+    """Run Serper.dev bulk URL discovery for gap-state PWSIDs.
+
+    Sprint 24: Replaces SearXNG discovery. Uses Google Search API via
+    Serper.dev for fast, high-quality URL discovery. Budget-guarded
+    for free tier (2,500 queries).
+
+    Examples:
+        ua-ops serper-discover --usage
+        ua-ops serper-discover --max-pwsids 625 --dry-run
+        ua-ops serper-discover --max-pwsids 25
+        ua-ops serper-discover --state NY --pop-min 5000
+    """
+    import subprocess
+    import sys
+
+    # Build command for the standalone script
+    cmd = [sys.executable, "scripts/serper_bulk_discovery.py"]
+    cmd.extend(["--scope", scope])
+    if state:
+        cmd.extend(["--state", state])
+    cmd.extend(["--pop-min", str(pop_min)])
+    if max_pwsids is not None:
+        cmd.extend(["--max-pwsids", str(max_pwsids)])
+    cmd.extend(["--max-queries", str(max_queries)])
+    cmd.extend(["--delay", str(delay)])
+    if dry_run:
+        cmd.append("--dry-run")
+    if usage:
+        cmd.append("--usage")
+    if diagnostic:
+        cmd.append("--diagnostic")
+
+    result = subprocess.run(cmd, cwd=str(Path(__file__).parents[3]))
+    raise typer.Exit(result.returncode)
 
 
 if __name__ == "__main__":

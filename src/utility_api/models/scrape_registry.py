@@ -135,6 +135,16 @@ class ScrapeRegistry(Base):
         comment="Free text — why it failed, what was tried",
     )
 
+    # Discovery metadata (Sprint 24)
+    discovery_rank: Mapped[int | None] = mapped_column(
+        Integer,
+        comment="Rank position from search discovery (1=best, 2, 3)",
+    )
+    discovery_score: Mapped[float | None] = mapped_column(
+        Float,
+        comment="URL relevance score from search discovery (0-100)",
+    )
+
     # Timestamps
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
