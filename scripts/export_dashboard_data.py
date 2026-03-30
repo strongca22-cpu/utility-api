@@ -187,8 +187,14 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
 
         has_reference_only = bool(row.has_reference_only)
         # Duke-only PWSIDs are reference, not commercial rate data
+        # Guard against NaN (float) values that pass "is not None" check
+        import math
+        _bill10 = row.bill_10ccf
+        _bill10est = row.bill_estimate_10ccf
+        _bill10_valid = _bill10 is not None and not (isinstance(_bill10, float) and math.isnan(_bill10))
+        _bill10est_valid = _bill10est is not None and not (isinstance(_bill10est, float) and math.isnan(_bill10est))
         has_rate_data = (
-            (row.bill_10ccf is not None or row.bill_estimate_10ccf is not None)
+            (_bill10_valid or _bill10est_valid)
             and not has_reference_only
         )
 
