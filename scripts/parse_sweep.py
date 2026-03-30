@@ -102,6 +102,11 @@ def persist_scraped_text(registry_id: int, raw_text: str) -> None:
     """Write scraped text to scrape_registry for future use."""
     import hashlib
 
+    # Skip binary content (docx/xlsx/zip with null bytes)
+    if "\x00" in raw_text:
+        logger.debug(f"  Skipping text persistence (binary content)")
+        return
+
     with engine.connect() as conn:
         conn.execute(text(f"""
             UPDATE {schema}.scrape_registry SET

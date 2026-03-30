@@ -168,6 +168,12 @@ class ScrapeAgent(BaseAgent):
             )
             char_count = len(scrape_result.text) if scrape_result.text else 0
 
+            # Only persist text if it's valid UTF-8 (skip binary docx/xlsx/zip)
+            persistable_text = scrape_result.text
+            if persistable_text and "\x00" in persistable_text:
+                logger.debug(f"  Skipping text persistence (binary content)")
+                persistable_text = None
+
             with engine.connect() as conn:
                 conn.execute(text(f"""
                     UPDATE {schema}.scrape_registry SET
@@ -185,7 +191,7 @@ class ScrapeAgent(BaseAgent):
                     "status": getattr(scrape_result, "status_code", 200),
                     "hash": content_hash,
                     "length": char_count,
-                    "scraped_text": scrape_result.text,
+                    "scraped_text": persistable_text,
                     "id": row.id,
                 })
                 conn.commit()
