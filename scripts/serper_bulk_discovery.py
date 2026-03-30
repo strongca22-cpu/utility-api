@@ -13,7 +13,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-29
-Modified: 2026-03-29
+Modified: 2026-03-30
 
 Dependencies:
     - utility_api (installed in dev mode)
@@ -40,6 +40,12 @@ Usage:
     tmux new-session -d -s serper_sweep \
         "python3 scripts/serper_bulk_discovery.py --max-pwsids 625 2>&1 | tee logs/serper_sweep.log"
 
+    # Discover + cascade process immediately (best for diagnostics):
+    python scripts/serper_bulk_discovery.py --max-pwsids 150 --process immediate
+
+    # Discover all, then batch cascade process:
+    python scripts/serper_bulk_discovery.py --max-pwsids 625 --process batch
+
 Notes:
     - Budget guard: refuses to exceed 2,500 queries unless SERPER_PAID_MODE=true
     - Each PWSID uses 4 Serper queries (optimized for Google quality)
@@ -47,6 +53,8 @@ Notes:
     - search_queries table logs every API call (billing audit trail)
     - search_log table logs per-PWSID funnel summary with ranked URLs
     - Run --dry-run FIRST to preview before committing API budget
+    - --process immediate: cascade each PWSID right after discovery (streaming results)
+    - --process batch: discover all, then cascade all (faster discovery phase)
 
 Data Sources:
     - Input: utility.pwsid_coverage + utility.sdwis_systems (gap states, pop >= min)
@@ -277,7 +285,18 @@ def run_bulk_discovery(args):
         "urls_written": 0,
         "no_results": 0,
         "errors": 0,
+        # Cascade processing (only used when --process)
+        "cascade_processed": 0,
+        "cascade_succeeded": 0,
+        "cascade_failed": 0,
+        "cascade_errors": 0,
+        "deep_crawl_children_total": 0,
     }
+    states_with_new_data: set[str] = set()
+    discovered_pwsids: list[dict] = []  # PWSIDs that got URLs, for batch mode
+
+    if args.process:
+        from utility_api.pipeline.process import process_pwsid
 
     delay_between = args.delay_between
 
@@ -298,8 +317,30 @@ def run_bulk_discovery(args):
             stats["urls_written"] += result["urls_written"]
             if result["urls_written"] > 0:
                 stats["urls_found"] += 1
+                discovered_pwsids.append(pwsid_meta)
             else:
                 stats["no_results"] += 1
+
+            # Immediate mode: cascade process right after discovery
+            if args.process == "immediate" and result["urls_written"] > 0:
+                try:
+                    cascade_result = process_pwsid(
+                        pwsid=pwsid,
+                        skip_best_estimate=True,
+                    )
+                    stats["cascade_processed"] += 1
+                    stats["deep_crawl_children_total"] += cascade_result.get(
+                        "deep_crawl_children", 0
+                    )
+                    if cascade_result["parse_success"]:
+                        stats["cascade_succeeded"] += 1
+                        states_with_new_data.add(pwsid_meta["state_code"])
+                    else:
+                        stats["cascade_failed"] += 1
+                except Exception as e:
+                    logger.error(f"  {pwsid} cascade error: {e}")
+                    stats["cascade_errors"] += 1
+                    stats["cascade_processed"] += 1
 
         except Exception as e:
             logger.error(f"  {pwsid} error: {e}")
@@ -310,10 +351,17 @@ def run_bulk_discovery(args):
         if stats["searched"] % 25 == 0:
             try:
                 current_usage = client.usage
+                cascade_msg = ""
+                if args.process == "immediate" and stats["cascade_processed"] > 0:
+                    cascade_msg = (
+                        f", cascade {stats['cascade_succeeded']}/"
+                        f"{stats['cascade_processed']} succeeded"
+                    )
                 logger.info(
                     f"  Progress: {stats['searched']}/{len(pwsids)} searched, "
                     f"{stats['urls_found']} with URLs, "
                     f"{current_usage['queries_total']:,} total Serper queries"
+                    f"{cascade_msg}"
                 )
             except Exception:
                 logger.info(
@@ -325,7 +373,56 @@ def run_bulk_discovery(args):
         if delay_between > 0:
             time.sleep(delay_between)
 
-    # 7. Summary
+    # 7. Batch cascade processing (if --process batch)
+    if args.process == "batch" and discovered_pwsids:
+        logger.info(f"\n{'='*60}")
+        logger.info(
+            f"Batch Cascade Processing: {len(discovered_pwsids)} PWSIDs"
+        )
+        logger.info(f"{'='*60}")
+
+        for pwsid_meta in discovered_pwsids:
+            pwsid = pwsid_meta["pwsid"]
+            try:
+                cascade_result = process_pwsid(
+                    pwsid=pwsid,
+                    skip_best_estimate=True,
+                )
+                stats["cascade_processed"] += 1
+                stats["deep_crawl_children_total"] += cascade_result.get(
+                    "deep_crawl_children", 0
+                )
+                if cascade_result["parse_success"]:
+                    stats["cascade_succeeded"] += 1
+                    states_with_new_data.add(pwsid_meta["state_code"])
+                else:
+                    stats["cascade_failed"] += 1
+            except Exception as e:
+                logger.error(f"  {pwsid} cascade error: {e}")
+                stats["cascade_errors"] += 1
+                stats["cascade_processed"] += 1
+
+            # Progress logging every 10 PWSIDs (cascade is slower)
+            if stats["cascade_processed"] % 10 == 0:
+                logger.info(
+                    f"  Cascade progress: "
+                    f"{stats['cascade_processed']}/{len(discovered_pwsids)}, "
+                    f"{stats['cascade_succeeded']} succeeded, "
+                    f"{stats['cascade_failed']} failed"
+                )
+
+    # 8. BestEstimate for affected states
+    if args.process and states_with_new_data:
+        logger.info(f"\nRebuilding best_estimate for {len(states_with_new_data)} states...")
+        from utility_api.agents.best_estimate import BestEstimateAgent
+        for st in sorted(states_with_new_data):
+            try:
+                logger.info(f"  BestEstimate: {st}")
+                BestEstimateAgent().run(state=st)
+            except Exception as e:
+                logger.error(f"  BestEstimate failed for {st}: {e}")
+
+    # 9. Summary
     logger.info(f"\n{'='*60}")
     logger.info(f"Serper Bulk Discovery Complete")
     logger.info(f"{'='*60}")
@@ -343,9 +440,30 @@ def run_bulk_discovery(args):
     except Exception:
         pass
 
-    logger.info(f"\nNext steps:")
-    logger.info(f"  ua-ops serper-status              # Check results")
-    logger.info(f"  ua-ops process-backlog --max 50   # Parse discovered URLs")
+    if args.process:
+        logger.info(f"\n  --- Cascade Processing ({args.process} mode) ---")
+        logger.info(f"  Processed:        {stats['cascade_processed']}")
+        logger.info(f"  Parse succeeded:  {stats['cascade_succeeded']}")
+        logger.info(f"  Parse failed:     {stats['cascade_failed']}")
+        logger.info(f"  Cascade errors:   {stats['cascade_errors']}")
+        if stats["cascade_processed"] > 0:
+            rate = 100 * stats["cascade_succeeded"] / stats["cascade_processed"]
+            logger.info(f"  Success rate:     {rate:.0f}%")
+        logger.info(f"  Deep crawl URLs:  {stats['deep_crawl_children_total']}")
+        if states_with_new_data:
+            logger.info(
+                f"  BestEstimate rebuilt for: "
+                f"{', '.join(sorted(states_with_new_data))}"
+            )
+        logger.info(f"\nDiagnostics query:")
+        logger.info(f"  SELECT pwsid, parse_success, winning_rank, winning_source,")
+        logger.info(f"         deep_crawl_children, total_candidates")
+        logger.info(f"  FROM utility.discovery_diagnostics")
+        logger.info(f"  ORDER BY run_at DESC LIMIT {stats['cascade_processed']};")
+    else:
+        logger.info(f"\nNext steps:")
+        logger.info(f"  ua-ops serper-status              # Check results")
+        logger.info(f"  ua-ops process-backlog --max 50   # Parse discovered URLs")
 
 
 def main():
@@ -361,6 +479,9 @@ Examples:
   %(prog)s --max-pwsids 625                  # Full free-tier sweep
   %(prog)s --state NY --pop-min 5000         # Specific state
   %(prog)s --scope all_uncovered --pop-min 10000 --max-queries 5000
+  %(prog)s --max-pwsids 150 --process immediate   # Discover + cascade, one at a time
+  %(prog)s --max-pwsids 625 --process              # Discover all, then batch cascade
+  %(prog)s --max-pwsids 625 --process batch        # Same as above (explicit)
         """,
     )
 
@@ -426,6 +547,16 @@ Examples:
         "--diagnostic",
         action="store_true",
         help="Log near-miss URLs for threshold tuning",
+    )
+    parser.add_argument(
+        "--process",
+        nargs="?",
+        const="batch",
+        default=None,
+        choices=["immediate", "batch"],
+        help="Run cascade processing after discovery. "
+             "'immediate' = process each PWSID right after discovery; "
+             "'batch' (default) = discover all first, then process all.",
     )
 
     args = parser.parse_args()
