@@ -10,7 +10,7 @@
 #   > low-confidence scraping. Within government sources, newer vintage wins.
 #
 # Created: 2026-03-24
-# Modified: 2026-03-24
+# Modified: 2026-03-30
 
 # Default source priority (applies to all states unless overridden)
 # Each entry maps a source key (or pattern) to a base priority number.
@@ -44,8 +44,38 @@ default:
       confidence: medium
       notes: "Water-only, curated YAML, but often 5-8 years old."
 
-  # Fallback: any source not in the list gets this priority
-  fallback_priority: 99
+    # Reference datasets — aggregate/static, no rate structure detail.
+    # Always deprioritized vs LLM scrape (which has tiers, fixed charges,
+    # rate structures) and government bulk (official). As LLM scrape scales,
+    # these serve as fallback-only for PWSIDs with no better source.
+    - source: "duke_nieps_10state"
+      priority: 8
+      confidence: low
+      notes: "Academic reference. Aggregate bills only, no rate structure. Deprioritize when any alt source exists."
+    - source: "tx_tml_2023"
+      priority: 8
+      confidence: medium
+      notes: "Texas Municipal League survey. Good data but static snapshot, no rate tiers."
+    - source: "ky_psc_water_tariffs_2025"
+      priority: 8
+      confidence: medium
+      notes: "Kentucky PSC tariff filings. Structured but limited to KY."
+
+  # Fallback: any source not in the list gets this priority.
+  # EFC state sources (efc_ar_2020, efc_wi_2016, etc.) and state-specific
+  # bulk sources (wv_psc_2026, nm_nmed_2025, in_iurc_2024, etc.) all hit
+  # this. They are government/survey data and should beat reference datasets.
+  fallback_priority: 5
+
+  # Pattern-based priority overrides for sources not listed above.
+  # Checked in order; first match wins. Falls back to fallback_priority.
+  source_patterns:
+    - pattern: "efc_"
+      priority: 2
+      notes: "EFC state surveys — government bulk data, high trust"
+    - pattern: "swrcb_"
+      priority: 2
+      notes: "SWRCB surveys — CA government data"
 
 # State-specific overrides
 CA:

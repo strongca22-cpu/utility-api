@@ -82,6 +82,42 @@ def get_source_base_priority(config: dict) -> dict[str, int]:
     return priorities
 
 
+def resolve_source_priority(
+    source: str,
+    base_priorities: dict[str, int],
+    config: dict,
+) -> int:
+    """Resolve priority for a source, including pattern-based fallbacks.
+
+    Parameters
+    ----------
+    source : str
+        The source_key to look up.
+    base_priorities : dict
+        Exact-match priority mapping from get_source_base_priority().
+    config : dict
+        Full config (for pattern overrides and fallback_priority).
+
+    Returns
+    -------
+    int
+        Priority number (lower = higher priority).
+    """
+    # 1. Exact match
+    if source in base_priorities:
+        return base_priorities[source]
+
+    # 2. Pattern-based overrides
+    defaults = config.get("default", {})
+    for pattern_entry in defaults.get("source_patterns", []):
+        pattern = pattern_entry.get("pattern", "")
+        if pattern and source.startswith(pattern):
+            return pattern_entry["priority"]
+
+    # 3. Fallback
+    return defaults.get("fallback_priority", 99)
+
+
 # --- Bill Extraction ---
 
 def get_comparable_bill(row: pd.Series) -> float | None:
@@ -169,7 +205,7 @@ def select_best_estimate(group: pd.DataFrame, config: dict, base_priorities: dic
 
         source = r["source"]
         confidence = r["parse_confidence"] or "medium"
-        base_priority = base_priorities.get(source, fallback_priority)
+        base_priority = resolve_source_priority(source, base_priorities, config)
 
         notes = []
 
