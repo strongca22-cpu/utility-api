@@ -1231,14 +1231,15 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Validated on 8 failed PWSIDs:** 1/8 succeeded (NYC was false PWSID match — Richmondville Village). Deep crawl found children for 4/8 PWSIDs. Aurora CO: deep_crawl child scored #1 (85) beating all Serper originals.
 
 **Immediate next steps (Sprint 24b):**
-- [ ] Integrate `process_pwsid()` into `serper_bulk_discovery.py` with `--process` flag
-- [ ] Run full free-tier sweep (600 PWSIDs) with cascade processing
-- [ ] Analyze diagnostics: `SELECT winning_source, winning_discovery_rank, count(*) FROM utility.discovery_diagnostics WHERE parse_success GROUP BY 1, 2`
-- [ ] Key questions from diagnostics data:
-  - How often does deep crawl child beat original Serper URL? (Aurora CO shows it happens)
-  - How often does rank #2/#3 win? (NYC shows rank 2 can win)
-  - What % of successes come from rank 1 vs rank 2-3?
-  - Is proactive deep crawl worth the fetch cost?
+- [x] Integrate `process_pwsid()` into `serper_bulk_discovery.py` with `--process` flag
+  - Added `--process [immediate|batch]` — immediate cascades each PWSID after discovery, batch discovers all then cascades
+  - 5-PWSID validation: 100% discovery, 80% cascade parse success
+- [x] 150-PWSID diagnostic run launched: `tmux attach -t serper_diag` to monitor
+  - Command: `python3 scripts/serper_bulk_discovery.py --max-pwsids 150 --process immediate --diagnostic`
+  - Log: `logs/serper_diag_20260330_0000.log`
+- [ ] After diagnostic run completes: analyze diagnostics
+  - `SELECT winning_source, winning_discovery_rank, count(*) FROM utility.discovery_diagnostics WHERE parse_success GROUP BY 1, 2`
+  - Key questions: deep crawl value, rank 2/3 win rate, cascade vs simple parse improvement
 - [ ] Address false PWSID-URL match issue (NYC → Richmondville Village)
 - [ ] Remove SearXNG (deliverable 5): code removal + Docker cleanup
 - [ ] If diagnostics justify: buy Serper paid tier ($50/50K queries) for full gap-state sweep
