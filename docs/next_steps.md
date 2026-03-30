@@ -1237,12 +1237,15 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] 150-PWSID diagnostic run launched: `tmux attach -t serper_diag` to monitor
   - Command: `python3 scripts/serper_bulk_discovery.py --max-pwsids 150 --process immediate --diagnostic`
   - Log: `logs/serper_diag_20260330_0000.log`
-- [ ] After diagnostic run completes: analyze diagnostics
-  - `SELECT winning_source, winning_discovery_rank, count(*) FROM utility.discovery_diagnostics WHERE parse_success GROUP BY 1, 2`
-  - Key questions: deep crawl value, rank 2/3 win rate, cascade vs simple parse improvement
-- [ ] Address false PWSID-URL match issue (NYC → Richmondville Village)
+- [x] 150-PWSID diagnostic complete: 87/150 (58%) cascade parse success, 720 queries ($0.72)
+  - **URL cap:** Keep top 3. Rank 2+3 contributed 43/87 successes (49%)
+  - **Deep crawl:** Switched to reactive. Proactive added 33% fetches for 5% of wins (4/87)
+  - **Cascade:** Keep 3-attempt cascade — rescued 30/87 (34%) that would have failed with single-parse
+  - **CO analysis:** 12/16 failures from overlapping special districts, JS-heavy sites, .colorado.gov blocking. Hard state.
+- [x] Reactive deep crawl implemented in `process_pwsid()` — crawl only if all 3 Serper URLs fail
+- [ ] Address false PWSID-URL match issue (NYC → Richmondville Village, CO special districts)
 - [ ] Remove SearXNG (deliverable 5): code removal + Docker cleanup
-- [ ] If diagnostics justify: buy Serper paid tier ($50/50K queries) for full gap-state sweep
+- [ ] Full gap-state sweep: ~600 PWSIDs with reactive cascade (~1,768 free queries remaining)
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
