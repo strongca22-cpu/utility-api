@@ -3,13 +3,14 @@
 Duke Water Affordability Reference Data Ingest
 
 Purpose:
-    Ingests Duke/Nicholas Institute rate data as INTERNAL REFERENCE ONLY.
-    This data is CC BY-NC-ND 4.0 and CANNOT be redistributed commercially.
+    Ingests Duke/Nicholas Institute water affordability rate data.
+    Licensed CC BY-NC-ND 4.0 — free-tier attributed source.
 
-    Stored in a separate table (duke_reference_rates) that is never
-    exposed through the API or bulk download.
+    Stored in a separate table (duke_reference_rates) for licensing
+    isolation. Has 10CCF bill estimates for ~1,917 PWSIDs across 10 states.
 
     Used for:
+    - Free-tier rate data (10CCF bills) where no higher-priority source exists
     - Validating LLM-parsed rates against manually-collected rates
     - Gap analysis (PWSIDs with Duke data but no commercial source)
     - Coverage benchmarking
@@ -354,7 +355,7 @@ def run_duke_reference_ingest(
     """
     started = datetime.now(timezone.utc)
     logger.info("=== Duke Reference Rate Ingest Starting ===")
-    logger.info("⚠ INTERNAL REFERENCE ONLY — CC BY-NC-ND 4.0 — NOT for commercial use")
+    logger.info("Duke/NIEPS rate ingest — CC BY-NC-ND 4.0 — attribution required")
 
     if all_states:
         target = ALL_STATES
@@ -559,7 +560,7 @@ def run_duke_reference_ingest(
                     f"states={total_stats['states_processed']}, "
                     f"inserted={total_stats['total_inserted']}, "
                     f"skipped_not_in_db={total_stats['total_skipped']}, "
-                    f"license=CC_BY-NC-ND_4.0_INTERNAL_ONLY"
+                    f"license=CC_BY-NC-ND_4.0"
                 ),
             })
             conn.commit()

@@ -147,7 +147,7 @@ class SourceCatalog(Base):
     # Distribution tier
     tier: Mapped[str | None] = mapped_column(
         String(20),
-        comment="free_open | free_attributed | premium | internal_only",
+        comment="free_open | free_attributed | bulk | premium | internal_only",
     )
     tier_rationale: Mapped[str | None] = mapped_column(
         Text, comment="Why this source is assigned to this tier",

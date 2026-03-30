@@ -185,6 +185,7 @@ def select_best_estimate(group: pd.DataFrame, config: dict, base_priorities: dic
             "rate_effective_date": row.get("rate_effective_date"),
             "parse_confidence": row.get("parse_confidence"),
             "state_code": state_code,
+            "source_url": row.get("source_url"),
         })
 
     # Find anchor (if this state has anchor sources configured)
@@ -252,6 +253,7 @@ def select_best_estimate(group: pd.DataFrame, config: dict, base_priorities: dic
             "anchor_bill": anchor_bill,
             "confidence": "none",
             "selection_notes": "no comparable bill from any source",
+            "source_url": None,
         }
 
     # Select best (lowest priority number)
@@ -290,6 +292,7 @@ def select_best_estimate(group: pd.DataFrame, config: dict, base_priorities: dic
         "anchor_bill": anchor_bill,
         "confidence": confidence,
         "selection_notes": best.get("selection_notes", ""),
+        "source_url": best.get("source_url"),
     }
 
 
@@ -365,7 +368,8 @@ def run_best_estimate(
                        rs.rate_structure_type,
                        rs.vintage_date AS rate_effective_date,
                        rs.billing_frequency,
-                       rs.confidence AS parse_confidence
+                       rs.confidence AS parse_confidence,
+                       rs.source_url
                 FROM {schema}.rate_schedules rs
                 {state_join}
                 {where_clause}
@@ -404,7 +408,8 @@ def run_best_estimate(
                 SELECT pwsid, source, utility_name, state_code,
                        bill_5ccf, bill_6ccf, bill_9ccf, bill_10ccf, bill_12ccf, bill_24ccf,
                        fixed_charge_monthly, rate_structure_type, rate_effective_date,
-                       billing_frequency, parse_confidence
+                       billing_frequency, parse_confidence,
+                       NULL::text AS source_url
                 FROM {schema}.water_rates
                 {wr_where}
                 ORDER BY pwsid, source
@@ -420,7 +425,8 @@ def run_best_estimate(
                 SELECT pwsid, source, utility_name, state_code,
                        bill_5ccf, bill_6ccf, bill_9ccf, bill_10ccf, bill_12ccf, bill_24ccf,
                        fixed_charge_monthly, rate_structure_type, rate_effective_date,
-                       billing_frequency, parse_confidence
+                       billing_frequency, parse_confidence,
+                       NULL::text AS source_url
                 FROM {schema}.water_rates
                 {where_clause}
                 ORDER BY pwsid, source
@@ -510,12 +516,14 @@ def run_best_estimate(
                         pwsid, utility_name, state_code, selected_source,
                         bill_estimate_10ccf, bill_5ccf, bill_10ccf, bill_6ccf, bill_12ccf,
                         fixed_charge_monthly, rate_structure_type, rate_effective_date,
-                        n_sources, anchor_source, anchor_bill, confidence, selection_notes
+                        n_sources, anchor_source, anchor_bill, confidence, selection_notes,
+                        source_url
                     ) VALUES (
                         :pwsid, :utility_name, :state_code, :selected_source,
                         :bill_estimate_10ccf, :bill_5ccf, :bill_10ccf, :bill_6ccf, :bill_12ccf,
                         :fixed_charge_monthly, :rate_structure_type, :rate_effective_date,
-                        :n_sources, :anchor_source, :anchor_bill, :confidence, :selection_notes
+                        :n_sources, :anchor_source, :anchor_bill, :confidence, :selection_notes,
+                        :source_url
                     )
                 """), {
                     "pwsid": r["pwsid"],
@@ -535,6 +543,7 @@ def run_best_estimate(
                     "anchor_bill": float(r["anchor_bill"]) if pd.notna(r.get("anchor_bill")) else None,
                     "confidence": r.get("confidence"),
                     "selection_notes": r.get("selection_notes"),
+                    "source_url": r.get("source_url"),
                 })
                 inserted += 1
             except Exception as e:

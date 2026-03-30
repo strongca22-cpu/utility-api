@@ -97,4 +97,10 @@ class RateBestEstimate(Base):
     )
     selection_notes: Mapped[str | None] = mapped_column(Text)
 
+    # Spot-check provenance
+    source_url: Mapped[str | None] = mapped_column(
+        Text,
+        comment="Original rate page URL (from rate_schedules, populated for scraped sources)",
+    )
+
     built_at = mapped_column(DateTime(timezone=True), server_default=func.now())
