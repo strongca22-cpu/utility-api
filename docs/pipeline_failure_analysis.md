@@ -1,5 +1,146 @@
 # Rate Pipeline Failure Analysis
 
+---
+
+## Sprint 25 Sweep Analysis (2026-03-30)
+
+Three discovery+parse runs executed today. This section evaluates performance across runs to inform tuning before a comprehensive sweep.
+
+### Runs Summary
+
+| Run | Scope | Target | Searched | Discovered | Parsed | Success Rate |
+|---|---|---|---|---|---|---|
+| 440 Gap States | >=3k pop, gap states | 440 | 440 | 405 (92%) | 261 | **64%** |
+| ND | >=500 pop | 119 | 119 | 90 (76%) | 56 | **62%** |
+| SD | >=500 pop | 141 | 141 | 128 (91%) | 86 | **67%** |
+| **Combined** | | **700** | **700** | **623 (89%)** | **403** | **65%** |
+
+### Post-Sweep Coverage
+
+| State | Before | After | Pop Coverage |
+|---|---|---|---|
+| ND | 5/293 (2%) | 61/293 (21%) | 65% |
+| SD | 6/448 (1%) | 94/448 (21%) | 48% |
+
+Source URLs propagated to `rate_best_estimate`: ND 58/61, SD 89/94 rows with `source_url`.
+
+### Discovery Stage
+
+**Overall:** 89% of PWSIDs yielded at least one URL scoring above 50. The 11% with no usable URLs are genuine discovery failures — typically very small utilities with no web-findable rate page.
+
+**Near-miss URLs (440 sweep only):** 2,194 URLs scored 30-50 (below threshold). Average score: 41.7. **1,219 scored >=45.** This is the single largest tuning lever — lowering the threshold from 50 to 45 would add ~1,200 candidate URLs. Given that 1-candidate PWSIDs parse at 51%, this could rescue an estimated 60-100 additional rates from the 440 sweep alone.
+
+### Parse Success by Candidate Count
+
+| Candidates Above Threshold | Attempted | Succeeded | Rate |
+|---|---|---|---|
+| 0 | 14 | 0 | 0% |
+| 1 | 141 | 72 | **51%** |
+| 2 | 171 | 110 | **64%** |
+| 3 | 420 | 298 | **71%** |
+| 4 | 23 | 12 | 52% |
+| 5 | 10 | 2 | 20% |
+
+**Key finding:** 3 candidates is the sweet spot (71%). Having 2+ candidates significantly improves success over 1 candidate. Having 4-5 may indicate noisy/generic discovery results. The current 3-URL cascade is well-calibrated.
+
+### Winning Rank Distribution
+
+| Rank | Wins | % of Successes |
+|---|---|---|
+| #1 | 349 | 71% |
+| #2 | 107 | 22% |
+| #3 | 38 | 8% |
+
+Rank #2 and #3 together account for **29% of all successes**. Dropping to single-URL would lose nearly a third of successful parses.
+
+### Parse Success by Population Bucket
+
+| Bucket | Attempted | Success | Rate | Avg Candidates |
+|---|---|---|---|---|
+| 100k+ | 77 | 48 | 62% | 3.0 |
+| 50k-100k | 138 | 74 | 54% | 2.7 |
+| 25k-50k | 267 | 171 | 64% | 2.6 |
+| 10k-25k | 95 | 71 | **75%** | 2.4 |
+| 3k-10k | 44 | 23 | 52% | 1.7 |
+| 1k-3k | 78 | 52 | **67%** | 1.8 |
+| 500-1k | 80 | 55 | **69%** | 1.8 |
+
+**Surprising:** 500-1k and 1k-3k parse at 67-69%, *higher* than 50k-100k (54%). Small-town utility websites tend to have simple, clean rate pages. Mid-size utilities have complex tiered structures or JS-heavy sites. **Implication:** the >=500 pop floor used for ND/SD is viable nationwide.
+
+### Failure Modes
+
+**Discovery failures (no candidates):** 77 PWSIDs (11%). Genuine — no web-findable rate page.
+
+**Parse failures by type:**
+
+| Failure Mode | 440 Sweep | ND | SD |
+|---|---|---|---|
+| `confidence_failed` | 476 | 76 | 91 |
+| `no_tier_1_rate` | 537 | 87 | 100 |
+| Thin content after Playwright | 198 | 21 | 61 |
+| HTTP 403 | 46 | 6 | 14 |
+
+`confidence_failed` + `no_tier_1_rate` remain the dominant failure pair. These are largely true negatives — the page didn't contain parseable rate data.
+
+**Thin content after Playwright (280 total):** Second-largest failure category. Page serves content via JS, Playwright renders it, but result is still too thin. Often: SPA with client-side routing, login/portal-gated rates, or third-party bill-pay platform.
+
+### Deep Crawl Effectiveness
+
+| Metric | Value |
+|---|---|
+| PWSIDs triggering deep crawl | 80 (10% of attempts) |
+| Deep crawl → success | 27 (34% of triggered) |
+| Avg children found | 1.4 |
+
+Valuable fallback but fires infrequently.
+
+### Model Routing
+
+| Metric | 440 Sweep | ND | SD |
+|---|---|---|---|
+| Haiku calls | 388 | 41 | 70 |
+| Sonnet calls | 244 | 73 | 83 |
+| Playwright attempts | 854 | 84 | 223 |
+
+ND and SD routed more heavily to Sonnet. SD had 2.7x more Playwright attempts per PWSID — Dakota utility websites are disproportionately JS-heavy or thin.
+
+### Cost
+
+| Metric | Value |
+|---|---|
+| Total Anthropic (direct) | $14.61 |
+| Serper queries | ~3,116 |
+| Serper cost | ~$3.12 |
+| **All-in** | **$17.72** |
+| Cost per successful rate | $0.036 |
+| Cost per PWSID attempted | $0.023 |
+| Cost on failures | $5.85 (40%) |
+| At batch pricing | ~$0.022/successful rate |
+
+### State-Level Performance
+
+**Top performers (>=10 attempted):** IL 97%, IN 88%, LA 88%, ID 82%, RI 83%
+
+**Underperformers:** CO 38%, MT 29%, NV 25%, UT 50%. CO aligns with Sprint 24 observations — special districts, JS-heavy sites, .colorado.gov blocking.
+
+### Recommendations Before Comprehensive Sweep
+
+**High-impact, low-effort:**
+1. **Lower score threshold 50→45.** 1,219 near-miss URLs at 45-49 represent the largest untapped pool. Expected ~5-8% lift in overall success rate.
+
+**Medium-impact:**
+2. **Investigate thin-after-Playwright failures (280 PWSIDs).** Nav-crawl enhancement or PDF-specific fetching could rescue some.
+3. **State-specific Serper query tuning for CO, NV, MT.** Different utility web presence requires different search keywords.
+
+**Comprehensive sweep design:**
+4. **>=500 pop floor is viable.** 500-1k bucket parses at 69%.
+5. **Budget (all gap >=3k):** ~5,000 PWSIDs × $0.023 = ~$115 direct, ~$80 batch. Expected ~3,000 new rates.
+6. **Consider 1k-3k segment for high-value states only** (NY, TX, FL, MI) rather than nationwide.
+
+---
+
+## Original Analysis (2026-03-26)
+
 **Date:** 2026-03-26
 **Scope:** End-to-end analysis of failure modes across scraping, PDF extraction, LLM parsing, and rate validation.
 
