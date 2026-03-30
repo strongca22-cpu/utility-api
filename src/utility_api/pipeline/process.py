@@ -6,10 +6,15 @@ Purpose:
     Orchestrates the full discovery-to-parse cascade for a single PWSID:
 
     1. Gather all URLs for the PWSID from scrape_registry (Serper top 3)
-    2. Deep crawl each starting URL proactively (15 fetches each, 45 total)
-    3. Re-score all URLs (originals + deep crawl children) with scoring v2
+    2. Fetch/ensure text for each starting URL (NO proactive deep crawl)
+    3. Re-score all URLs with scoring v2
     4. Parse rank #1 → if fail → rank #2 → if fail → rank #3 (max 3 attempts)
-    5. Log full cascade diagnostics to discovery_diagnostics table
+    5. If ALL parses fail: reactive deep crawl top URL, try crawl children
+    6. Log full cascade diagnostics to discovery_diagnostics table
+
+    Deep crawl is REACTIVE: only triggered when all 3 Serper URLs fail to
+    parse. Diagnostic data showed proactive deep crawl added ~33% fetches
+    for only 5% of successes (4/87). Reactive mode cuts fetch volume ~40%.
 
     This is the shared processing function called by:
     - serper_bulk_discovery.py (--process flag)
@@ -114,51 +119,34 @@ def process_pwsid(
     )
 
     # ---------------------------------------------------------------
-    # Step 2: Deep crawl each starting URL proactively
+    # Step 2: Fetch text for each starting URL (no deep crawl yet)
     # ---------------------------------------------------------------
     all_candidates = []
     total_fetches = 0
 
     for start in starting_urls:
-        crawl_results = _deep_crawl_url(
+        fetch_result = _ensure_fetched(
             pwsid=pwsid,
             registry_id=start["id"],
             url=start["url"],
         )
-        total_fetches += crawl_results["fetch_count"]
+        total_fetches += fetch_result["fetch_count"]
 
-        # The starting URL itself is always a candidate
         all_candidates.append({
             "registry_id": start["id"],
             "url": start["url"],
             "url_source": start["url_source"],
             "discovery_rank": start["discovery_rank"],
-            "text_len": crawl_results["final_text_len"],
-            "scraped_text": crawl_results["final_text"],
-            "content_type": crawl_results["content_type"],
-            "is_deep_crawl_result": crawl_results["deep_crawled"],
+            "text_len": fetch_result["text_len"],
+            "scraped_text": fetch_result["text"],
+            "content_type": fetch_result["content_type"],
+            "is_deep_crawl_result": False,
         })
 
-        # Add deep crawl children as separate candidates
-        for child in crawl_results["children"]:
-            all_candidates.append({
-                "registry_id": child["registry_id"],
-                "url": child["url"],
-                "url_source": "deep_crawl",
-                "discovery_rank": start["discovery_rank"],  # parent's rank
-                "text_len": child["text_len"],
-                "scraped_text": child["scraped_text"],
-                "content_type": child["content_type"],
-                "is_deep_crawl_result": True,
-            })
-
-    deep_crawl_children = sum(
-        1 for c in all_candidates if c["url_source"] == "deep_crawl"
-    )
+    deep_crawl_children = 0
 
     logger.info(
-        f"  {len(starting_urls)} starting + {deep_crawl_children} deep crawl "
-        f"= {len(all_candidates)} total candidates, {total_fetches} fetches"
+        f"  {len(starting_urls)} starting URLs fetched, {total_fetches} fetches"
     )
 
     # ---------------------------------------------------------------
@@ -270,13 +258,118 @@ def process_pwsid(
             cand["parse_result"] = "error"
             logger.warning(f"    Parse error: {e}")
 
+    # ---------------------------------------------------------------
+    # Step 5: Reactive deep crawl — only if all Serper URLs failed
+    # ---------------------------------------------------------------
+    if not parse_success and parseable:
+        logger.info(
+            f"  All {parse_attempts} parse attempts failed — "
+            f"triggering reactive deep crawl on top URL"
+        )
+
+        # Deep crawl the highest-scored starting URL
+        best_start = parseable[0]
+        crawl_results = _deep_crawl_url(
+            pwsid=pwsid,
+            registry_id=best_start["registry_id"],
+            url=best_start["url"],
+        )
+        total_fetches += crawl_results["fetch_count"]
+
+        # Add crawl children as new candidates
+        for child in crawl_results["children"]:
+            child_cand = {
+                "registry_id": child["registry_id"],
+                "url": child["url"],
+                "url_source": "deep_crawl",
+                "discovery_rank": best_start["discovery_rank"],
+                "text_len": child["text_len"],
+                "scraped_text": child["scraped_text"],
+                "content_type": child["content_type"],
+                "is_deep_crawl_result": True,
+                "parsed": False,
+                "parse_result": None,
+            }
+
+            # Score the child
+            snippet_proxy = (child["scraped_text"] or "")[:200]
+            child_cand["rescore"] = score_url_relevance(
+                url=child["url"],
+                title="",
+                snippet=snippet_proxy,
+                utility_name=utility_name,
+                city=city,
+                state=state,
+            )
+
+            if child_cand["rescore"] >= score_threshold and child["text_len"] > 100:
+                all_candidates.append(child_cand)
+                deep_crawl_children += 1
+
+        if deep_crawl_children > 0:
+            # Sort new candidates by score and try parsing
+            crawl_parseable = sorted(
+                [c for c in all_candidates
+                 if c["url_source"] == "deep_crawl" and not c["parsed"]],
+                key=lambda c: c["rescore"],
+                reverse=True,
+            )
+
+            logger.info(
+                f"  Deep crawl found {deep_crawl_children} children, "
+                f"trying top {min(2, len(crawl_parseable))}"
+            )
+
+            for cand in crawl_parseable[:2]:
+                if parse_success:
+                    break
+                parse_attempts += 1
+                logger.info(
+                    f"  Parse attempt {parse_attempts} (deep_crawl): "
+                    f"[{cand['rescore']}] {cand['url'][:70]}"
+                )
+                try:
+                    result = parse_agent.run(
+                        pwsid=pwsid,
+                        raw_text=cand["scraped_text"],
+                        content_type=cand.get("content_type", "html"),
+                        source_url=cand["url"],
+                        registry_id=cand["registry_id"],
+                        skip_best_estimate=True,
+                    )
+                    cand["parsed"] = True
+                    cost = result.get("cost_usd", 0.0) if result else 0.0
+                    total_parse_cost += cost
+
+                    if result and result.get("success"):
+                        parse_success = True
+                        winning_rank = parse_attempts
+                        winning_url = cand["url"]
+                        winning_source = "deep_crawl"
+                        winning_discovery_rank = cand["discovery_rank"]
+                        winning_score = cand["rescore"]
+                        cand["parse_result"] = "success"
+                        logger.info(
+                            f"    SUCCESS via reactive deep crawl "
+                            f"(discovery_rank={winning_discovery_rank})"
+                        )
+                    else:
+                        cand["parse_result"] = "failed"
+                        logger.info(f"    Failed")
+                except Exception as e:
+                    cand["parsed"] = True
+                    cand["parse_result"] = "error"
+                    logger.warning(f"    Deep crawl parse error: {e}")
+        else:
+            logger.info(f"  Deep crawl found no new candidates")
+
     if not parse_success:
         logger.info(
             f"  All {parse_attempts} parse attempts failed for {pwsid}"
         )
 
     # ---------------------------------------------------------------
-    # Step 5: BestEstimate (unless caller batches)
+    # Step 6: BestEstimate (unless caller batches)
     # ---------------------------------------------------------------
     if parse_success and not skip_best_estimate:
         try:
@@ -286,7 +379,7 @@ def process_pwsid(
             logger.debug(f"  BestEstimate update skipped: {e}")
 
     # ---------------------------------------------------------------
-    # Step 6: Persist diagnostics
+    # Step 7: Persist diagnostics
     # ---------------------------------------------------------------
     candidate_details = [
         {
@@ -366,6 +459,61 @@ def _get_starting_urls(pwsid: str, schema: str, max_urls: int) -> list[dict]:
         }
         for r in rows
     ]
+
+
+def _ensure_fetched(
+    pwsid: str,
+    registry_id: int,
+    url: str,
+) -> dict:
+    """Ensure a URL has been fetched and has text, without deep crawling.
+
+    If scraped_text already exists in the registry, use it.
+    Otherwise, trigger a single-level fetch via ScrapeAgent.
+
+    Returns
+    -------
+    dict
+        text, text_len, content_type, fetch_count.
+    """
+    schema = settings.utility_schema
+
+    with engine.connect() as conn:
+        row = conn.execute(text(f"""
+            SELECT status, scraped_text, last_content_length, content_type
+            FROM {schema}.scrape_registry WHERE id = :id
+        """), {"id": registry_id}).fetchone()
+
+    if row and row.scraped_text and (row.last_content_length or 0) > 0:
+        # Already fetched — use existing text
+        return {
+            "text": row.scraped_text,
+            "text_len": row.last_content_length or len(row.scraped_text),
+            "content_type": row.content_type or "html",
+            "fetch_count": 0,
+        }
+
+    # Needs fetching — use ScrapeAgent with max_depth=0 (no deep crawl)
+    from utility_api.agents.scrape import ScrapeAgent
+    scrape = ScrapeAgent()
+    result = scrape.run(registry_id=registry_id, max_depth=0)
+    raw_texts = result.get("raw_texts", [])
+
+    if raw_texts:
+        entry = raw_texts[0]
+        return {
+            "text": entry.get("text", ""),
+            "text_len": len(entry.get("text", "")),
+            "content_type": entry.get("content_type", "html"),
+            "fetch_count": 1,
+        }
+
+    return {
+        "text": "",
+        "text_len": 0,
+        "content_type": "html",
+        "fetch_count": 1,
+    }
 
 
 def _deep_crawl_url(
