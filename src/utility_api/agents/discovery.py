@@ -552,8 +552,9 @@ class DiscoveryAgent(BaseAgent):
 
         # Sort by score, compute funnel stats
         all_candidates.sort(key=lambda c: c["score"], reverse=True)
-        above_threshold = [c for c in all_candidates if c["score"] > 50]
-        near_misses = [c for c in all_candidates if 15 <= c["score"] <= 50]
+        score_threshold = _DISCOVERY_CONFIG.get("url_score_threshold", 45)
+        above_threshold = [c for c in all_candidates if c["score"] > score_threshold]
+        near_misses = [c for c in all_candidates if 15 <= c["score"] <= score_threshold]
         below_threshold = [c for c in all_candidates if c["score"] < 15]
 
         # Take up to 3 URLs above threshold with rank tagging
@@ -562,7 +563,7 @@ class DiscoveryAgent(BaseAgent):
 
         logger.info(
             f"  Funnel: {raw_result_count} raw → {len(seen_urls)} deduped → "
-            f"{len(above_threshold)} above 50 → {len(near_misses)} near-miss → "
+            f"{len(above_threshold)} above {score_threshold} → {len(near_misses)} near-miss → "
             f"{len(top_candidates)} written"
         )
 
@@ -649,7 +650,7 @@ class DiscoveryAgent(BaseAgent):
             notes=(
                 f"{utility_name} ({state}): "
                 f"{raw_result_count} raw → {len(seen_urls)} dedup → "
-                f"{len(above_threshold)} scored >50 → {urls_written} written"
+                f"{len(above_threshold)} scored >{score_threshold} → {urls_written} written"
             ),
         )
 
