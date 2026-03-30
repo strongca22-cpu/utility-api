@@ -543,7 +543,7 @@ def run_best_estimate(
                     "anchor_bill": float(r["anchor_bill"]) if pd.notna(r.get("anchor_bill")) else None,
                     "confidence": r.get("confidence"),
                     "selection_notes": r.get("selection_notes"),
-                    "source_url": r.get("source_url"),
+                    "source_url": r["source_url"] if pd.notna(r.get("source_url")) else None,
                 })
                 inserted += 1
             except Exception as e:
