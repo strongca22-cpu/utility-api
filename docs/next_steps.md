@@ -1217,16 +1217,31 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Monitoring:** `ua-ops serper-status` command — query usage, cost tracking, parse success by discovery rank, search funnel summary.
 - [x] **Config:** `SERPER_API_KEY` + `SERPER_PAID_MODE` env vars in Settings. `agent_config.yaml` updated with Serper discovery block (4 queries/PWSID, 0.2s delay, top 3 URLs).
 
-**Immediate next steps (pre-validation session):**
-- [ ] Add `SERPER_API_KEY=<key>` to `.env`
-- [ ] Run migration: `alembic -c migrations/alembic.ini upgrade head`
-- [ ] Dry run: `python scripts/serper_bulk_discovery.py --max-pwsids 625 --dry-run`
-- [ ] Small validation (25 PWSIDs): `python scripts/serper_bulk_discovery.py --max-pwsids 25`
-- [ ] Check results: `ua-ops serper-status`
-- [ ] If scoring looks good: full free-tier sweep (`--max-pwsids 625`)
-- [ ] Process found URLs: `ua-ops process-backlog --max 50`
-- [ ] Evaluate rank 2-3 value: query parse success by `discovery_rank`
+**Sprint 24 validation (2026-03-29):**
+- [x] Dry run: 600 PWSIDs across 30 gap states
+- [x] Small validation: 25 PWSIDs, 92% hit rate (far above 40-50% estimate)
+- [x] 63 URLs scraped, 55 submitted to batch API (batch cancelled)
+- [x] Direct API parse: 24 success, 35 failed, 1 skipped, 3 no text = 38% URL-level parse rate
+- [x] PWSID-level: 15/23 (65%) got at least one successful parse
+
+### Sprint 24b: Cascade Process Pipeline (2026-03-30)
+- [x] **Migration 020:** `discovery_diagnostics` table for cascade tracking (per-PWSID: starting URLs, deep crawl children, total candidates, parse attempts, winning rank/source/score, full candidate JSONB)
+- [x] **`pipeline/process.py`:** `process_pwsid()` orchestrator — deep crawl all 3 Serper URLs proactively (15 fetches each, 45 total), re-score all candidates with scoring v2, cascade parse top 3 until success
+- [x] **`scripts/reprocess_failed_serper.py`:** Re-run failed PWSIDs through cascade
+- [x] **Validated on 8 failed PWSIDs:** 1/8 succeeded (NYC was false PWSID match — Richmondville Village). Deep crawl found children for 4/8 PWSIDs. Aurora CO: deep_crawl child scored #1 (85) beating all Serper originals.
+
+**Immediate next steps (Sprint 24b):**
+- [ ] Integrate `process_pwsid()` into `serper_bulk_discovery.py` with `--process` flag
+- [ ] Run full free-tier sweep (600 PWSIDs) with cascade processing
+- [ ] Analyze diagnostics: `SELECT winning_source, winning_discovery_rank, count(*) FROM utility.discovery_diagnostics WHERE parse_success GROUP BY 1, 2`
+- [ ] Key questions from diagnostics data:
+  - How often does deep crawl child beat original Serper URL? (Aurora CO shows it happens)
+  - How often does rank #2/#3 win? (NYC shows rank 2 can win)
+  - What % of successes come from rank 1 vs rank 2-3?
+  - Is proactive deep crawl worth the fetch cost?
+- [ ] Address false PWSID-URL match issue (NYC → Richmondville Village)
 - [ ] Remove SearXNG (deliverable 5): code removal + Docker cleanup
+- [ ] If diagnostics justify: buy Serper paid tier ($50/50K queries) for full gap-state sweep
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
