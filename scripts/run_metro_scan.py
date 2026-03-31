@@ -4,17 +4,21 @@ Metro Scan Orchestrator
 
 Purpose:
     End-to-end metro area rate page discovery + pipeline processing.
-    Ties together: metro config → template generator → research agent →
-    URL importer → existing scrape/parse pipeline.
+    Ties together: metro config → template generator → DiscoveryAgent (Serper)
+    → process_pwsid cascade pipeline.
+
+    Sprint 26: Migrated from Claude web_search (metro_research_agent.py) to
+    Serper-based DiscoveryAgent. Eliminates Claude API dependency for URL
+    discovery, reduces cost ~97% ($0.15/batch → $0.004/utility), and gains
+    rank tagging, diagnostics, domain guessing, and service-area handling.
 
 Author: AI-Generated
 Created: 2026-03-26
-Modified: 2026-03-26
+Modified: 2026-03-31 (Sprint 26: Serper migration via DiscoveryAgent)
 
 Dependencies:
     - pyyaml
     - sqlalchemy
-    - anthropic
     - utility_api (local package)
 
 Usage:
@@ -33,7 +37,6 @@ Notes:
 """
 
 import argparse
-import math
 import sys
 from pathlib import Path
 
@@ -48,15 +51,21 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 from metro_template_generator import generate_metro_context
-from metro_research_agent import (
-    build_batch_requests,
-    check_batch_status,
-    collect_batch_results,
-    list_batches,
-    research_metro,
-    submit_batch_request,
-)
-from metro_url_importer import import_research_results
+
+from utility_api.agents.discovery import DiscoveryAgent
+
+# Legacy imports — preserved for batch-collect of in-flight batches.
+# These are no longer used for new discovery runs (Serper replaces web_search).
+try:
+    from metro_research_agent import (
+        check_batch_status as legacy_check_batch_status,
+        collect_batch_results as legacy_collect_batch_results,
+        list_batches as legacy_list_batches,
+    )
+    from metro_url_importer import import_research_results as legacy_import_results
+    _LEGACY_AVAILABLE = True
+except ImportError:
+    _LEGACY_AVAILABLE = False
 
 # Add file logging
 LOG_PATH = Path("/var/log/uapi/metro_scan.log")
@@ -104,6 +113,72 @@ def update_metro_status(metro_id: str, new_status: str) -> None:
 
     with open(CONFIG_PATH, "w") as f:
         f.write("\n".join(lines))
+
+
+def discover_metro_urls(
+    utilities: list[dict],
+    metro_name: str = "",
+    dry_run: bool = False,
+) -> dict:
+    """Run DiscoveryAgent for each utility in a metro context.
+
+    Replaces the old research_metro() → import_research_results() two-step.
+    DiscoveryAgent writes directly to scrape_registry with rank tagging,
+    so no separate import step is needed.
+
+    Parameters
+    ----------
+    utilities : list[dict]
+        Utility dicts from generate_metro_context(), each with
+        pwsid, pws_name, population, state, etc.
+    metro_name : str
+        Metro name for logging.
+    dry_run : bool
+        Preview only, no API calls.
+
+    Returns
+    -------
+    dict
+        Summary with urls_found, urls_written, errors, per-utility details.
+    """
+    agent = DiscoveryAgent()
+    total_written = 0
+    total_found = 0
+    errors = 0
+    details = []
+
+    for i, u in enumerate(utilities, 1):
+        pwsid = u["pwsid"]
+
+        if dry_run:
+            details.append({"pwsid": pwsid, "dry_run": True})
+            continue
+
+        logger.info(
+            f"  [{i}/{len(utilities)}] {pwsid} — "
+            f"{u.get('pws_name', '?')[:35]} (pop {u.get('population', 0):,})"
+        )
+        try:
+            result = agent.run(pwsid=pwsid, search_delay=0.3)
+            total_written += result.get("urls_written", 0)
+            total_found += result.get("urls_found", 0)
+            details.append(result)
+        except Exception as e:
+            logger.error(f"    → Discovery failed for {pwsid}: {e}")
+            errors += 1
+            details.append({"pwsid": pwsid, "error": str(e)})
+
+    logger.info(
+        f"  Discovery complete: {total_found} candidates found, "
+        f"{total_written} URLs written, {errors} errors"
+    )
+
+    return {
+        "urls_found": total_found,
+        "urls_written": total_written,
+        "errors": errors,
+        "details": details,
+    }
 
 
 def list_metros() -> None:
@@ -192,12 +267,12 @@ def run_metro(
             logger.info(f"  Budget exhausted (${budget_remaining:.2f} remaining). Skipping.")
             return {"metro_id": metro_id, "status": "budget_exhausted", "estimated_cost": 0}
 
-    # Cost estimate
-    batches_needed = math.ceil(len(utilities) / 5)
-    estimated_cost = batches_needed * 0.75
+    # Cost estimate — Serper-based (4 queries per PWSID, ~$0.001/query)
+    estimated_queries = len(utilities) * 4
+    estimated_cost = estimated_queries * 0.001
     logger.info(
-        f"  Estimated research cost: ${estimated_cost:.2f} "
-        f"({batches_needed} API calls × ~$0.75)"
+        f"  Estimated discovery cost: ${estimated_cost:.2f} "
+        f"({estimated_queries} Serper queries, {len(utilities)} utilities)"
     )
 
     if dry_run:
@@ -226,64 +301,63 @@ def run_metro(
             logger.info("  Cancelled by user.")
             return {"metro_id": metro_id, "status": "cancelled"}
 
-    # Step 2: Research URLs via Claude API
+    # Step 2: Discover URLs via Serper (DiscoveryAgent writes directly to scrape_registry)
     update_metro_status(metro_id, "processing")
-    logger.info(f"  Researching {len(utilities)} utilities...")
+    logger.info(f"  Discovering URLs for {len(utilities)} utilities via Serper...")
 
-    research_context = {
-        "metro_name": config["name"],
-        "utilities": utilities,
-    }
-    results = research_metro(research_context)
+    discovery = discover_metro_urls(utilities, metro_name=config["name"])
 
-    found = [r for r in results if r.get("url")]
-    not_found = [r for r in results if not r.get("url")]
-    logger.info(f"  Found {len(found)}/{len(results)} URLs")
-
-    # Step 3: Import to scrape_registry
-    import_stats = import_research_results(results, metro_id)
-
-    # Step 4: Optionally process through pipeline
-    if process and import_stats["imported"] > 0:
+    # Step 3: Optionally process through cascade pipeline
+    parse_successes = 0
+    parse_failures = 0
+    if process and discovery["urls_written"] > 0:
         logger.info(
-            f"  Processing {import_stats['imported']} URLs through pipeline..."
+            f"  Processing {discovery['urls_written']} URLs through cascade pipeline..."
         )
-        try:
-            from process_guesser_batch import process_batch
+        from utility_api.pipeline.process import process_pwsid
 
+        for u in utilities:
+            try:
+                result = process_pwsid(u["pwsid"], skip_best_estimate=True)
+                if result.get("parse_success"):
+                    parse_successes += 1
+                else:
+                    parse_failures += 1
+            except Exception as e:
+                logger.warning(f"  Process failed for {u['pwsid']}: {e}")
+                parse_failures += 1
+
+        # Rebuild best estimate per state
+        from utility_api.ops.best_estimate import run_best_estimate
+
+        if parse_successes > 0:
             for state in config["states"]:
-                process_batch(
-                    max_count=import_stats["imported"],
-                    state=state,
-                    url_source="metro_research",
-                )
-        except Exception as e:
-            logger.warning(
-                f"  Pipeline processing failed: {e}. "
-                f"URLs are in scrape_registry — process manually with: "
-                f"python scripts/process_guesser_batch.py --url-source metro_research"
-            )
+                try:
+                    run_best_estimate(state_filter=state)
+                except Exception as e:
+                    logger.warning(f"  Best estimate rebuild failed for {state}: {e}")
 
-    # Step 5: Update status and report
+    # Step 4: Update status and report
     update_metro_status(metro_id, "complete")
 
     logger.info(f"\n{'=' * 60}")
     logger.info(f"Metro Scan Complete: {config['name']}")
     logger.info(f"{'=' * 60}")
-    logger.info(f"  Utilities researched: {len(results)}")
-    logger.info(f"  URLs found:           {len(found)}")
-    logger.info(f"  Imported to registry:  {import_stats['imported']}")
-    logger.info(f"  Skipped (no URL):      {import_stats['skipped_no_url']}")
-    logger.info(f"  Skipped (exists):      {import_stats['skipped_exists']}")
-    logger.info(f"  Skipped (bad PWSID):   {import_stats['skipped_bad_pwsid']}")
+    logger.info(f"  Utilities discovered:   {len(utilities)}")
+    logger.info(f"  URLs written:           {discovery['urls_written']}")
+    logger.info(f"  Discovery errors:       {discovery['errors']}")
+    if process and discovery["urls_written"] > 0:
+        logger.info(f"  Parse successes:        {parse_successes}")
+        logger.info(f"  Parse failures:         {parse_failures}")
     logger.info(f"{'=' * 60}")
 
     return {
         "metro_id": metro_id,
         "status": "complete",
-        "researched": len(results),
-        "found": len(found),
-        "imported": import_stats["imported"],
+        "utilities_count": len(utilities),
+        "urls_written": discovery["urls_written"],
+        "parse_successes": parse_successes,
+        "parse_failures": parse_failures,
         "estimated_cost": estimated_cost,
     }
 
@@ -292,7 +366,10 @@ def batch_submit(
     metro_ids: list[str],
     large_only: bool = False,
 ) -> str | None:
-    """Generate contexts for metros and submit all as one Batch API request.
+    """LEGACY: Submit metros to Claude Batch API for web_search discovery.
+
+    Preserved for collecting in-flight batches submitted before Serper migration.
+    New discovery runs should use the immediate Serper path (--metro or --top).
 
     Args:
         metro_ids: List of metro IDs to research.
@@ -301,6 +378,15 @@ def batch_submit(
     Returns:
         Batch ID string, or None if nothing to submit.
     """
+    if not _LEGACY_AVAILABLE:
+        logger.error(
+            "Legacy batch imports not available. "
+            "Use --metro for Serper-based discovery instead."
+        )
+        return None
+
+    from metro_research_agent import build_batch_requests, submit_batch_request
+
     metro_contexts = []
 
     for metro_id in metro_ids:
@@ -363,13 +449,23 @@ def batch_submit(
 
 
 def batch_collect(batch_id: str) -> None:
-    """Collect results from a completed batch and import to scrape_registry.
+    """LEGACY: Collect results from a completed Claude Batch API submission.
+
+    Preserved for collecting in-flight batches submitted before Serper migration.
 
     Args:
         batch_id: The batch ID from batch_submit().
     """
+    if not _LEGACY_AVAILABLE:
+        logger.error(
+            "Legacy batch imports not available. "
+            "This command is only for collecting batches submitted "
+            "before the Serper migration."
+        )
+        return
+
     # Check status
-    status = check_batch_status(batch_id)
+    status = legacy_check_batch_status(batch_id)
     if status["processing_status"] != "ended":
         logger.info(
             f"Batch not ready yet. Status: {status['processing_status']}. "
@@ -379,7 +475,7 @@ def batch_collect(batch_id: str) -> None:
         return
 
     # Collect and parse results
-    results_by_metro = collect_batch_results(batch_id)
+    results_by_metro = legacy_collect_batch_results(batch_id)
 
     if not results_by_metro:
         logger.warning("No results to import.")
@@ -391,7 +487,7 @@ def batch_collect(batch_id: str) -> None:
         logger.info(f"\n  {metro_id}: {found}/{len(results)} URLs found")
 
         if results:
-            import_stats = import_research_results(results, metro_id)
+            import_stats = legacy_import_results(results, metro_id)
             logger.info(
                 f"  {metro_id}: {import_stats['imported']} imported, "
                 f"{import_stats['skipped_no_url']} no URL, "
@@ -466,11 +562,17 @@ def main():
         return
 
     if args.batch_list:
-        list_batches()
+        if not _LEGACY_AVAILABLE:
+            logger.error("Legacy batch functions not available.")
+            return
+        legacy_list_batches()
         return
 
     if args.batch_status:
-        check_batch_status(args.batch_status)
+        if not _LEGACY_AVAILABLE:
+            logger.error("Legacy batch functions not available.")
+            return
+        legacy_check_batch_status(args.batch_status)
         return
 
     if args.batch_collect:
