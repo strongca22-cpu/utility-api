@@ -163,13 +163,17 @@ def _build_volumetric_tiers_from_parse(result: dict) -> list[dict]:
         if rate_ccf is None:
             break
         try:
-            rate_ccf = float(rate_ccf)
+            rate_ccf = float(
+                str(rate_ccf).replace("$", "").replace(",", "")
+                .replace("/CCF", "").replace("/ccf", "").replace("/HCF", "").replace("/hcf", "")
+                .strip()
+            )
         except (ValueError, TypeError):
             break
 
         limit_ccf = result.get(f"tier_{i}_limit_ccf")
         try:
-            limit_ccf = float(limit_ccf) if limit_ccf else None
+            limit_ccf = float(str(limit_ccf).replace(",", "").strip()) if limit_ccf else None
         except (ValueError, TypeError):
             limit_ccf = None
         max_gal = int(round(limit_ccf * CCF_TO_GAL)) if limit_ccf else None
@@ -193,7 +197,7 @@ def _build_volumetric_tiers_from_parse(result: dict) -> list[dict]:
 def _compute_bill(gallons: float, tiers: list[dict], fixed: float = 0) -> float | None:
     """Compute bill at a given gallon consumption."""
     if not tiers:
-        return None
+        return round(fixed, 2) if fixed and fixed > 0 else None
     total = fixed
     remaining = gallons
     for tier in sorted(tiers, key=lambda t: t["tier"]):
