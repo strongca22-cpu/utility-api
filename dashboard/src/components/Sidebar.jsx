@@ -17,7 +17,19 @@ export default function Sidebar({ dynamicStats }) {
     <div className="h-full flex flex-col bg-slate-900 border-r border-slate-700 overflow-y-auto sidebar-scroll">
       {/* Header */}
       <div className="p-4 pb-3 border-b border-slate-700">
-        <h1 className="text-lg font-semibold text-slate-100 mb-2">UAPI Dashboard</h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-lg font-semibold text-slate-100">UAPI Dashboard</h1>
+          <button
+            onClick={() => dispatch({ type: "TOGGLE_SIDEBAR" })}
+            className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M8 1L3 6l5 5" />
+            </svg>
+          </button>
+        </div>
         <div className="flex gap-1 bg-slate-800 rounded-lg p-0.5">
           <ModeButton
             label="Product"

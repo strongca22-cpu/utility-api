@@ -32,6 +32,7 @@ const initialState = {
   selected: null,
 
   // UI chrome
+  sidebarOpen: true,
   devToolsOpen: false,
 };
 
@@ -65,6 +66,8 @@ function dashboardReducer(state, action) {
       return { ...state, selected: action.payload };
     case "DESELECT":
       return { ...state, selected: null };
+    case "TOGGLE_SIDEBAR":
+      return { ...state, sidebarOpen: !state.sidebarOpen };
     case "TOGGLE_DEVTOOLS":
       return { ...state, devToolsOpen: !state.devToolsOpen };
     default:

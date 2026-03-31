@@ -92,16 +92,32 @@ function AppInner() {
       style={{
         display: "grid",
         gridTemplateRows: "1fr auto",
-        gridTemplateColumns: state.selected
-          ? "260px 1fr 320px"
-          : "260px 1fr",
+        gridTemplateColumns: [
+          state.sidebarOpen ? "260px" : "0px",
+          "1fr",
+          state.selected ? "320px" : "",
+        ].filter(Boolean).join(" "),
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
       }}
     >
-      {/* Left sidebar — row 1, col 1 */}
-      <Sidebar dynamicStats={dynamicStats} />
+      {/* Left sidebar — row 1, col 1 (collapsible) */}
+      {state.sidebarOpen && <Sidebar dynamicStats={dynamicStats} />}
+
+      {/* Sidebar toggle — floats on map edge when collapsed */}
+      {!state.sidebarOpen && (
+        <button
+          onClick={() => dispatch({ type: "TOGGLE_SIDEBAR" })}
+          className="absolute top-3 left-3 z-30 w-8 h-8 flex items-center justify-center rounded-md bg-slate-800/90 border border-slate-600 text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors shadow-lg"
+          aria-label="Open sidebar"
+          title="Open sidebar"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M1 3h12M1 7h12M1 11h12" />
+          </svg>
+        </button>
+      )}
 
       {/* Map — row 1, col 2 */}
       <div style={{ position: "relative", overflow: "hidden" }}>
