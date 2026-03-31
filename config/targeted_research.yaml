@@ -1,0 +1,44 @@
+# Targeted Research Batches
+#
+# Purpose:
+#   Ad-hoc PWSID lists for priority URL discovery + parse processing.
+#   Used by scripts/run_targeted_research.py to run DiscoveryAgent → process_pwsid
+#   → rebuild best_estimate end-to-end.
+#
+# Author: AI-Generated
+# Created: 2026-03-31
+# Modified: 2026-03-31
+
+batches:
+  top25_duke_sourced:
+    description: "Top-25 uncovered by pop — Duke-sourced, not in Scenario A"
+    pwsids:
+      - TX1010013   # CITY OF HOUSTON, Harris Co, 2,202,531 pop
+      - TX2200012   # CITY OF FORT WORTH, Tarrant Co, 955,900 pop
+      - CA3010092   # IRVINE RANCH WATER DISTRICT, Orange Co, 444,800 pop
+      - CT0930011   # REGIONAL WATER AUTHORITY, New Haven Co, 418,900 pop
+      - KS2017308   # WICHITA CITY OF, Sedgwick Co, 395,699 pop
+      - TX0430007   # CITY OF PLANO, Collin Co, 288,800 pop
+      - TX1520002   # LUBBOCK PUBLIC WATER SYSTEM, Lubbock Co, 275,041 pop
+      - TX0570050   # CITY OF IRVING, Dallas Co, 264,546 pop
+      - NJ0906001   # JERSEY CITY MUA, Hudson Co, 262,000 pop
+      - TX2400001   # CITY OF LAREDO, Webb Co, 260,046 pop
+      - TX0570010   # CITY OF GARLAND, Dallas Co, 248,822 pop
+
+  top25_gap_sourced:
+    description: "Top-25 uncovered by pop — no source, likely overlaps Scenario A batch"
+    pwsids:
+      - NV0000090   # LAS VEGAS VALLEY WATER DISTRICT, Clark Co, 1,539,277 pop
+      - NY5110526   # SUFFOLK COUNTY WATER AUTHORITY, Suffolk Co, 1,100,000 pop
+      - NY2701047   # MCWA, Orleans Co, 496,753 pop
+      - CO0103005   # AURORA CITY OF, Arapahoe Co, 487,365 pop
+      - CO0121150   # COLORADO SPRINGS UTILITIES, El Paso Co, 464,111 pop
+      - MN1270024   # Minneapolis, Hennepin Co, 425,300 pop
+      - UTAH18026   # SALT LAKE CITY WATER SYSTEM, Salt Lake Co, 381,174 pop
+      - NV0000175   # NORTH LAS VEGAS UTILITIES, Clark Co, 376,515 pop
+      - NV0000076   # HENDERSON CITY OF, Clark Co, 336,534 pop
+      - VA4087125   # HENRICO COUNTY WATER SYSTEM, Henrico Co, 292,000 pop
+      - MD0020017   # GLEN BURNIE-BROADNECK, Anne Arundel Co, 290,606 pop
+      - MD0130002   # HOWARD COUNTY D.P.W. DISTRIBUTION, Howard Co, 286,158 pop
+      - TN0000116   # CLARKSVILLE WATER DEPARTMENT, Montgomery Co, 251,864 pop
+      - AZ0407090   # CHANDLER CITY OF, Maricopa Co, 247,328 pop
