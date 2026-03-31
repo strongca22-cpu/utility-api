@@ -364,7 +364,11 @@ class BatchAgent(BaseAgent):
 
             # Build canonical structures
             tiers = _build_volumetric_tiers_from_parse(parsed)
-            fixed_charge = parsed.get("fixed_charge_monthly", 0) or 0
+            raw_fc = parsed.get("fixed_charge_monthly", 0) or 0
+            try:
+                fixed_charge = float(str(raw_fc).replace("$", "").replace(",", "").strip())
+            except (ValueError, TypeError):
+                fixed_charge = 0
             fixed_charges_json = json.dumps([{
                 "name": "Service Charge",
                 "amount": round(float(fixed_charge), 2),
