@@ -102,25 +102,26 @@ function AppInner() {
         overflow: "hidden",
       }}
     >
-      {/* Left sidebar — row 1, col 1 (collapsible) */}
-      {state.sidebarOpen && <Sidebar dynamicStats={dynamicStats} />}
-
-      {/* Sidebar toggle — floats on map edge when collapsed */}
-      {!state.sidebarOpen && (
-        <button
-          onClick={() => dispatch({ type: "TOGGLE_SIDEBAR" })}
-          className="absolute top-3 left-3 z-30 w-8 h-8 flex items-center justify-center rounded-md bg-slate-800/90 border border-slate-600 text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors shadow-lg"
-          aria-label="Open sidebar"
-          title="Open sidebar"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M1 3h12M1 7h12M1 11h12" />
-          </svg>
-        </button>
-      )}
+      {/* Left sidebar — row 1, col 1 (collapses to 0px, stays in DOM) */}
+      <div style={{ overflow: "hidden", width: state.sidebarOpen ? 260 : 0 }}>
+        {state.sidebarOpen && <Sidebar dynamicStats={dynamicStats} />}
+      </div>
 
       {/* Map — row 1, col 2 */}
       <div style={{ position: "relative", overflow: "hidden" }}>
+        {/* Sidebar reopen button (only when collapsed) */}
+        {!state.sidebarOpen && (
+          <button
+            onClick={() => dispatch({ type: "TOGGLE_SIDEBAR" })}
+            className="absolute top-3 left-3 z-30 w-8 h-8 flex items-center justify-center rounded-md bg-slate-800/90 border border-slate-600 text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors shadow-lg"
+            aria-label="Open sidebar"
+            title="Open sidebar"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M1 3h12M1 7h12M1 11h12" />
+            </svg>
+          </button>
+        )}
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
