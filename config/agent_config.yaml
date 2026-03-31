@@ -39,7 +39,7 @@ discovery:
   max_utilities_per_session: 100       # Serper can handle much higher throughput
   max_queries_per_run: 2500            # matches free tier cap
   url_score_threshold: 45              # minimum score to import to scrape_registry (was 50, lowered Sprint 25)
-  urls_per_pwsid: 3                    # top 3 with rank tagging (evaluate rank 2-3 value)
+  urls_per_pwsid: 5                    # top 5 with rank tagging (was 3; funnel analysis showed 4.8 avg above threshold, rank 2-3 win 49% of cascades)
   gap_state_threshold_pct: 20          # states below this % coverage are targeted
   min_population: 3000                 # skip tiny systems
   search_cooldown_days: 30             # don't re-search within this window

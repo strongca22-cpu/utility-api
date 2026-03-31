@@ -70,7 +70,7 @@ from utility_api.db import engine
 def process_pwsid(
     pwsid: str,
     skip_best_estimate: bool = False,
-    max_starting_urls: int = 3,
+    max_starting_urls: int = 5,
     max_parse_attempts: int = 3,
     score_threshold: int = 30,
 ) -> dict:
@@ -83,7 +83,7 @@ def process_pwsid(
     skip_best_estimate : bool
         If True, caller handles BestEstimate batching.
     max_starting_urls : int
-        Max Serper URLs to deep crawl (default 3).
+        Max Serper URLs to try in cascade (default 5, matches discovery config).
     max_parse_attempts : int
         Max parse attempts before giving up (default 3).
     score_threshold : int
@@ -174,7 +174,7 @@ def process_pwsid(
         # For re-scoring, we use URL + whatever title/snippet we can construct
         # from the scraped text (first 200 chars as proxy snippet)
         snippet_proxy = (cand["scraped_text"] or "")[:200]
-        cand["rescore"] = score_url_relevance(
+        base_score = score_url_relevance(
             url=cand["url"],
             title="",  # no title stored post-scrape
             snippet=snippet_proxy,
@@ -182,6 +182,11 @@ def process_pwsid(
             city=city,
             state=state,
         )
+
+        # Content-aware boost: check full text for rate-bearing signals
+        from utility_api.utils.content_scoring import compute_content_boost
+        content_boost = compute_content_boost(cand.get("scraped_text", ""))
+        cand["rescore"] = min(base_score + content_boost, 100)
 
     # Sort by re-score descending
     all_candidates.sort(key=lambda c: c["rescore"], reverse=True)
@@ -302,9 +307,9 @@ def process_pwsid(
                 "parse_result": None,
             }
 
-            # Score the child
+            # Score the child (URL heuristic + content boost)
             snippet_proxy = (child["scraped_text"] or "")[:200]
-            child_cand["rescore"] = score_url_relevance(
+            child_base = score_url_relevance(
                 url=child["url"],
                 title="",
                 snippet=snippet_proxy,
@@ -312,6 +317,8 @@ def process_pwsid(
                 city=city,
                 state=state,
             )
+            child_boost = compute_content_boost(child.get("scraped_text", ""))
+            child_cand["rescore"] = min(child_base + child_boost, 100)
 
             if child_cand["rescore"] >= score_threshold and child["text_len"] > 100:
                 all_candidates.append(child_cand)

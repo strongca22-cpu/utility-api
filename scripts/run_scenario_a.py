@@ -289,7 +289,7 @@ def discover_and_scrape(targets: list[dict]) -> list[dict]:
 
         for cand in all_candidates:
             snippet_proxy = (cand["scraped_text"] or "")[:200]
-            cand["rescore"] = score_url_relevance(
+            base_score = score_url_relevance(
                 url=cand["url"],
                 title="",
                 snippet=snippet_proxy,
@@ -297,6 +297,14 @@ def discover_and_scrape(targets: list[dict]) -> list[dict]:
                 city=city,
                 state=state,
             )
+
+            # Content-aware boost: check full text for rate-bearing signals.
+            # The URL-based scorer can't tell if the content actually has rates.
+            # This pulls rate-bearing pages up in ranking — critical because
+            # 24% of failures have rate content in rank 2/3 that rank 1 lacks.
+            from utility_api.utils.content_scoring import compute_content_boost
+            content_boost = compute_content_boost(cand.get("scraped_text", ""))
+            cand["rescore"] = min(base_score + content_boost, 100)
 
         # Sort by re-score, filter
         all_candidates.sort(key=lambda c: c["rescore"], reverse=True)
