@@ -235,7 +235,7 @@ def efc(
     """Generic EFC dashboard ingest — works for any of the 20+ EFC states.
 
     Fetches bill curves from the UNC EFC Topsail JSON API, extracts
-    tier structures, and writes to water_rates. All states share the
+    tier structures, and writes to rate_schedules. All states share the
     same API pattern.
 
     Examples:

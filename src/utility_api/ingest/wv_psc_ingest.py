@@ -4,7 +4,7 @@ WV Public Service Commission Water Rate Ingest
 
 Purpose:
     Scrapes water utility cost rankings from the West Virginia Public
-    Service Commission website and ingests into the utility.water_rates
+    Service Commission website and ingests into the utility.rate_schedules
     table.
 
     The WV PSC publishes cost rankings at two consumption levels
@@ -55,7 +55,7 @@ Data Sources:
     - Input: WV PSC rankings HTML tables (fetched → cached)
     - Input: utility.sdwis_systems (name matching)
     - Input: utility.cws_boundaries (PWSID filter)
-    - Output: utility.water_rates table (source=wv_psc_2026)
+    - Output: utility.rate_schedules table (source_key=wv_psc_2026)
 
 Configuration:
     - HTML responses cached at data/raw/wv_psc/

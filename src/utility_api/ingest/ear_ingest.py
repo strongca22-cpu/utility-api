@@ -7,7 +7,7 @@ Purpose:
     Board's Electronic Annual Report (eAR), cleaned and formatted by
     HydroShare (Erik Porse, UC ANR / California Institute for Water Resources).
 
-    Maps eAR single-family residential rate tier structure to the water_rates
+    Maps eAR single-family residential rate tier structure to the rate_schedules
     schema. Only ingests PWSIDs that already exist in our cws_boundaries table
     (i.e., systems we're tracking via MDWD or other sources).
 
@@ -50,7 +50,7 @@ Notes:
 Data Sources:
     - Input: data/raw/swrcb_ear/ear_annual_matrix_YYYY.xlsx (HydroShare)
     - Input: utility.cws_boundaries (PWSID filter)
-    - Output: utility.water_rates table (source=swrcb_ear_YYYY)
+    - Output: utility.rate_schedules table (source_key=swrcb_ear_YYYY)
 
 Configuration:
     - Excel files must be in data/raw/swrcb_ear/

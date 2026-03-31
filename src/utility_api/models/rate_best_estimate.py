@@ -28,7 +28,7 @@ Notes:
     - Confidence reflects both source quality and cross-source agreement
 
 Data Sources:
-    - Input: utility.water_rates (all sources)
+    - Input: utility.rate_schedules (all sources)
     - Output: utility.rate_best_estimate table
 """
 

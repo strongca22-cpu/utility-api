@@ -5,7 +5,7 @@ UNC EFC Florida Water Rate Ingest (API-Based)
 Purpose:
     Fetches water rate data from the UNC Environmental Finance Center's
     Florida Water and Wastewater Rates Dashboard via its JSON API, then
-    ingests into the utility.water_rates table.
+    ingests into the utility.rate_schedules table.
 
     The EFC API returns bill amounts at 500-gallon consumption increments
     (identical format to the NC EFC CSV). This module reuses the NC tier
@@ -52,7 +52,7 @@ Notes:
 Data Sources:
     - Input: EFC Topsail JSON API (fetched → cached at data/raw/efc_fl/)
     - Input: utility.cws_boundaries (PWSID filter)
-    - Output: utility.water_rates table (source=efc_fl_2020)
+    - Output: utility.rate_schedules table (source_key=efc_fl_2020)
 
 Configuration:
     - API responses cached at data/raw/efc_fl/api_cache.json

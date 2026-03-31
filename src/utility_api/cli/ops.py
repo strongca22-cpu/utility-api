@@ -470,9 +470,9 @@ def scrape_status(
 def sync_rate_schedules(
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview without DB writes"),
 ):
-    """Sync water_rates → rate_schedules.
+    """Sync water_rates → rate_schedules (DEPRECATED).
 
-    Finds water_rates records not yet in rate_schedules and converts
+    All ingests now write directly to rate_schedules. This command is a no-op.
     them to the canonical JSONB schema. Run this after any ingest
     to keep rate_schedules current.
 

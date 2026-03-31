@@ -29,13 +29,13 @@ Usage:
     from utility_api.models.source_catalog import SourceCatalog
 
 Notes:
-    - source_key is the primary key and matches water_rates.source values
+    - source_key is the primary key and matches rate_schedules.source_key values
     - states_covered uses PostgreSQL TEXT[] array type
     - Seeded by scripts/seed_source_catalog.py after migration
     - Queried by ua-ops CLI for status reporting
 
 Data Sources:
-    - Populated from existing water_rates.source values + manual entries
+    - Populated from existing rate_schedules.source_key values + manual entries
 """
 
 from sqlalchemy import (
@@ -61,7 +61,7 @@ class SourceCatalog(Base):
 
     source_key: Mapped[str] = mapped_column(
         String(50), primary_key=True,
-        comment="Unique key matching water_rates.source (e.g., swrcb_ear_2022, efc_nc_2025)",
+        comment="Unique key matching rate_schedules.source_key (e.g., swrcb_ear_2022, efc_nc_2025)",
     )
     display_name: Mapped[str] = mapped_column(
         String(255),
@@ -93,7 +93,7 @@ class SourceCatalog(Base):
     )
     last_ingested_at = mapped_column(
         DateTime(timezone=True), nullable=True,
-        comment="When this source was last ingested into water_rates",
+        comment="When this source was last ingested into rate_schedules",
     )
     next_check_date = mapped_column(
         Date, nullable=True,

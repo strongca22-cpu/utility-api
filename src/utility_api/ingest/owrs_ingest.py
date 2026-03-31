@@ -51,7 +51,7 @@ Notes:
 Data Sources:
     - Input: data/raw/owrs_summary_table.csv (from OWRS-Analysis GitHub repo)
     - Input: utility.cws_boundaries (PWSID filter for FK constraint)
-    - Output: utility.water_rates table (source='owrs')
+    - Output: utility.rate_schedules table (source_key='owrs')
 
 Configuration:
     - CSV file must be at data/raw/owrs_summary_table.csv

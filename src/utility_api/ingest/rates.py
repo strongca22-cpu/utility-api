@@ -9,7 +9,7 @@ Purpose:
     2. Web scraping (fetch + extract text)
     3. Claude API parsing (structured rate extraction)
     4. Bill calculation (tier structure → dollar amounts)
-    5. Database storage (water_rates table)
+    5. Database storage (rate_schedules table)
 
 Author: AI-Generated
 Created: 2026-03-23
@@ -39,7 +39,7 @@ Notes:
 Data Sources:
     - Input: utility.cws_boundaries + utility.mdwd_financials (target list)
     - Input: Web search results → utility rate page URLs → scraped text
-    - Output: utility.water_rates table
+    - Output: utility.rate_schedules table (via water_rate_to_schedule helper)
 """
 
 import time

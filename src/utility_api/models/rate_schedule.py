@@ -35,8 +35,8 @@ Notes:
     - Unique on (pwsid, source_key, vintage_date, customer_class)
 
 Data Sources:
-    - Populated by ingest modules (dual-write with water_rates)
-    - Migrated from existing water_rates records via scripts/migrate_to_rate_schedules.py
+    - Populated by ingest modules (sole write target since Phase 3 deprecation)
+    - Historical data migrated from water_rates via scripts/sync_water_rates_to_rate_schedules.py
 """
 
 from sqlalchemy import (

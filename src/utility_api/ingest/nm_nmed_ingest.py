@@ -4,7 +4,7 @@ New Mexico NMED Drinking Water Bureau Annual Rate Survey Ingest
 
 Purpose:
     Parses the NMED annual water and wastewater user charge survey PDF
-    and ingests into the utility.water_rates table. The PDF lists publicly
+    and ingests into the utility.rate_schedules table. The PDF lists publicly
     owned community water systems with monthly bill at 6,000 gallons.
 
     Since NMED uses utility names (not PWSIDs), this module fuzzy-matches
@@ -42,7 +42,7 @@ Notes:
 Data Sources:
     - Input: NMED rate survey PDF (downloaded + cached)
     - Input: utility.sdwis_systems (name matching for NM CWS)
-    - Output: utility.water_rates table (source=nm_nmed_rate_survey_2025)
+    - Output: utility.rate_schedules table (source_key=nm_nmed_rate_survey_2025)
 
 Configuration:
     - PDF cached at data/raw/nm_nmed/
@@ -395,7 +395,7 @@ def run_nm_nmed_ingest(
     """Run the NM NMED rate survey ingest."""
     started = datetime.now(timezone.utc)
     logger.info("=== NM NMED Rate Survey Ingest Starting ===")
-    logger.info(f"Target: water_rates (source={SOURCE_TAG})")
+    logger.info(f"Target: rate_schedules (source_key={SOURCE_TAG})")
 
     # Step 1: Download PDF
     pdf_path = _download_pdf(refresh=refresh)

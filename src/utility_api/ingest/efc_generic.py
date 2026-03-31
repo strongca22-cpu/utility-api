@@ -11,7 +11,7 @@ Purpose:
     1. Fetches the dashboard HTML to extract rate_structure_ids
     2. Calls the JSON API for each utility (bill curves at 500-gal steps)
     3. Extracts tier structure from bill curve (marginal rate detection)
-    4. Writes to utility.water_rates
+    4. Writes to utility.rate_schedules
 
     State configuration is in config/efc_dashboards.yaml.
 
@@ -48,7 +48,7 @@ Notes:
 Data Sources:
     - Input: EFC Topsail JSON API
     - Input: utility.cws_boundaries (PWSID filter)
-    - Output: utility.water_rates table
+    - Output: utility.rate_schedules table
     - Config: config/efc_dashboards.yaml
 
 Configuration:

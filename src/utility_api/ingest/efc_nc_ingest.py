@@ -47,7 +47,7 @@ Notes:
 Data Sources:
     - Input: data/raw/table_NC_cost_tables_2025.csv (UNC EFC dashboard export)
     - Input: utility.cws_boundaries (PWSID filter)
-    - Output: utility.water_rates table (source=efc_nc_2025)
+    - Output: utility.rate_schedules table (source_key=efc_nc_2025)
 
 Configuration:
     - CSV file must be at data/raw/table_NC_cost_tables_2025.csv

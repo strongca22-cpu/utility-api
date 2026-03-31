@@ -165,7 +165,7 @@ class BulkIngestAgent(BaseAgent):
             return 0
 
     def _sync_rate_schedules(self) -> None:
-        """Sync any new water_rates records to rate_schedules."""
+        """DEPRECATED: No longer called. Ingests write directly to rate_schedules since Phase 3."""
         try:
             from utility_api.ops.rate_schedule_helpers import (
                 water_rate_to_schedule,

@@ -118,7 +118,7 @@ def get_rate(pwsid: str, db: Session = Depends(get_db)):
     """Get parsed water rate data for a specific utility.
 
     Reads from rate_schedules (canonical JSONB schema) when available,
-    falls back to water_rates (legacy fixed columns).
+    reads from rate_schedules (canonical JSONB format).
 
     Parameters
     ----------

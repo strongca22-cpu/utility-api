@@ -32,7 +32,7 @@ Configuration:
 
 Data Sources:
     - Input: Scraped text from rate_scraper
-    - Output: Structured rate data for water_rates table
+    - Output: Structured rate data for rate_schedules table
 """
 
 import json

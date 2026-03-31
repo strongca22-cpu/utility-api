@@ -5,7 +5,7 @@ Rate Page URL Discovery
 Purpose:
     For each CWS utility in target states, discover the URL of their
     water rate schedule page using web search. Stores discovered URLs
-    in the water_rates table as staging rows (parse_confidence='pending').
+    in the scrape_registry table as staging rows (status='pending').
 
 Author: AI-Generated
 Created: 2026-03-23
@@ -449,7 +449,7 @@ def discover_rate_urls(
 
 
 def _store_discovery(result: DiscoveryResult) -> None:
-    """Store a discovery result as a pending water_rates row.
+    """Store a discovery result as a pending scrape_registry row.
 
     Parameters
     ----------

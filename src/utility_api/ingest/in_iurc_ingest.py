@@ -4,7 +4,7 @@ Indiana IURC Annual Water Bill Analysis Ingest
 
 Purpose:
     Parses the Indiana Utility Regulatory Commission annual water billing
-    survey PDF and ingests into the utility.water_rates table. The PDF
+    survey PDF and ingests into the utility.rate_schedules table. The PDF
     lists all IURC-regulated water utilities with monthly bill at 4,000
     gallons consumption.
 
@@ -43,7 +43,7 @@ Data Sources:
     - Input: IURC PDF (downloaded + cached)
     - Input: utility.sdwis_systems (name matching)
     - Input: utility.cws_boundaries (PWSID filter)
-    - Output: utility.water_rates table (source=in_iurc_water_billing_2024)
+    - Output: utility.rate_schedules table (source_key=in_iurc_water_billing_2024)
 
 Configuration:
     - PDF cached at data/raw/in_iurc/
@@ -642,7 +642,7 @@ def run_in_iurc_ingest(
     started = datetime.now(timezone.utc)
     logger.info("=== Indiana IURC Water Billing Ingest Starting ===")
     logger.info(f"Source: {PDF_URL}")
-    logger.info(f"Target: water_rates (source={SOURCE_TAG})")
+    logger.info(f"Target: rate_schedules (source_key={SOURCE_TAG})")
 
     # Step 1: Download PDF
     pdf_path = _download_pdf(refresh=refresh)

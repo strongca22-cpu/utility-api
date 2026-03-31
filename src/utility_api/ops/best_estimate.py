@@ -148,7 +148,7 @@ def select_best_estimate(group: pd.DataFrame, config: dict, base_priorities: dic
     Parameters
     ----------
     group : pd.DataFrame
-        All water_rates records for one PWSID.
+        All rate_schedules records for one PWSID.
     config : dict
         Full source priority config.
     base_priorities : dict
