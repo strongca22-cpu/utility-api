@@ -1262,12 +1262,24 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 
 ### Sprint 25b — In Progress (Scenario A)
 - [x] **Scenario A script:** `scripts/run_scenario_a.py` — batch API sweep for all gap >=3k
-- [ ] **Scenario A running:** `tmux attach -t scenario_a` — 4,912 PWSIDs (4,904 gap + 8 retries), ~19.6k Serper queries, ~$28 Anthropic batch cost
-  - Discovery + scrape phase: ~27 hours (started 2026-03-30 14:10 UTC)
-  - Batch submit: automatic at end of discovery
-  - Process results: `python scripts/run_scenario_a.py --process-batch` (run after ~24hr batch processing)
-  - Expected yield: ~3,000 new rates, coverage 73%→86% pop
-- [ ] **Duke-only sweep:** 963 PWSIDs where Duke is sole source (>=3k pop). Separate script, not yet built. States: TX 221, CA 167, PA 158, WA 123, NJ 108.
+- [x] **Scenario A discovery complete:** 4,912 PWSIDs, 4,540 parse tasks submitted
+  - Batch `msgbatch_01FhetQeo9TfoTkBroYFHT1T` — in_progress at Anthropic (submitted 2026-03-31 06:40 UTC)
+  - **NOTE:** task_details missing from batch_jobs (VARCHAR(2) state_filter bug). Reconstruct before processing.
+  - Process when complete: `python scripts/run_scenario_a.py --process-batch`
+  - **After processing: rebuild best_estimate + re-export dashboard** (don't re-export before batch completes)
+- [x] **Duke-only sweep:** 963 PWSIDs. 434 succeeded (47%), 508 remain Duke-only.
+  - Batch `msgbatch_01AT77529EDstWZn3ygzR2ZH` processed. $4.59 cost.
+  - Duke bill unit mismatch documented in `docs/duke_upgrade_batch_report.md`
+  - Failure decomposition in `docs/duke_failure_decomposition.md`
+
+### Sprint 25c — Parse Quality Fixes (2026-03-31)
+- [x] **Canonical enum in parse prompt** — rate_structure_type constrained to 6 types
+- [x] **Normalization map** — 100+ LLM variants → 6 canonical types (`src/utility_api/utils/rate_structure_normalize.py`)
+- [x] **Bill consistency validator** — identical 5/10/20 CCF bills + non-flat → low confidence
+- [x] **Duke-only → low confidence** in dashboard export, reference estimate caveat
+- [x] **58 failed-but-wrote records cleaned** from rate_schedules
+- [x] **Bill computation fix** — `_compute_bill` returns fixed charge for empty tiers, string rates cleaned. 116 records recovered.
+- [ ] **Scenario A batch processing** — waiting on Anthropic. After processing: rebuild best_estimate, re-export dashboard, rebuild coverage_stats.
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
