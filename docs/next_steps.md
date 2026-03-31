@@ -1291,8 +1291,8 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Config:** `config/targeted_research.yaml` — 25 high-pop uncovered PWSIDs in 2 batches (Duke-sourced, gap-sourced)
 - [ ] **Targeted research run:** Execute Duke-sourced batch (11 PWSIDs, ~5.3M pop)
 - [ ] **Scenario A batch processing** — still in_progress at Anthropic
-- [ ] **water_rates deprecation Phase 3:** Redirect all ingest WRITE paths to rate_schedules
-- [ ] **water_rates deprecation Phase 4:** Redirect all READ paths (coverage views, API, analysis scripts)
+- [x] **water_rates deprecation Phase 3:** All 10 ingest modules redirected to write directly to rate_schedules. rate_discovery.py staging moved to scrape_registry. BulkIngestAgent sync removed.
+- [x] **water_rates deprecation Phase 4:** All active reads redirected to rate_schedules — best_estimate.py (3 backfill blocks removed), coverage.py (UNION simplified), API routers, cli/ops.py (4 queries), 6 scripts. water_rates preserved as read-only legacy.
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
