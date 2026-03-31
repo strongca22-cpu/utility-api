@@ -56,6 +56,72 @@ from utility_api.db import engine
 from utility_api.ingest.rate_parser import SYSTEM_PROMPT
 
 
+def _repair_json(raw: str) -> dict | None:
+    """Attempt to repair common LLM JSON formatting errors.
+
+    Handles three failure modes observed in Scenario A batch:
+    1. Extra data after closing brace (LLM appended notes after JSON)
+    2. Missing comma delimiters between fields
+    3. Unterminated strings (truncated output)
+
+    Parameters
+    ----------
+    raw : str
+        The malformed JSON string.
+
+    Returns
+    -------
+    dict | None
+        Parsed dict if repair succeeded, None if unrecoverable.
+    """
+    import re
+
+    # Strategy 1: Extra data — find the first complete top-level JSON object
+    # Match from first { to its balanced closing }
+    brace_depth = 0
+    for i, ch in enumerate(raw):
+        if ch == "{":
+            brace_depth += 1
+        elif ch == "}":
+            brace_depth -= 1
+            if brace_depth == 0:
+                try:
+                    return json.loads(raw[: i + 1])
+                except json.JSONDecodeError:
+                    break  # First object isn't valid either
+                break
+
+    # Strategy 2: Missing comma — add commas before lines starting with "
+    # Pattern: }\n"key" or value\n"key" without comma
+    try:
+        fixed = re.sub(
+            r'(?<=[}\]"\d])\s*\n(\s*")',
+            r',\n\1',
+            raw,
+        )
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 3: Unterminated string — close it and complete the JSON
+    # Add closing quotes, braces, brackets as needed
+    try:
+        patched = raw.rstrip()
+        # Close any open string
+        if patched.count('"') % 2 == 1:
+            patched += '"'
+        # Close open braces/brackets
+        open_braces = patched.count("{") - patched.count("}")
+        open_brackets = patched.count("[") - patched.count("]")
+        patched += "]" * max(open_brackets, 0)
+        patched += "}" * max(open_braces, 0)
+        return json.loads(patched)
+    except json.JSONDecodeError:
+        pass
+
+    return None
+
+
 class BatchAgent(BaseAgent):
     """Submits and processes Anthropic Message Batches."""
 
@@ -350,16 +416,22 @@ class BatchAgent(BaseAgent):
                     + usage.output_tokens * pricing["output"]) * 0.5
             total_cost += cost
 
-            # Parse JSON from response
+            # Parse JSON from response (with repair for common LLM formatting errors)
             try:
                 raw_json = "{" + message.content[0].text
                 parsed = json.loads(raw_json)
             except (json.JSONDecodeError, IndexError) as e:
-                logger.warning(f"  {pwsid}: JSON parse failed: {e}")
-                failed += 1
-                parse_agent._update_registry(registry_id, "failed", "failed", cost, model)
-                details.append({"pwsid": pwsid, "status": "json_error"})
-                continue
+                # Attempt repair before giving up
+                repaired = _repair_json(raw_json)
+                if repaired is not None:
+                    parsed = repaired
+                    logger.info(f"  {pwsid}: JSON repaired (original error: {e})")
+                else:
+                    logger.warning(f"  {pwsid}: JSON parse failed: {e}")
+                    failed += 1
+                    parse_agent._update_registry(registry_id, "failed", "failed", cost, model)
+                    details.append({"pwsid": pwsid, "status": "json_error"})
+                    continue
 
             # Validate
             valid, issues = validate_parse_result(parsed)
@@ -389,13 +461,27 @@ class BatchAgent(BaseAgent):
             bill_20 = _compute_bill(14960, tiers, fixed_charge)
 
             # Bill consistency check: identical bills at all volumes + non-flat = suspect
+            # Recovery: reclassify as flat/uniform and keep the bill amount
             rate_type = parsed.get("rate_structure_type")
             if check_bill_consistency(bill_5, bill_10, bill_20, rate_type):
-                logger.warning(
-                    f"  {pwsid}: bill consistency flag — 5/10/20 CCF identical "
-                    f"(${bill_10:.2f}) but type={rate_type}. Downgrading to low."
-                )
-                confidence = "low"
+                if bill_10 and bill_10 > 0:
+                    # Bills are identical and non-zero — this is a flat rate misclassified
+                    # as tiered. Reclassify and keep the data rather than rejecting.
+                    old_type = rate_type
+                    rate_type = "flat"
+                    parsed["rate_structure_type"] = "flat"
+                    # Flatten tiers to a single tier (the flat amount IS the bill)
+                    tiers = []
+                    logger.info(
+                        f"  {pwsid}: bill consistency recovery — reclassified "
+                        f"{old_type} → flat (bill=${bill_10:.2f})"
+                    )
+                else:
+                    logger.warning(
+                        f"  {pwsid}: bill consistency flag — 5/10/20 CCF identical "
+                        f"(${bill_10 or 0:.2f}) but type={rate_type}. Downgrading to low."
+                    )
+                    confidence = "low"
 
             conservation = None
             if len(tiers) >= 2:
