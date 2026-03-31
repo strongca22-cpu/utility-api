@@ -1,14 +1,18 @@
 /**
  * Right-side detail panel — appears when a polygon is clicked.
- * Shows utility metadata, rate data, tier breakdown, and source info.
- * Slide-in animation via CSS transition on the parent grid column.
+ * Product mode: utility metadata, rate data, tier breakdown, source info.
+ * QA mode: all of the above + source URL, variance, county comparison, flags.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCurrency, formatPopulation, ownerTypeLabel } from "../utils/format";
+import { useDashboard } from "../contexts/DashboardContext";
+import { TIER_COLORS } from "../utils/colors";
+import { useCountyRates } from "../hooks/useCountyRates";
 
 export default function DetailPanel({ utility, onClose }) {
   const panelRef = useRef(null);
+  const { appMode } = useDashboard();
 
   // ESC to close
   useEffect(() => {
@@ -37,8 +41,11 @@ export default function DetailPanel({ utility, onClose }) {
       fixedCharges = JSON.parse(utility.fixed_charges_json);
     }
   } catch {
-    // Parsing failed — show without tier detail
+    // Parsing failed
   }
+
+  // Tier badge
+  const tierBadge = utility.data_tier ? TIER_BADGE_MAP[utility.data_tier] : null;
 
   return (
     <div
@@ -59,10 +66,21 @@ export default function DetailPanel({ utility, onClose }) {
         <h2 className="text-base font-semibold text-slate-100 pr-8 leading-tight">
           {utility.pws_name || "Unknown Utility"}
         </h2>
-        <div className="mt-0.5 text-xs text-slate-400">
-          {utility.pwsid}
+        <div className="mt-0.5 text-xs text-slate-400 flex items-center gap-2">
+          <span>{utility.pwsid}</span>
           {utility.owner_type && (
             <span> · {ownerTypeLabel(utility.owner_type)}</span>
+          )}
+          {tierBadge && (
+            <span
+              className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase"
+              style={{
+                backgroundColor: tierBadge.color + "20",
+                color: tierBadge.color,
+              }}
+            >
+              {tierBadge.label}
+            </span>
           )}
         </div>
       </div>
@@ -153,16 +171,13 @@ export default function DetailPanel({ utility, onClose }) {
               {utility.source_name && (
                 <div className="text-slate-200">{utility.source_name}</div>
               )}
-              {utility.source_tier && (
-                <div>
-                  <span className="text-slate-500">Tier: </span>
-                  <span className="capitalize">{utility.source_tier.replace(/_/g, " ")}</span>
-                </div>
-              )}
               {utility.data_vintage && (
                 <div>
                   <span className="text-slate-500">Vintage: </span>
                   {utility.data_vintage}
+                  {utility.is_stale && (
+                    <span className="ml-1 text-orange-400 text-xs">(stale)</span>
+                  )}
                 </div>
               )}
               {utility.confidence && (
@@ -172,6 +187,11 @@ export default function DetailPanel({ utility, onClose }) {
                 </div>
               )}
             </div>
+
+            {/* QA Mode: extended details */}
+            {appMode === "qa" && (
+              <QASection utility={utility} />
+            )}
           </>
         ) : (
           <>
@@ -190,6 +210,159 @@ export default function DetailPanel({ utility, onClose }) {
     </div>
   );
 }
+
+/* --- QA Section (only in QA mode) --- */
+
+function QASection({ utility }) {
+  const countyRates = useCountyRates(utility.county, utility.state);
+  const [flagged, setFlagged] = useState(() => {
+    const flags = JSON.parse(localStorage.getItem("uapi_flags") || "{}");
+    return !!flags[utility.pwsid];
+  });
+
+  function toggleFlag() {
+    const flags = JSON.parse(localStorage.getItem("uapi_flags") || "{}");
+    if (flagged) {
+      delete flags[utility.pwsid];
+    } else {
+      flags[utility.pwsid] = new Date().toISOString();
+    }
+    localStorage.setItem("uapi_flags", JSON.stringify(flags));
+    setFlagged(!flagged);
+  }
+
+  // Reset flag state when utility changes
+  useEffect(() => {
+    const flags = JSON.parse(localStorage.getItem("uapi_flags") || "{}");
+    setFlagged(!!flags[utility.pwsid]);
+  }, [utility.pwsid]);
+
+  return (
+    <>
+      <SectionDivider label="QA Details" />
+
+      {/* Source URL */}
+      {utility.source_url && (
+        <div className="text-sm mb-2">
+          <span className="text-slate-500">Source: </span>
+          <a
+            href={utility.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline break-all"
+          >
+            {utility.source_url.length > 60
+              ? utility.source_url.slice(0, 60) + "..."
+              : utility.source_url}
+          </a>
+        </div>
+      )}
+
+      {/* Sources + selection */}
+      <div className="space-y-0.5 text-sm text-slate-400">
+        {utility.n_sources && (
+          <div>
+            <span className="text-slate-500">Sources: </span>
+            {utility.n_sources} distinct
+          </div>
+        )}
+        {utility.parse_model && (
+          <div>
+            <span className="text-slate-500">Parse model: </span>
+            {utility.parse_model}
+          </div>
+        )}
+        {utility.last_scraped && (
+          <div>
+            <span className="text-slate-500">Last scraped: </span>
+            {utility.last_scraped.split("T")[0]}
+          </div>
+        )}
+        {utility.conservation_signal != null && (
+          <div>
+            <span className="text-slate-500">Conservation signal: </span>
+            {utility.conservation_signal.toFixed(2)}x
+          </div>
+        )}
+        {utility.selection_notes && (
+          <div>
+            <span className="text-slate-500">Selection: </span>
+            {utility.selection_notes}
+          </div>
+        )}
+      </div>
+
+      {/* Variance */}
+      {utility.bill_range_min != null && utility.bill_range_max != null && (
+        <div className="mt-2 text-sm">
+          <span className="text-slate-500">Bill range: </span>
+          <span className={utility.has_high_variance ? "text-yellow-400" : "text-slate-300"}>
+            {formatCurrency(utility.bill_range_min)} – {formatCurrency(utility.bill_range_max)}
+          </span>
+          {utility.has_high_variance && (
+            <span className="ml-1 text-yellow-400 text-xs">(high variance)</span>
+          )}
+        </div>
+      )}
+
+      {/* Review flags */}
+      {utility.needs_review && (
+        <div className="mt-2 px-2 py-1.5 rounded bg-red-900/20 border border-red-800/30 text-sm">
+          <span className="text-red-400 font-medium">Flagged for review</span>
+          {utility.review_reason && (
+            <div className="text-red-400/70 text-xs mt-0.5">{utility.review_reason}</div>
+          )}
+        </div>
+      )}
+
+      {/* County comparison */}
+      {countyRates && countyRates.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+            County Comparison ({utility.county})
+          </div>
+          <div className="space-y-0.5 text-sm max-h-40 overflow-y-auto">
+            {countyRates.map((r) => (
+              <div
+                key={r.pwsid}
+                className={`flex justify-between text-slate-400 ${
+                  r.pwsid === utility.pwsid ? "text-blue-300 font-medium" : ""
+                }`}
+              >
+                <span className="truncate mr-2" title={r.name}>
+                  {r.name?.slice(0, 25) || r.pwsid}
+                </span>
+                <span className="flex-shrink-0">{formatCurrency(r.bill_10ccf)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Flag button */}
+      <div className="mt-4">
+        <button
+          onClick={toggleFlag}
+          className={`w-full text-sm py-2 rounded transition-colors ${
+            flagged
+              ? "bg-red-600/20 text-red-400 border border-red-600/40 hover:bg-red-600/30"
+              : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+          }`}
+        >
+          {flagged ? "Remove Flag" : "Flag for Review"}
+        </button>
+      </div>
+    </>
+  );
+}
+
+/* --- Sub-components --- */
+
+const TIER_BADGE_MAP = {
+  free: { label: "Free", color: TIER_COLORS.free },
+  premium: { label: "Premium", color: TIER_COLORS.premium },
+  reference: { label: "Reference", color: TIER_COLORS.reference },
+};
 
 function SectionDivider({ label }) {
   return (
