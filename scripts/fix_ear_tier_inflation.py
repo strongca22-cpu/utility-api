@@ -57,6 +57,7 @@ from utility_api.db import engine
 # US median household uses ~5 CCF/month. Even drought surcharge tiers
 # rarely exceed 50 CCF. 100 CCF is a very generous threshold.
 TIER_LIMIT_THRESHOLD = 100  # CCF
+TIER_LIMIT_THRESHOLD_GAL = 100 * 748  # 74,800 gallons (rate_schedules uses gallons)
 
 # Pre-computed bill amounts above this are clearly wrong
 BILL_THRESHOLD = 500  # $/month at any standard CCF level
@@ -81,21 +82,25 @@ def run_fix(dry_run: bool = False) -> dict:
     now = datetime.now(timezone.utc).isoformat()
 
     with engine.connect() as conn:
-        # Find all eAR records with inflated tier limits
+        # Find all eAR records with inflated tier limits in rate_schedules
+        # rate_schedules stores tiers in JSONB (gallons), so we check max_gal
         inflated = conn.execute(text(f"""
-            SELECT id, pwsid, source, utility_name,
-                   tier_1_limit_ccf, tier_2_limit_ccf, tier_3_limit_ccf, tier_4_limit_ccf,
-                   bill_6ccf, bill_9ccf, bill_12ccf, bill_24ccf,
-                   fixed_charge_monthly, parse_notes
-            FROM {schema}.water_rates
-            WHERE source LIKE 'swrcb_ear_%'
-              AND (tier_1_limit_ccf > :threshold
-                   OR tier_2_limit_ccf > :threshold
-                   OR tier_3_limit_ccf > :threshold
-                   OR tier_4_limit_ccf > :threshold)
-        """), {"threshold": TIER_LIMIT_THRESHOLD}).fetchall()
+            SELECT rs.id, rs.pwsid, rs.source_key AS source, c.pws_name AS utility_name,
+                   rs.volumetric_tiers,
+                   rs.bill_6ccf, rs.bill_9ccf, rs.bill_12ccf, rs.bill_24ccf,
+                   (rs.fixed_charges->0->>'amount')::float AS fixed_charge_monthly,
+                   rs.parse_notes
+            FROM {schema}.rate_schedules rs
+            LEFT JOIN {schema}.cws_boundaries c ON c.pwsid = rs.pwsid
+            WHERE rs.source_key LIKE 'swrcb_ear_%'
+              AND rs.volumetric_tiers IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM jsonb_array_elements(rs.volumetric_tiers) t
+                  WHERE (t->>'max_gal')::float > :threshold_gal
+              )
+        """), {"threshold_gal": TIER_LIMIT_THRESHOLD_GAL}).fetchall()
 
-        logger.info(f"Found {len(inflated)} eAR records with tier limits > {TIER_LIMIT_THRESHOLD} CCF")
+        logger.info(f"Found {len(inflated)} eAR records with tier limits > {TIER_LIMIT_THRESHOLD} CCF ({TIER_LIMIT_THRESHOLD_GAL} gal)")
 
         stats = {
             "total_found": len(inflated),
@@ -110,16 +115,18 @@ def run_fix(dry_run: bool = False) -> dict:
             pwsid = row[1]
             source = row[2]
             name = row[3] or ""
-            bill_6 = row[8]
-            bill_9 = row[9]
-            bill_12 = row[10]
-            bill_24 = row[11]
-            fixed = row[12]
-            notes = row[13] or ""
+            bill_6 = row[5]
+            bill_9 = row[6]
+            bill_12 = row[7]
+            bill_24 = row[8]
+            fixed = row[9]
+            notes = row[10] or ""
 
-            # Determine max tier limit for logging
-            limits = [row[4], row[5], row[6], row[7]]
-            max_limit = max(l for l in limits if l is not None)
+            # Determine max tier limit for logging (convert back to CCF for display)
+            import json as _json
+            tiers = row[4] if isinstance(row[4], list) else _json.loads(row[4]) if row[4] else []
+            max_gal = max((t.get("max_gal", 0) or 0) for t in tiers) if tiers else 0
+            max_limit_ccf = max_gal / 748.0
 
             # Check if pre-computed bills are reasonable
             bills_ok = True
@@ -132,7 +139,7 @@ def run_fix(dry_run: bool = False) -> dict:
             if bill_12 is not None and bill_12 < 2.0:
                 bills_ok = False
 
-            action_note = f"[FIX {now[:10]}] Tier limits inflated (max={max_limit:.0f} CCF, threshold={TIER_LIMIT_THRESHOLD}). Tiers NULLed."
+            action_note = f"[FIX {now[:10]}] Tier limits inflated (max={max_limit_ccf:.0f} CCF, threshold={TIER_LIMIT_THRESHOLD}). Tiers NULLed."
             if not bills_ok:
                 action_note += " Bills also NULLed (inflated/suspect)."
             else:
@@ -144,34 +151,32 @@ def run_fix(dry_run: bool = False) -> dict:
                 status = "bills_nulled" if not bills_ok else "tiers_only"
                 logger.info(
                     f"  [DRY RUN] {pwsid} {source} {name[:30]:30s} "
-                    f"max_limit={max_limit:.0f} bill@12=${bill_12 or 0:.2f} → {status}"
+                    f"max_limit={max_limit_ccf:.0f}CCF bill@12=${bill_12 or 0:.2f} → {status}"
                 )
             else:
                 if bills_ok:
                     # NULL tiers only, keep bills
                     conn.execute(text(f"""
-                        UPDATE {schema}.water_rates
-                        SET tier_1_limit_ccf = NULL, tier_1_rate = NULL,
-                            tier_2_limit_ccf = NULL, tier_2_rate = NULL,
-                            tier_3_limit_ccf = NULL, tier_3_rate = NULL,
-                            tier_4_limit_ccf = NULL, tier_4_rate = NULL,
+                        UPDATE {schema}.rate_schedules
+                        SET volumetric_tiers = NULL,
+                            tier_count = 0,
+                            conservation_signal = NULL,
                             parse_notes = :notes,
-                            parse_confidence = 'medium'
+                            confidence = 'medium'
                         WHERE id = :id
                     """), {"id": rec_id, "notes": new_notes})
                     stats["bills_preserved"] += 1
                 else:
                     # NULL tiers AND bills
                     conn.execute(text(f"""
-                        UPDATE {schema}.water_rates
-                        SET tier_1_limit_ccf = NULL, tier_1_rate = NULL,
-                            tier_2_limit_ccf = NULL, tier_2_rate = NULL,
-                            tier_3_limit_ccf = NULL, tier_3_rate = NULL,
-                            tier_4_limit_ccf = NULL, tier_4_rate = NULL,
+                        UPDATE {schema}.rate_schedules
+                        SET volumetric_tiers = NULL,
+                            tier_count = 0,
+                            conservation_signal = NULL,
                             bill_6ccf = NULL, bill_9ccf = NULL,
                             bill_12ccf = NULL, bill_24ccf = NULL,
                             parse_notes = :notes,
-                            parse_confidence = 'low'
+                            confidence = 'low'
                         WHERE id = :id
                     """), {"id": rec_id, "notes": new_notes})
                     stats["bills_nulled"] += 1

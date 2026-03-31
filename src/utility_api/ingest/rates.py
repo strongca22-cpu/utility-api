@@ -134,8 +134,8 @@ def _get_target_utilities(
         # Get already-parsed PWSIDs
         if skip_existing:
             existing = conn.execute(text(f"""
-                SELECT DISTINCT pwsid FROM {schema}.water_rates
-                WHERE parse_confidence IN ('high', 'medium')
+                SELECT DISTINCT pwsid FROM {schema}.rate_schedules
+                WHERE confidence IN ('high', 'medium')
             """)).fetchall()
             existing_set = {r[0] for r in existing}
         else:

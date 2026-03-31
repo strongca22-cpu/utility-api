@@ -189,66 +189,11 @@ def get_rate(pwsid: str, db: Session = Depends(get_db)):
             },
         }
 
-    # Fallback to water_rates (legacy)
-    row = db.execute(text(f"""
-        SELECT
-            w.pwsid, w.utility_name, w.state_code, w.county,
-            w.rate_effective_date, w.rate_structure_type, w.rate_class,
-            w.billing_frequency, w.fixed_charge_monthly, w.meter_size_inches,
-            w.tier_1_limit_ccf, w.tier_1_rate,
-            w.tier_2_limit_ccf, w.tier_2_rate,
-            w.tier_3_limit_ccf, w.tier_3_rate,
-            w.tier_4_limit_ccf, w.tier_4_rate,
-            w.bill_5ccf, w.bill_10ccf,
-            w.source_url, w.parse_confidence, w.parse_model,
-            w.parse_notes, w.scraped_at, w.parsed_at
-        FROM {SCHEMA}.water_rates w
-        WHERE w.pwsid = :pwsid
-        AND w.parse_confidence IN ('high', 'medium')
-        ORDER BY w.rate_effective_date DESC NULLS LAST
-        LIMIT 1
-    """), {"pwsid": pwsid_upper}).mappings().first()
-
-    if not row:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No parsed rate data found for PWSID {pwsid}"
-        )
-
-    # Build legacy tier list
-    tiers = []
-    for i in range(1, 5):
-        rate = row[f"tier_{i}_rate"]
-        if rate is not None:
-            tiers.append({
-                "tier": i,
-                "limit_ccf": row[f"tier_{i}_limit_ccf"],
-                "rate_per_ccf": rate,
-            })
-
-    return {
-        "pwsid": row["pwsid"],
-        "utility_name": row["utility_name"],
-        "state_code": row["state_code"],
-        "county": row["county"],
-        "rate_effective_date": str(row["rate_effective_date"]) if row["rate_effective_date"] else None,
-        "rate_structure": row["rate_structure_type"],
-        "rate_class": row["rate_class"],
-        "billing_frequency": row["billing_frequency"],
-        "fixed_charge_monthly": row["fixed_charge_monthly"],
-        "meter_size_inches": row["meter_size_inches"],
-        "tiers": tiers,
-        "bill_5ccf": row["bill_5ccf"],
-        "bill_10ccf": row["bill_10ccf"],
-        "provenance": {
-            "source_url": row["source_url"],
-            "parse_confidence": row["parse_confidence"],
-            "parse_model": row["parse_model"],
-            "parse_notes": row["parse_notes"],
-            "scraped_at": row["scraped_at"].isoformat() if row["scraped_at"] else None,
-            "parsed_at": row["parsed_at"] if row["parsed_at"] else None,
-        },
-    }
+    # Phase 4: water_rates fallback removed — rate_schedules is sole source
+    raise HTTPException(
+        status_code=404,
+        detail=f"No parsed rate data found for PWSID {pwsid}"
+    )
 
 
 @router.get("/rates")
@@ -268,19 +213,21 @@ def list_rates(
     state_clause = ""
     params = {}
     if state:
-        state_clause = "AND w.state_code = :state"
+        state_clause = "AND c.state_code = :state"
         params["state"] = state.upper()
 
     rows = db.execute(text(f"""
         SELECT
-            w.pwsid, w.utility_name, w.state_code, w.county,
-            w.rate_structure_type, w.fixed_charge_monthly,
-            w.bill_5ccf, w.bill_10ccf,
-            w.parse_confidence, w.rate_effective_date,
+            rs.pwsid, c.pws_name AS utility_name, c.state_code, c.county,
+            rs.rate_structure_type,
+            (rs.fixed_charges->0->>'amount')::float AS fixed_charge_monthly,
+            rs.bill_5ccf, rs.bill_10ccf,
+            rs.confidence AS parse_confidence, rs.vintage_date AS rate_effective_date,
             m.population
-        FROM {SCHEMA}.water_rates w
-        LEFT JOIN {SCHEMA}.mdwd_financials m ON m.pwsid = w.pwsid
-        WHERE w.parse_confidence IN ({placeholders})
+        FROM {SCHEMA}.rate_schedules rs
+        LEFT JOIN {SCHEMA}.cws_boundaries c ON c.pwsid = rs.pwsid
+        LEFT JOIN {SCHEMA}.mdwd_financials m ON m.pwsid = rs.pwsid
+        WHERE rs.confidence IN ({placeholders})
         {state_clause}
         ORDER BY m.population DESC NULLS LAST
     """), params).mappings().all()

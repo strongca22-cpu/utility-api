@@ -185,17 +185,17 @@ def seed_source_catalog(update_counts: bool = False) -> int:
 
         # Update pwsid_count and last_ingested_at from actual DB data
         if update_counts:
-            logger.info("Updating pwsid_count from water_rates...")
+            logger.info("Updating pwsid_count from rate_schedules...")
             conn.execute(text(f"""
                 UPDATE {schema}.source_catalog sc
                 SET pwsid_count = sub.cnt,
                     updated_at = NOW()
                 FROM (
-                    SELECT source, COUNT(DISTINCT pwsid) AS cnt
-                    FROM {schema}.water_rates
-                    GROUP BY source
+                    SELECT source_key, COUNT(DISTINCT pwsid) AS cnt
+                    FROM {schema}.rate_schedules
+                    GROUP BY source_key
                 ) sub
-                WHERE sc.source_key = sub.source
+                WHERE sc.source_key = sub.source_key
             """))
 
             logger.info("Updating last_ingested_at from pipeline_runs...")

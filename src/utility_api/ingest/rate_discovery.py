@@ -416,7 +416,7 @@ def discover_rate_urls(
     # Skip utilities that already have a rate URL
     with engine.connect() as conn:
         existing = conn.execute(
-            text(f"SELECT DISTINCT pwsid FROM {schema}.water_rates WHERE source_url IS NOT NULL")
+            text(f"SELECT DISTINCT pwsid FROM {schema}.rate_schedules WHERE source_url IS NOT NULL")
         ).fetchall()
         existing_pwsids = {r[0] for r in existing}
 

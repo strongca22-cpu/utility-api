@@ -74,8 +74,8 @@ def get_targets() -> list[dict]:
     # Skip any that already have good rates
     with engine.connect() as conn:
         existing = conn.execute(text(f"""
-            SELECT DISTINCT pwsid FROM {schema}.water_rates
-            WHERE parse_confidence IN ('high', 'medium')
+            SELECT DISTINCT pwsid FROM {schema}.rate_schedules
+            WHERE confidence IN ('high', 'medium')
         """)).fetchall()
         existing_set = {r[0] for r in existing}
 

@@ -109,9 +109,6 @@ def get_target_pwsids() -> list[dict]:
             AND NOT EXISTS(
                 SELECT 1 FROM {schema}.rate_schedules rs WHERE rs.pwsid = c.pwsid
             )
-            AND NOT EXISTS(
-                SELECT 1 FROM {schema}.water_rates wr WHERE wr.pwsid = c.pwsid
-            )
             ORDER BY c.population_served DESC
         """), {"min_pop": MIN_POPULATION}).fetchall()
 

@@ -209,8 +209,8 @@ def main():
     schema = settings.utility_schema
     with engine.connect() as conn:
         parsed = conn.execute(text(f"""
-            SELECT DISTINCT pwsid FROM {schema}.water_rates
-            WHERE parse_confidence IN ('high', 'medium')
+            SELECT DISTINCT pwsid FROM {schema}.rate_schedules
+            WHERE confidence IN ('high', 'medium')
         """)).fetchall()
         parsed_set = {r[0] for r in parsed}
 

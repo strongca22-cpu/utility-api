@@ -101,17 +101,17 @@ def status():
                     c.state_code,
                     COUNT(*) AS total_cws,
                     COUNT(CASE WHEN EXISTS (
-                        SELECT 1 FROM {schema}.water_rates wr WHERE wr.pwsid = c.pwsid
+                        SELECT 1 FROM {schema}.rate_schedules rs WHERE rs.pwsid = c.pwsid
                     ) THEN 1 END) AS with_rates,
                     ROUND(
                         100.0 * COUNT(CASE WHEN EXISTS (
-                            SELECT 1 FROM {schema}.water_rates wr WHERE wr.pwsid = c.pwsid
+                            SELECT 1 FROM {schema}.rate_schedules rs WHERE rs.pwsid = c.pwsid
                         ) THEN 1 END) / NULLIF(COUNT(*), 0), 1
                     ) AS pct
                 FROM {schema}.cws_boundaries c
                 GROUP BY c.state_code
                 HAVING COUNT(CASE WHEN EXISTS (
-                    SELECT 1 FROM {schema}.water_rates wr WHERE wr.pwsid = c.pwsid
+                    SELECT 1 FROM {schema}.rate_schedules rs WHERE rs.pwsid = c.pwsid
                 ) THEN 1 END) > 0
                 ORDER BY pct DESC
             """)).fetchall()
@@ -262,14 +262,15 @@ def coverage_report():
         # --- Coverage by Source ---
         typer.echo("\n── Rate Records by Source ──")
         rows = conn.execute(text(f"""
-            SELECT source, state_code,
+            SELECT rs.source_key AS source, c.state_code,
                    COUNT(*) AS records,
-                   COUNT(DISTINCT pwsid) AS pwsids,
-                   MIN(rate_effective_date) AS earliest,
-                   MAX(rate_effective_date) AS latest
-            FROM {schema}.water_rates
-            GROUP BY source, state_code
-            ORDER BY source, state_code
+                   COUNT(DISTINCT rs.pwsid) AS pwsids,
+                   MIN(rs.vintage_date) AS earliest,
+                   MAX(rs.vintage_date) AS latest
+            FROM {schema}.rate_schedules rs
+            LEFT JOIN {schema}.cws_boundaries c ON c.pwsid = rs.pwsid
+            GROUP BY rs.source_key, c.state_code
+            ORDER BY rs.source_key, c.state_code
         """)).fetchall()
 
         typer.echo(f"  {'Source':25s} {'State':6s} {'Records':>8s} {'PWSIDs':>8s} {'Earliest':>12s} {'Latest':>12s}")
@@ -287,15 +288,15 @@ def coverage_report():
         rows = conn.execute(text(f"""
             SELECT
                 CASE
-                    WHEN rate_effective_date >= CURRENT_DATE - INTERVAL '1 year' THEN '<1 year'
-                    WHEN rate_effective_date >= CURRENT_DATE - INTERVAL '2 years' THEN '1-2 years'
-                    WHEN rate_effective_date >= CURRENT_DATE - INTERVAL '5 years' THEN '2-5 years'
-                    WHEN rate_effective_date IS NOT NULL THEN '>5 years'
+                    WHEN vintage_date >= CURRENT_DATE - INTERVAL '1 year' THEN '<1 year'
+                    WHEN vintage_date >= CURRENT_DATE - INTERVAL '2 years' THEN '1-2 years'
+                    WHEN vintage_date >= CURRENT_DATE - INTERVAL '5 years' THEN '2-5 years'
+                    WHEN vintage_date IS NOT NULL THEN '>5 years'
                     ELSE 'no date'
                 END AS age_bucket,
                 COUNT(*) AS records,
                 COUNT(DISTINCT pwsid) AS pwsids
-            FROM {schema}.water_rates
+            FROM {schema}.rate_schedules
             GROUP BY age_bucket
             ORDER BY age_bucket
         """)).fetchall()
@@ -488,61 +489,10 @@ def sync_rate_schedules(
 
     schema = settings.utility_schema
 
-    with engine.connect() as conn:
-        # Find water_rates records not yet in rate_schedules
-        rows = conn.execute(text(f"""
-            SELECT
-                wr.pwsid, wr.source, wr.utility_name, wr.state_code,
-                wr.rate_effective_date, wr.rate_structure_type, wr.rate_class,
-                wr.billing_frequency, wr.fixed_charge_monthly, wr.meter_size_inches,
-                wr.tier_1_limit_ccf, wr.tier_1_rate,
-                wr.tier_2_limit_ccf, wr.tier_2_rate,
-                wr.tier_3_limit_ccf, wr.tier_3_rate,
-                wr.tier_4_limit_ccf, wr.tier_4_rate,
-                wr.bill_5ccf, wr.bill_10ccf,
-                wr.bill_6ccf, wr.bill_9ccf, wr.bill_12ccf, wr.bill_24ccf,
-                wr.source_url, wr.raw_text_hash, wr.parse_confidence,
-                wr.parse_model, wr.parse_notes, wr.scraped_at, wr.parsed_at
-            FROM {schema}.water_rates wr
-            WHERE NOT EXISTS (
-                SELECT 1 FROM {schema}.rate_schedules rs
-                WHERE rs.pwsid = wr.pwsid
-                  AND rs.source_key = wr.source
-                  AND rs.vintage_date IS NOT DISTINCT FROM wr.rate_effective_date
-                  AND rs.customer_class = COALESCE(wr.rate_class, 'residential')
-            )
-        """)).mappings().all()
-
-    if not rows:
-        typer.echo("rate_schedules is in sync — no new records to convert.")
-        return
-
-    typer.echo(f"Found {len(rows)} water_rates records not yet in rate_schedules.")
-
-    if dry_run:
-        for r in list(rows)[:5]:
-            typer.echo(f"  {r['pwsid']} [{r['source']}] date={r['rate_effective_date']}")
-        if len(rows) > 5:
-            typer.echo(f"  ... and {len(rows) - 5} more")
-        return
-
-    inserted = 0
-    skipped = 0
-    with engine.connect() as conn:
-        for r in rows:
-            schedule = water_rate_to_schedule(dict(r))
-            try:
-                if write_rate_schedule(conn, schedule):
-                    inserted += 1
-                else:
-                    skipped += 1
-            except Exception as e:
-                typer.echo(f"  Error on {r['pwsid']}: {e}")
-                skipped += 1
-                conn.rollback()
-        conn.commit()
-
-    typer.echo(f"Synced {inserted} records to rate_schedules ({skipped} skipped).")
+    # Phase 4: Sync is no longer needed — all ingests write directly to rate_schedules.
+    # Use scripts/sync_water_rates_to_rate_schedules.py --verify-only to check historical parity.
+    typer.echo("Sync is no longer needed — all ingests write directly to rate_schedules (Phase 3).")
+    typer.echo("Use scripts/sync_water_rates_to_rate_schedules.py --verify-only to verify historical parity.")
 
 
 @app.command("check-sources")

@@ -89,7 +89,7 @@ mdwd_match AS (
 ),
 rate_match AS (
     SELECT TRUE AS has_rate_data
-    FROM utility.water_rates r
+    FROM utility.rate_schedules r
     WHERE r.pwsid = (SELECT pwsid FROM cws_match)
     LIMIT 1
 ),

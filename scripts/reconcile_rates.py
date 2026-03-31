@@ -164,17 +164,22 @@ def run_reconciliation(cv_threshold: float = 25.0, write_csv: bool = False) -> d
 
     with engine.connect() as conn:
         df = pd.read_sql(text("""
-            SELECT wr.pwsid, wr.source, wr.utility_name,
-                   wr.bill_5ccf, wr.bill_6ccf, wr.bill_9ccf, wr.bill_10ccf, wr.bill_12ccf, wr.bill_24ccf,
-                   wr.fixed_charge_monthly,
-                   wr.tier_1_rate, wr.tier_1_limit_ccf,
-                   wr.tier_2_rate, wr.tier_2_limit_ccf,
-                   wr.tier_3_rate, wr.tier_3_limit_ccf,
-                   wr.tier_4_rate, wr.tier_4_limit_ccf,
-                   wr.rate_effective_date, wr.rate_structure_type,
-                   wr.parse_confidence
-            FROM utility.water_rates wr
-            ORDER BY wr.pwsid, wr.source
+            SELECT rs.pwsid, rs.source_key AS source, c.pws_name AS utility_name,
+                   rs.bill_5ccf, rs.bill_6ccf, rs.bill_9ccf, rs.bill_10ccf, rs.bill_12ccf, rs.bill_24ccf,
+                   (rs.fixed_charges->0->>'amount')::float AS fixed_charge_monthly,
+                   (rs.volumetric_tiers->0->>'rate_per_1000_gal')::float AS tier_1_rate,
+                   (rs.volumetric_tiers->0->>'max_gal')::float AS tier_1_limit_ccf,
+                   (rs.volumetric_tiers->1->>'rate_per_1000_gal')::float AS tier_2_rate,
+                   (rs.volumetric_tiers->1->>'max_gal')::float AS tier_2_limit_ccf,
+                   (rs.volumetric_tiers->2->>'rate_per_1000_gal')::float AS tier_3_rate,
+                   (rs.volumetric_tiers->2->>'max_gal')::float AS tier_3_limit_ccf,
+                   (rs.volumetric_tiers->3->>'rate_per_1000_gal')::float AS tier_4_rate,
+                   (rs.volumetric_tiers->3->>'max_gal')::float AS tier_4_limit_ccf,
+                   rs.vintage_date AS rate_effective_date, rs.rate_structure_type,
+                   rs.confidence AS parse_confidence
+            FROM utility.rate_schedules rs
+            LEFT JOIN utility.cws_boundaries c ON c.pwsid = rs.pwsid
+            ORDER BY rs.pwsid, rs.source_key
         """), conn)
 
     logger.info(f"Total rate records: {len(df)}")
