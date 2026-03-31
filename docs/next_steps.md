@@ -1281,6 +1281,19 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Bill computation fix** — `_compute_bill` returns fixed charge for empty tiers, string rates cleaned. 116 records recovered.
 - [ ] **Scenario A batch processing** — waiting on Anthropic. After processing: rebuild best_estimate, re-export dashboard, rebuild coverage_stats.
 
+### Sprint 26 — Metro Serper Migration + water_rates Deprecation (2026-03-31)
+- [x] **Targeted research script:** `scripts/run_targeted_research.py` — feeds PWSID list through DiscoveryAgent → process_pwsid → rebuild best_estimate end-to-end
+- [x] **Metro scan Serper migration:** `run_metro_scan.py` now uses Serper-based DiscoveryAgent (~97% cost reduction vs Claude web_search). Legacy batch functions preserved for in-flight batches.
+- [x] **water_rates deprecation Phase 1:** Migration 022 adds bill_6ccf/9ccf/12ccf/24ccf to rate_schedules (eAR benchmarks)
+- [x] **water_rates deprecation Phase 2:** Synced all 7,149 water_rates records to rate_schedules. Zero FK violations, 364 eAR bill records backfilled.
+- [x] **Hierarchy bug fixed:** ~5,400 EFC PWSIDs across 18 states were invisible to best_estimate (stuck in water_rates, never synced). Duke was winning over EFC. Now fixed — Duke dropped to 13.1%, EFC sources account for ~52%.
+- [x] **Best estimate rebuilt globally** with correct priority hierarchy
+- [x] **Config:** `config/targeted_research.yaml` — 25 high-pop uncovered PWSIDs in 2 batches (Duke-sourced, gap-sourced)
+- [ ] **Targeted research run:** Execute Duke-sourced batch (11 PWSIDs, ~5.3M pop)
+- [ ] **Scenario A batch processing** — still in_progress at Anthropic
+- [ ] **water_rates deprecation Phase 3:** Redirect all ingest WRITE paths to rate_schedules
+- [ ] **water_rates deprecation Phase 4:** Redirect all READ paths (coverage views, API, analysis scripts)
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
