@@ -104,12 +104,15 @@ def expand_utility_name(name: str, county: str | None = None) -> str:
 
     # Handle short acronyms (PWCSA, ACSA, JCSA, HRSD, BVU, etc.)
     # Only trigger for tokens <=6 chars that are all uppercase and we have county.
-    # This avoids false positives on real words like STAFFORD (8), HENRICO (7).
+    # Exclude names with 3+ words (descriptive names like "IRVINE RANCH WATER DISTRICT")
+    # and names that look like places followed by common utility suffixes.
     first_token = cleaned.split("-")[0].split()[0].strip()
+    word_count = len(cleaned.split())
     is_likely_acronym = (
-        len(first_token) <= 6
+        len(first_token) <= 5  # Tighter: <=5 chars (was 6, caught "IRVINE")
         and first_token.isupper()
         and county
+        and word_count <= 3  # Acronym names are short: "PWCSA - EAST", not "IRVINE RANCH WATER DISTRICT"
     )
     if is_likely_acronym:
         core = first_token
@@ -192,22 +195,39 @@ def build_search_queries(
     expanded = expand_utility_name(utility_name, county)
     best_name = expanded if expanded != utility_name else utility_name
 
-    # Q1 — Highest precision: quoted expanded name + rates + state
-    queries.append(f'"{best_name}" water rates {state}')
+    # For multi-area utilities ("CAL AM - SUBURBAN ROSEMONT"), use full name
+    # including the service area suffix for precision
+    service_area = None
+    if " - " in utility_name:
+        service_area = utility_name.split(" - ", 1)[1].strip()
 
-    # Q2 — City + state + rate schedule (catches different naming)
+    # Q1 — Highest precision: quoted full name + rates + state
+    # For multi-area, use full name so "CAL AM - SUBURBAN ROSEMONT" gets
+    # specific results, not generic CAL AM pages
+    q1_name = utility_name if service_area else best_name
+    queries.append(f'"{q1_name}" water rates {state}')
+
+    # Q2 — City/area + state + rate schedule
     city_meta = _get_city_from_name(utility_name, county)
-    if city_meta:
+    if service_area:
+        # Multi-area: use the service area name as the geographic anchor
+        queries.append(f'{service_area} {state} water rate schedule')
+    elif city_meta:
         queries.append(f'{city_meta} {state} water rate schedule')
     elif county:
         queries.append(f'{county} County {state} water rate schedule')
 
-    # Q3 — Broader utility + fees query
+    # Q3 — Broader utility + fees query (use the company name, not area)
     queries.append(f'{best_name} water utility rates fees {state}')
 
     # Q4 — Varies by owner type for targeted results
     if owner_type == "P":  # private/IOU
-        queries.append(f'"{best_name}" tariff rate schedule filetype:pdf')
+        # Private utilities have CPUC/PUC tariff filings
+        q4_name = utility_name if service_area else best_name
+        queries.append(f'"{q4_name}" tariff rate schedule filetype:pdf')
+    elif service_area:
+        # Multi-area: use service area + utility name for specificity
+        queries.append(f'{best_name} "{service_area}" water rates {state}')
     elif county:
         queries.append(f'{county} county {state} water rates')
     else:
