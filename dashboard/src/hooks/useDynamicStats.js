@@ -25,6 +25,11 @@ export function useDynamicStats(geojson, settings) {
     let popFree = 0;
     let popPremium = 0;
 
+    // QA counts
+    let flaggedCount = 0;
+    let staleCount = 0;
+    let highVarianceCount = 0;
+
     for (const feat of geojson.features) {
       const p = feat.properties;
       const pop = p.population_served || 0;
@@ -53,6 +58,11 @@ export function useDynamicStats(geojson, settings) {
       } else {
         noData++;
       }
+
+      // QA stats (counted regardless of tier filter)
+      if (p.needs_review) flaggedCount++;
+      if (p.is_stale && p.has_rate_data) staleCount++;
+      if (p.has_high_variance && p.has_rate_data) highVarianceCount++;
     }
 
     const visibleCovered = withRateData + withReference;
@@ -71,6 +81,10 @@ export function useDynamicStats(geojson, settings) {
       population_free: popFree,
       population_premium: popPremium,
       pct_population: popTotal > 0 ? (visiblePop / popTotal) * 100 : 0,
+      // QA
+      flagged_count: flaggedCount,
+      stale_count: staleCount,
+      high_variance_count: highVarianceCount,
     };
   }, [geojson, settings?.showFree, settings?.showPremium, settings?.showReference]);
 }

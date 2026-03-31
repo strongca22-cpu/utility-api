@@ -1,43 +1,45 @@
 /**
- * UAPI Rate Explorer — Main application shell.
+ * UAPI Dashboard — Main application shell.
  *
- * Layout uses CSS grid with explicit regions so MapLibre's absolute
- * positioning doesn't escape its container.
+ * Layout: left sidebar (260px) + map (flex) + optional detail panel (320px).
+ * Uses DashboardContext for shared state across all components.
  */
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect } from "react";
+import { DashboardProvider, useDashboard, useDashboardDispatch } from "./contexts/DashboardContext";
 import { useMapData } from "./hooks/useMapData";
-import { useSelectedUtility } from "./hooks/useSelectedUtility";
 import { useDynamicStats } from "./hooks/useDynamicStats";
-import { DEFAULT_BILL_RAMP } from "./utils/colors";
 import Map from "./components/Map";
 import DetailPanel from "./components/DetailPanel";
 import CoverageBar from "./components/CoverageBar";
-import LayerToggle from "./components/LayerToggle";
-import SettingsPanel from "./components/SettingsPanel";
 import BillLegend from "./components/BillLegend";
 import DevTools from "./components/DevTools";
-
-const DEFAULT_SETTINGS = {
-  fillOpacity: 0.6,
-  showFree: true,
-  showPremium: true,
-  showReference: true,
-  showNoData: true,
-  showOutlines: true,
-};
+import Sidebar from "./components/Sidebar";
 
 export default function App() {
+  return (
+    <DashboardProvider>
+      <AppInner />
+    </DashboardProvider>
+  );
+}
+
+function AppInner() {
+  const state = useDashboard();
+  const dispatch = useDashboardDispatch();
   const { geojson, stats: staticStats, loading, error } = useMapData();
-  const { selected, select, deselect } = useSelectedUtility();
-  const [layerMode, setLayerMode] = useState("coverage");
-  const [mapSettings, setMapSettings] = useState(DEFAULT_SETTINGS);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [billRamp, setBillRamp] = useState(DEFAULT_BILL_RAMP);
-  const [devToolsOpen, setDevToolsOpen] = useState(false);
   const mapRef = useRef(null);
 
-  // Dynamic stats based on current tier filter
+  // Build mapSettings from context for backward compat with hooks
+  const mapSettings = {
+    fillOpacity: state.fillOpacity,
+    showFree: state.showFree,
+    showPremium: state.showPremium,
+    showReference: state.showReference,
+    showNoData: state.showNoData,
+    showOutlines: state.showOutlines,
+  };
+
   const dynamicStats = useDynamicStats(geojson, mapSettings);
 
   // Ctrl+Shift+D toggles dev tools
@@ -45,16 +47,16 @@ export default function App() {
     function handleKey(e) {
       if (e.ctrlKey && e.shiftKey && e.key === "D") {
         e.preventDefault();
-        setDevToolsOpen((v) => !v);
+        dispatch({ type: "TOGGLE_DEVTOOLS" });
       }
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [dispatch]);
 
   const handleFeatureClick = useCallback(
     (properties, feature) => {
-      select(properties);
+      dispatch({ type: "SELECT_UTILITY", payload: properties });
 
       // Zoom to feature centroid
       if (feature?.geometry) {
@@ -65,8 +67,12 @@ export default function App() {
         }
       }
     },
-    [select]
+    [dispatch]
   );
+
+  const handleDeselect = useCallback(() => {
+    dispatch({ type: "DESELECT" });
+  }, [dispatch]);
 
   if (error) {
     return (
@@ -83,68 +89,19 @@ export default function App() {
     <div
       style={{
         display: "grid",
-        gridTemplateRows: "auto 1fr auto",
-        gridTemplateColumns: selected ? "1fr 320px" : "1fr",
+        gridTemplateRows: "1fr auto",
+        gridTemplateColumns: state.selected
+          ? "260px 1fr 320px"
+          : "260px 1fr",
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
       }}
     >
-      {/* Top bar — spans full width */}
-      <div
-        className="flex items-center justify-between border-b border-slate-700 bg-slate-800 px-4 py-2"
-        style={{ gridColumn: "1 / -1" }}
-      >
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-slate-100">
-            UAPI Rate Explorer
-          </h1>
-          {/* Dev tools toggle (wrench icon) */}
-          <button
-            onClick={() => setDevToolsOpen(!devToolsOpen)}
-            className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
-              devToolsOpen
-                ? "bg-amber-600/20 text-amber-400"
-                : "text-slate-600 hover:text-slate-400"
-            }`}
-            aria-label="Toggle dev tools"
-            title="Dev Tools (Ctrl+Shift+D)"
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M11.7 1.3a1 1 0 011.4 0l1.6 1.6a1 1 0 010 1.4L13.4 5.6l-3-3 1.3-1.3zM2 11.5V14.5h3l7.4-7.4-3-3L2 11.5z" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex items-center gap-3">
-          <LayerToggle mode={layerMode} onChange={setLayerMode} />
-          {/* Settings gear */}
-          <div className="relative">
-            <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-                settingsOpen
-                  ? "bg-slate-600 text-slate-100"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-700"
-              }`}
-              aria-label="Map settings"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 10a2 2 0 100-4 2 2 0 000 4z" />
-                <path fillRule="evenodd" d="M6.343 1.2a1 1 0 01.98-.8h1.354a1 1 0 01.98.8l.175 1.046a5.5 5.5 0 011.108.64l.99-.363a1 1 0 011.14.392l.677 1.173a1 1 0 01-.16 1.191l-.816.684a5.5 5.5 0 010 1.28l.816.683a1 1 0 01.16 1.191l-.677 1.173a1 1 0 01-1.14.392l-.99-.363a5.5 5.5 0 01-1.108.64l-.175 1.046a1 1 0 01-.98.8H7.323a1 1 0 01-.98-.8l-.175-1.046a5.5 5.5 0 01-1.108-.64l-.99.363a1 1 0 01-1.14-.392l-.677-1.173a1 1 0 01.16-1.191l.816-.684a5.5 5.5 0 010-1.28l-.816-.683a1 1 0 01-.16-1.191L2.93 3.915a1 1 0 011.14-.392l.99.363a5.5 5.5 0 011.108-.64L6.343 1.2zM8 11a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-              </svg>
-            </button>
-            {settingsOpen && (
-              <SettingsPanel
-                settings={mapSettings}
-                onChange={setMapSettings}
-                onClose={() => setSettingsOpen(false)}
-              />
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Left sidebar — row 1, col 1 */}
+      <Sidebar dynamicStats={dynamicStats} />
 
-      {/* Map — row 2, col 1 */}
+      {/* Map — row 1, col 2 */}
       <div style={{ position: "relative", overflow: "hidden" }}>
         {loading ? (
           <div className="flex h-full items-center justify-center">
@@ -160,26 +117,26 @@ export default function App() {
             <Map
               ref={mapRef}
               geojson={geojson}
-              layerMode={layerMode}
-              billRamp={billRamp}
+              layerMode={state.layerMode}
+              billRamp={state.billRamp}
               mapSettings={mapSettings}
               onFeatureClick={handleFeatureClick}
             />
-            <BillLegend rampKey={billRamp} visible={layerMode === "bill"} />
-            {devToolsOpen && (
+            <BillLegend rampKey={state.billRamp} visible={state.layerMode === "bill"} />
+            {state.devToolsOpen && (
               <DevTools
-                billRamp={billRamp}
-                onBillRampChange={setBillRamp}
-                onClose={() => setDevToolsOpen(false)}
+                billRamp={state.billRamp}
+                onBillRampChange={(ramp) => dispatch({ type: "SET_BILL_RAMP", payload: ramp })}
+                onClose={() => dispatch({ type: "TOGGLE_DEVTOOLS" })}
               />
             )}
           </>
         )}
       </div>
 
-      {/* Detail panel — row 2, col 2 (only when selected) */}
-      {selected && (
-        <DetailPanel utility={selected} onClose={deselect} />
+      {/* Detail panel — row 1, col 3 (only when selected) */}
+      {state.selected && (
+        <DetailPanel utility={state.selected} onClose={handleDeselect} />
       )}
 
       {/* Bottom coverage bar — spans full width */}
