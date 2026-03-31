@@ -40,7 +40,7 @@ metros:
     metro_pop: 2200000
     current_coverage_pct: 0.0
     priority: 3
-    status: pending
+    status: complete
     notes: "LVVWD and SNWA are dominant utilities — not regulated by NV PUC"
 
   - id: minneapolis
@@ -53,7 +53,7 @@ metros:
     metro_pop: 3600000
     current_coverage_pct: 0.0
     priority: 4
-    status: pending
+    status: complete
 
   - id: baltimore
     name: "Baltimore-Columbia-Towson"
@@ -64,7 +64,7 @@ metros:
     metro_pop: 2800000
     current_coverage_pct: 0.0
     priority: 5
-    status: pending
+    status: complete
 
   - id: nashville
     name: "Nashville-Davidson-Murfreesboro-Franklin"
@@ -75,7 +75,7 @@ metros:
     metro_pop: 1900000
     current_coverage_pct: 0.0
     priority: 6
-    status: pending
+    status: complete
 
   - id: indianapolis
     name: "Indianapolis-Carmel-Anderson"
@@ -98,7 +98,7 @@ metros:
     metro_pop: 1200000
     current_coverage_pct: 0.0
     priority: 8
-    status: pending
+    status: complete
     notes: "UT has zero coverage from any source"
 
   - id: memphis
@@ -112,7 +112,7 @@ metros:
     metro_pop: 1300000
     current_coverage_pct: 0.0
     priority: 9
-    status: pending
+    status: complete
 
   - id: oklahoma_city
     name: "Oklahoma City"
@@ -123,7 +123,7 @@ metros:
     metro_pop: 1400000
     current_coverage_pct: 0.0
     priority: 10
-    status: pending
+    status: complete
 
   - id: new_orleans
     name: "New Orleans-Metairie"
@@ -134,7 +134,7 @@ metros:
     metro_pop: 1300000
     current_coverage_pct: 0.0
     priority: 11
-    status: pending
+    status: complete
 
   - id: providence
     name: "Providence-Warwick"
@@ -146,7 +146,7 @@ metros:
     metro_pop: 1600000
     current_coverage_pct: 0.0
     priority: 12
-    status: pending
+    status: complete
 
   - id: buffalo
     name: "Buffalo-Cheektowaga-Rochester"
@@ -157,7 +157,7 @@ metros:
     metro_pop: 1500000
     current_coverage_pct: 0.0
     priority: 13
-    status: pending
+    status: complete
 
   # --- HIGH: Partial coverage, major utility missing ---
 
@@ -197,7 +197,7 @@ metros:
     metro_pop: 2700000
     current_coverage_pct: 0.0
     priority: 16
-    status: pending
+    status: complete
     notes: "FL has 85% state coverage but OUC (Orlando Utilities Commission) not matched — likely name matching issue"
 
   - id: kansas_city
@@ -210,7 +210,7 @@ metros:
     metro_pop: 2200000
     current_coverage_pct: 24.1
     priority: 17
-    status: pending
+    status: complete
 
   # --- BONUS: Portland (originally requested) ---
 
@@ -224,5 +224,5 @@ metros:
     metro_pop: 2500000
     current_coverage_pct: 100.0
     priority: 18
-    status: pending
+    status: complete
     notes: "Portland Water Bureau matched but suburban utilities not. OR has near-zero coverage beyond PWB."
