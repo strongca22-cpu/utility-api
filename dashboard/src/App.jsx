@@ -40,6 +40,7 @@ function AppInner() {
     showOutlines: state.showOutlines,
     showStateBoundaries: state.showStateBoundaries,
     showCountyBoundaries: state.showCountyBoundaries,
+    appMode: state.appMode,
   };
 
   const dynamicStats = useDynamicStats(geojson, mapSettings);

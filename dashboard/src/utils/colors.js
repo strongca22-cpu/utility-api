@@ -67,9 +67,22 @@ export const CHROME = {
 
 /**
  * Build a Maplibre fill-color expression for coverage mode.
- * Colors by data_tier: free (green), premium (blue), reference (amber), no data (gray).
+ *
+ * QA mode:      free (green), premium (blue), reference (amber), no data (gray).
+ * Product mode:  Premium tier = free + premium (green), Free tier = reference (amber),
+ *                no data (gray). Source distinction is QA-level detail.
  */
-export function coverageFillExpression() {
+export function coverageFillExpression(appMode) {
+  if (appMode === "product") {
+    return [
+      "match",
+      ["get", "data_tier"],
+      "free", TIER_COLORS.free,          // green — part of Product "Premium"
+      "premium", TIER_COLORS.free,       // green — part of Product "Premium"
+      "reference", TIER_COLORS.reference, // amber — Product "Free"
+      TIER_COLORS.noData,
+    ];
+  }
   return [
     "match",
     ["get", "data_tier"],

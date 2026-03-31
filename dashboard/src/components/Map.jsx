@@ -125,7 +125,7 @@ const Map = forwardRef(function Map({ geojson, layerMode, billRamp, mapSettings,
         type: "fill",
         source: SOURCE_ID,
         paint: {
-          "fill-color": coverageFillExpression(),
+          "fill-color": coverageFillExpression(mapSettings?.appMode),
           "fill-opacity": buildOpacityExpression(mapSettings),
         },
       });
@@ -189,13 +189,13 @@ const Map = forwardRef(function Map({ geojson, layerMode, billRamp, mapSettings,
     }
   }, [geojson]);
 
-  // Update fill color when layer mode or bill ramp changes
+  // Update fill color when layer mode, bill ramp, or app mode changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.getLayer(FILL_LAYER)) return;
-    const expr = layerMode === "bill" ? billFillExpression(billRamp) : coverageFillExpression();
+    const expr = layerMode === "bill" ? billFillExpression(billRamp) : coverageFillExpression(mapSettings?.appMode);
     map.setPaintProperty(FILL_LAYER, "fill-color", expr);
-  }, [layerMode, billRamp]);
+  }, [layerMode, billRamp, mapSettings?.appMode]);
 
   // Update opacity + visibility when settings change
   useEffect(() => {

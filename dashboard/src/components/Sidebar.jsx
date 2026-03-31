@@ -60,56 +60,108 @@ export default function Sidebar({ dynamicStats }) {
         </div>
       </Section>
 
-      {/* DATA LAYERS section */}
+      {/* DATA LAYERS section — mode-aware */}
       <Section label="Data Layers">
-        <div className="space-y-1.5">
-          <TierCheckbox
-            label="Premium"
-            sublabel="LLM-scraped rates"
-            color={TIER_COLORS.premium}
-            checked={state.showPremium}
-            onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showPremium" })}
-          />
-          <TierCheckbox
-            label="Free / Attributed"
-            sublabel="EFC, eAR, PUC filings"
-            color={TIER_COLORS.free}
-            checked={state.showFree}
-            onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showFree" })}
-          />
-          <TierCheckbox
-            label="Reference"
-            sublabel="Duke NIEPS"
-            color={TIER_COLORS.reference}
-            checked={state.showReference}
-            onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showReference" })}
-          />
-          <TierCheckbox
-            label="No Data"
-            sublabel=""
-            color={TIER_COLORS.noData}
-            checked={state.showNoData}
-            onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showNoData" })}
-          />
-        </div>
+        {state.appMode === "product" ? (
+          /* Product mode: Premium (LLM + open source) and Free (academic bulk) */
+          <div className="space-y-1.5">
+            <TierCheckbox
+              label="Premium"
+              sublabel="LLM-scraped + bulk open source"
+              color={TIER_COLORS.free}
+              checked={state.showPremium || state.showFree}
+              onChange={() => {
+                const next = !(state.showPremium || state.showFree);
+                dispatch({ type: "SET_TIERS", payload: { showPremium: next, showFree: next } });
+              }}
+            />
+            <TierCheckbox
+              label="Free"
+              sublabel="Academic bulk (Duke NIEPS)"
+              color={TIER_COLORS.reference}
+              checked={state.showReference}
+              onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showReference" })}
+            />
+            <TierCheckbox
+              label="No Data"
+              sublabel=""
+              color={TIER_COLORS.noData}
+              checked={state.showNoData}
+              onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showNoData" })}
+            />
+          </div>
+        ) : (
+          /* QA mode: full source breakdown */
+          <div className="space-y-1.5">
+            <TierCheckbox
+              label="Premium"
+              sublabel="LLM-scraped rates"
+              color={TIER_COLORS.premium}
+              checked={state.showPremium}
+              onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showPremium" })}
+            />
+            <TierCheckbox
+              label="Free / Attributed"
+              sublabel="EFC, eAR, PUC filings"
+              color={TIER_COLORS.free}
+              checked={state.showFree}
+              onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showFree" })}
+            />
+            <TierCheckbox
+              label="Reference"
+              sublabel="Duke NIEPS"
+              color={TIER_COLORS.reference}
+              checked={state.showReference}
+              onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showReference" })}
+            />
+            <TierCheckbox
+              label="No Data"
+              sublabel=""
+              color={TIER_COLORS.noData}
+              checked={state.showNoData}
+              onChange={() => dispatch({ type: "TOGGLE_TIER", payload: "showNoData" })}
+            />
+          </div>
+        )}
 
         {/* Live coverage stats */}
         {dynamicStats && (
           <div className="mt-3 pt-2 border-t border-slate-700/50 text-xs text-slate-400 space-y-0.5">
-            <div>
-              Coverage:{" "}
-              <span className="text-slate-200">
-                {(dynamicStats.with_rate_data || 0).toLocaleString()}
-              </span>{" "}
-              / {(dynamicStats.total_cws || 0).toLocaleString()}
-            </div>
-            <div>
-              Pop:{" "}
-              <span className="text-slate-200">
-                {formatCompact(dynamicStats.population_covered || 0)}
-              </span>{" "}
-              ({formatPct(dynamicStats.pct_population || 0)})
-            </div>
+            {state.appMode === "product" ? (
+              <>
+                <div>
+                  Premium:{" "}
+                  <span className="text-slate-200">
+                    {(dynamicStats.with_rate_data || 0).toLocaleString()}
+                  </span>{" "}
+                  / {(dynamicStats.total_cws || 0).toLocaleString()}
+                </div>
+                <div>
+                  Pop:{" "}
+                  <span className="text-slate-200">
+                    {formatCompact(dynamicStats.population_commercial || 0)}
+                  </span>{" "}
+                  ({formatPct(dynamicStats.population_total > 0 ? (dynamicStats.population_commercial / dynamicStats.population_total) * 100 : 0)})
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  Coverage:{" "}
+                  <span className="text-slate-200">
+                    {(dynamicStats.with_rate_data || 0).toLocaleString()}
+                  </span>{" "}
+                  / {(dynamicStats.total_cws || 0).toLocaleString()}
+                </div>
+                <div>
+                  Pop:{" "}
+                  <span className="text-slate-200">
+                    {formatCompact(dynamicStats.population_covered || 0)}
+                  </span>{" "}
+                  ({formatPct(dynamicStats.pct_population || 0)})
+                </div>
+              </>
+            )}
           </div>
         )}
       </Section>

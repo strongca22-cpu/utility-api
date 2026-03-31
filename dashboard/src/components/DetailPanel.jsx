@@ -44,8 +44,9 @@ export default function DetailPanel({ utility, onClose }) {
     // Parsing failed
   }
 
-  // Tier badge
-  const tierBadge = utility.data_tier ? TIER_BADGE_MAP[utility.data_tier] : null;
+  // Tier badge — Product mode remaps: free+premium → "Premium", reference → "Free"
+  const badgeMap = appMode === "product" ? PRODUCT_BADGE_MAP : TIER_BADGE_MAP;
+  const tierBadge = utility.data_tier ? badgeMap[utility.data_tier] : null;
 
   return (
     <div
@@ -172,28 +173,32 @@ export default function DetailPanel({ utility, onClose }) {
               </div>
             )}
 
-            {/* Source info */}
-            <SectionDivider label="Source" />
-            <div className="space-y-0.5 text-sm text-slate-400">
-              {utility.source_name && (
-                <div className="text-slate-200">{utility.source_name}</div>
-              )}
-              {utility.data_vintage && (
-                <div>
-                  <span className="text-slate-500">Vintage: </span>
-                  {utility.data_vintage}
-                  {utility.is_stale && (
-                    <span className="ml-1 text-orange-400 text-xs">(stale)</span>
+            {/* Source info — hidden in Product mode (provenance is QA detail) */}
+            {appMode === "qa" && (
+              <>
+                <SectionDivider label="Source" />
+                <div className="space-y-0.5 text-sm text-slate-400">
+                  {utility.source_name && (
+                    <div className="text-slate-200">{utility.source_name}</div>
+                  )}
+                  {utility.data_vintage && (
+                    <div>
+                      <span className="text-slate-500">Vintage: </span>
+                      {utility.data_vintage}
+                      {utility.is_stale && (
+                        <span className="ml-1 text-orange-400 text-xs">(stale)</span>
+                      )}
+                    </div>
+                  )}
+                  {utility.confidence && (
+                    <div>
+                      <span className="text-slate-500">Confidence: </span>
+                      <span className="capitalize">{utility.confidence}</span>
+                    </div>
                   )}
                 </div>
-              )}
-              {utility.confidence && (
-                <div>
-                  <span className="text-slate-500">Confidence: </span>
-                  <span className="capitalize">{utility.confidence}</span>
-                </div>
-              )}
-            </div>
+              </>
+            )}
 
             {/* QA Mode: extended details */}
             {appMode === "qa" && (
@@ -369,6 +374,13 @@ const TIER_BADGE_MAP = {
   free: { label: "Free", color: TIER_COLORS.free },
   premium: { label: "Premium", color: TIER_COLORS.premium },
   reference: { label: "Reference", color: TIER_COLORS.reference },
+};
+
+// Product mode: free+premium are both "Premium" (green), reference is "Free" (amber)
+const PRODUCT_BADGE_MAP = {
+  free: { label: "Premium", color: TIER_COLORS.free },
+  premium: { label: "Premium", color: TIER_COLORS.free },
+  reference: { label: "Free", color: TIER_COLORS.reference },
 };
 
 function SectionDivider({ label }) {

@@ -48,6 +48,9 @@ function dashboardReducer(state, action) {
       const key = action.payload; // "showPremium" | "showFree" | "showReference" | "showNoData"
       return { ...state, [key]: !state[key] };
     }
+    case "SET_TIERS":
+      // Set multiple tier flags at once — used by Product mode to group tiers
+      return { ...state, ...action.payload };
     case "SET_OPACITY":
       return { ...state, fillOpacity: action.payload };
     case "TOGGLE_OUTLINES":
