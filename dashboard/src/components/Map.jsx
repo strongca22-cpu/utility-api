@@ -17,6 +17,12 @@ import { coverageFillExpression, billFillExpression } from "../utils/colors";
 const SOURCE_ID = "cws";
 const FILL_LAYER = "cws-fill";
 const OUTLINE_LAYER = "cws-outline";
+const STATES_SOURCE = "us-states";
+const STATES_LAYER = "state-boundaries";
+const COUNTIES_SOURCE = "us-counties";
+const COUNTIES_LAYER = "county-boundaries";
+
+const BASE_URL = import.meta.env.BASE_URL || "/";
 
 const INITIAL_CENTER = [-98.5, 39.5];
 const INITIAL_ZOOM = 4;
@@ -140,6 +146,38 @@ const Map = forwardRef(function Map({ geojson, layerMode, billRamp, mapSettings,
         minzoom: 6,
       });
 
+      // Boundary layers (loaded from static GeoJSON, hidden by default)
+      fetch(`${BASE_URL}data/us_states_simplified.geojson`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (map.getSource(STATES_SOURCE)) return;
+          map.addSource(STATES_SOURCE, { type: "geojson", data });
+          map.addLayer({
+            id: STATES_LAYER,
+            type: "line",
+            source: STATES_SOURCE,
+            paint: { "line-color": "#94a3b8", "line-width": 1.5 },
+            layout: { visibility: "none" },
+          });
+        })
+        .catch(() => {}); // Boundary files optional
+
+      fetch(`${BASE_URL}data/us_counties_simplified.geojson`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (map.getSource(COUNTIES_SOURCE)) return;
+          map.addSource(COUNTIES_SOURCE, { type: "geojson", data });
+          map.addLayer({
+            id: COUNTIES_LAYER,
+            type: "line",
+            source: COUNTIES_SOURCE,
+            paint: { "line-color": "#64748b", "line-width": 0.5 },
+            layout: { visibility: "none" },
+            minzoom: 6,
+          });
+        })
+        .catch(() => {});
+
       attachHover(map);
       attachClick(map);
     }
@@ -172,6 +210,22 @@ const Map = forwardRef(function Map({ geojson, layerMode, billRamp, mapSettings,
         OUTLINE_LAYER,
         "visibility",
         mapSettings.showOutlines ? "visible" : "none"
+      );
+    }
+
+    // Boundary layer visibility
+    if (map.getLayer(STATES_LAYER)) {
+      map.setLayoutProperty(
+        STATES_LAYER,
+        "visibility",
+        mapSettings.showStateBoundaries ? "visible" : "none"
+      );
+    }
+    if (map.getLayer(COUNTIES_LAYER)) {
+      map.setLayoutProperty(
+        COUNTIES_LAYER,
+        "visibility",
+        mapSettings.showCountyBoundaries ? "visible" : "none"
       );
     }
   }, [mapSettings]);

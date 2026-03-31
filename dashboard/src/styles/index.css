@@ -23,14 +23,17 @@
   animation: slide-in-right 0.2s ease-out;
 }
 
-/* Custom scrollbar for detail panel */
-.detail-panel::-webkit-scrollbar {
+/* Custom scrollbar for detail panel + sidebar */
+.detail-panel::-webkit-scrollbar,
+.sidebar-scroll::-webkit-scrollbar {
   width: 6px;
 }
-.detail-panel::-webkit-scrollbar-track {
+.detail-panel::-webkit-scrollbar-track,
+.sidebar-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
-.detail-panel::-webkit-scrollbar-thumb {
+.detail-panel::-webkit-scrollbar-thumb,
+.sidebar-scroll::-webkit-scrollbar-thumb {
   background: #475569;
   border-radius: 3px;
 }

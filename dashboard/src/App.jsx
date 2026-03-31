@@ -38,6 +38,8 @@ function AppInner() {
     showReference: state.showReference,
     showNoData: state.showNoData,
     showOutlines: state.showOutlines,
+    showStateBoundaries: state.showStateBoundaries,
+    showCountyBoundaries: state.showCountyBoundaries,
   };
 
   const dynamicStats = useDynamicStats(geojson, mapSettings);
