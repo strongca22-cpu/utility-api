@@ -13,7 +13,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-26
-Modified: 2026-03-26
+Modified: 2026-03-30
 
 Dependencies:
     - sqlalchemy
@@ -125,11 +125,26 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
             rbe.selected_source as source_key,
             rbe.rate_effective_date,
 
+            -- Rate metadata from best_estimate
+            rbe.source_url,
+            rbe.n_sources,
+            rbe.selection_notes,
+
             -- Tier detail from rate_schedules (best matching record)
             rs.volumetric_tiers,
             rs.fixed_charges as fixed_charges_detail,
             rs.tier_count,
             rs.bill_20ccf,
+            rs.needs_review,
+            rs.review_reason,
+            rs.conservation_signal,
+            rs.scrape_timestamp,
+            rs.parse_model,
+            rs.source_url as schedule_source_url,
+
+            -- Bill variance across all sources for QA
+            var.bill_range_min,
+            var.bill_range_max,
 
             -- Duke reference flag: true if duke data exists (regardless of other sources)
             CASE WHEN dr.pwsid IS NOT NULL THEN true ELSE false END as has_duke_reference,
@@ -147,13 +162,24 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         LEFT JOIN sdwis_systems s ON s.pwsid = cb.pwsid
         LEFT JOIN rate_best_estimate rbe ON rbe.pwsid = cb.pwsid
         LEFT JOIN LATERAL (
-            SELECT rs2.volumetric_tiers, rs2.fixed_charges, rs2.tier_count, rs2.bill_20ccf
+            SELECT rs2.volumetric_tiers, rs2.fixed_charges, rs2.tier_count, rs2.bill_20ccf,
+                   rs2.needs_review, rs2.review_reason, rs2.conservation_signal,
+                   CASE WHEN rs2.scrape_timestamp < '2100-01-01'::timestamptz
+                        THEN rs2.scrape_timestamp ELSE NULL END as scrape_timestamp,
+                   rs2.parse_model, rs2.source_url
             FROM rate_schedules rs2
             WHERE rs2.pwsid = cb.pwsid
               AND rs2.customer_class = 'residential'
             ORDER BY rs2.vintage_date DESC NULLS LAST
             LIMIT 1
         ) rs ON true
+        LEFT JOIN LATERAL (
+            SELECT MIN(rs3.bill_10ccf) as bill_range_min,
+                   MAX(rs3.bill_10ccf) as bill_range_max
+            FROM rate_schedules rs3
+            WHERE rs3.pwsid = cb.pwsid
+              AND rs3.bill_10ccf IS NOT NULL
+        ) var ON true
         LEFT JOIN LATERAL (
             SELECT dr2.pwsid
             FROM duke_reference_rates dr2
@@ -169,6 +195,7 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
 
     # Build GeoJSON feature collection
     features = []
+    stale_cutoff = datetime.now(timezone.utc).year - 2
     stats = {
         "total_cws": 0,
         "with_rate_data": 0,
@@ -179,6 +206,9 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         "population_reference": 0,
         "by_state": {},
         "by_source": {},
+        "total_flagged": 0,
+        "total_stale": 0,
+        "total_high_variance": 0,
     }
 
     for row in result:
@@ -186,9 +216,7 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         pop = row.population_served or 0
 
         has_reference_only = bool(row.has_reference_only)
-        # Duke-only PWSIDs are reference, not commercial rate data
         # Guard against NaN (float) values that pass "is not None" check
-        import math
         _bill10 = row.bill_10ccf
         _bill10est = row.bill_estimate_10ccf
         _bill10_valid = _bill10 is not None and not (isinstance(_bill10, float) and math.isnan(_bill10))
@@ -269,6 +297,40 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
             vintage = str(row.rate_effective_date) if row.rate_effective_date else None
             confidence = row.confidence
 
+        # Compute QA fields
+        source_url = None
+        if not has_reference_only:
+            source_url = row.source_url or row.schedule_source_url
+            if source_url and isinstance(source_url, float) and math.isnan(source_url):
+                source_url = None
+
+        is_stale = False
+        if vintage:
+            try:
+                vintage_year = int(vintage[:4])
+                is_stale = vintage_year <= stale_cutoff
+            except (ValueError, TypeError):
+                pass
+
+        needs_review = bool(row.needs_review) if hasattr(row, "needs_review") and row.needs_review else False
+        bill_range_min = _round(row.bill_range_min)
+        bill_range_max = _round(row.bill_range_max)
+        has_high_variance = False
+        if bill_range_min is not None and bill_range_max is not None:
+            has_high_variance = (bill_range_max - bill_range_min) > 20
+
+        # Track QA stats
+        if needs_review:
+            stats["total_flagged"] += 1
+        if is_stale and has_rate_data:
+            stats["total_stale"] += 1
+        if has_high_variance and has_rate_data:
+            stats["total_high_variance"] += 1
+
+        n_sources = row.n_sources if hasattr(row, "n_sources") and row.n_sources else None
+        if n_sources is not None and isinstance(n_sources, float) and math.isnan(n_sources):
+            n_sources = None
+
         # Build flat properties
         properties = {
             "pwsid": row.pwsid,
@@ -292,6 +354,19 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
             "tier_count": row.tier_count,
             "confidence": confidence,
             "has_reference_only": has_reference_only,
+            # QA fields
+            "source_url": source_url,
+            "n_sources": int(n_sources) if n_sources is not None else None,
+            "selection_notes": row.selection_notes if not has_reference_only else None,
+            "needs_review": needs_review,
+            "review_reason": row.review_reason if needs_review else None,
+            "conservation_signal": _round(row.conservation_signal),
+            "last_scraped": row.scrape_timestamp.isoformat() if hasattr(row, "scrape_timestamp") and row.scrape_timestamp else None,
+            "parse_model": row.parse_model if not has_reference_only else None,
+            "is_stale": is_stale,
+            "bill_range_min": bill_range_min,
+            "bill_range_max": bill_range_max,
+            "has_high_variance": has_high_variance,
         }
 
         # Serialize tier detail as JSON string for detail panel
@@ -384,7 +459,83 @@ def build_coverage_stats(stats: dict) -> dict:
         "pct_population": round(100 * pop_covered / pop_total, 1) if pop_total > 0 else 0,
         "by_state": by_state,
         "by_source": by_source,
+        # QA summary counts
+        "total_flagged": stats.get("total_flagged", 0),
+        "total_stale": stats.get("total_stale", 0),
+        "total_high_variance": stats.get("total_high_variance", 0),
     }
+
+
+def export_county_rates(conn, output_path: Path) -> int:
+    """Export county-level rate comparison data for QA mode.
+
+    Produces a JSON file keyed by "STATE:County" with an array of
+    utilities in that county that have rate data. Used by the dashboard
+    for QA county comparison in the inspect panel.
+
+    Parameters
+    ----------
+    conn : SQLAlchemy connection
+    output_path : Path
+        Where to write county_rates.json
+
+    Returns
+    -------
+    int
+        Number of counties exported.
+    """
+    logger.info("Exporting county rates for QA comparison...")
+
+    result = conn.execute(text("""
+        SELECT
+            cb.state_code,
+            cb.county_served,
+            rbe.pwsid,
+            COALESCE(s.pws_name, cb.pws_name) as pws_name,
+            cb.population_served,
+            rbe.bill_10ccf,
+            rbe.bill_estimate_10ccf,
+            rbe.selected_source,
+            rbe.confidence
+        FROM rate_best_estimate rbe
+        JOIN cws_boundaries cb ON cb.pwsid = rbe.pwsid
+        LEFT JOIN sdwis_systems s ON s.pwsid = rbe.pwsid
+        WHERE rbe.bill_estimate_10ccf IS NOT NULL
+          AND cb.county_served IS NOT NULL
+        ORDER BY cb.state_code, cb.county_served, rbe.bill_estimate_10ccf
+    """))
+
+    county_data = {}
+    count = 0
+    for row in result:
+        bill = row.bill_10ccf or row.bill_estimate_10ccf
+        if bill is None or (isinstance(bill, float) and math.isnan(bill)):
+            continue
+
+        key = f"{row.state_code}:{row.county_served}"
+        if key not in county_data:
+            county_data[key] = []
+
+        county_data[key].append({
+            "pwsid": row.pwsid,
+            "name": row.pws_name,
+            "pop": row.population_served,
+            "bill_10ccf": _round(bill),
+            "source": row.selected_source,
+            "confidence": row.confidence,
+        })
+        count += 1
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(county_data, f, separators=(",", ":"))
+
+    file_size_mb = output_path.stat().st_size / 1024 / 1024
+    logger.info(
+        f"County rates written: {len(county_data)} counties, "
+        f"{count} utilities, {file_size_mb:.1f} MB"
+    )
+    return len(county_data)
 
 
 def _round(val, decimals=2):
@@ -430,6 +581,7 @@ def main():
 
     geojson_path = output_dir / "cws_rates.geojson"
     stats_path = output_dir / "coverage_stats.json"
+    county_path = output_dir / "county_rates.json"
 
     logger.info("Starting dashboard data export...")
     logger.info(f"Output directory: {output_dir}")
@@ -445,6 +597,9 @@ def main():
             json.dump(coverage, f, indent=2)
         logger.info(f"Coverage stats written to {stats_path}")
 
+        # Export county rates for QA comparison
+        export_county_rates(conn, county_path)
+
         # Print summary
         logger.info("--- Export Summary ---")
         logger.info(f"Total CWS:           {coverage['total_cws']:,}")
@@ -452,6 +607,7 @@ def main():
         logger.info(f"Reference only:      {coverage['with_reference_only']:,}")
         logger.info(f"No data:             {coverage['no_data']:,}")
         logger.info(f"Population coverage: {coverage['pct_population']}%")
+        logger.info(f"QA: {coverage['total_flagged']} flagged, {coverage['total_stale']} stale, {coverage['total_high_variance']} high-variance")
 
 
 if __name__ == "__main__":
