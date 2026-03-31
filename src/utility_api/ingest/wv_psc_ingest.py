@@ -75,6 +75,7 @@ from sqlalchemy import text
 
 from utility_api.config import settings
 from utility_api.db import engine
+from utility_api.ops.rate_schedule_helpers import water_rate_to_schedule, write_rate_schedule
 
 
 # --- Constants ---
@@ -793,42 +794,16 @@ def run_wv_psc_ingest(
 
     with engine.connect() as conn:
         deleted = conn.execute(text(f"""
-            DELETE FROM {schema}.water_rates
-            WHERE source = :source
+            DELETE FROM {schema}.rate_schedules
+            WHERE source_key = :source
         """), {"source": SOURCE_TAG}).rowcount
         if deleted:
-            logger.info(f"Cleared {deleted} existing {SOURCE_TAG} records")
+            logger.info(f"Cleared {deleted} existing {SOURCE_TAG} records from rate_schedules")
 
+        # Batch insert into rate_schedules (Phase 3: direct write, no water_rates)
         for record in records:
-            conn.execute(text(f"""
-                INSERT INTO {schema}.water_rates (
-                    pwsid, utility_name, state_code, county,
-                    rate_effective_date, rate_structure_type, rate_class,
-                    billing_frequency,
-                    fixed_charge_monthly, meter_size_inches,
-                    tier_1_limit_ccf, tier_1_rate,
-                    tier_2_limit_ccf, tier_2_rate,
-                    tier_3_limit_ccf, tier_3_rate,
-                    tier_4_limit_ccf, tier_4_rate,
-                    bill_5ccf, bill_10ccf,
-                    bill_6ccf, bill_9ccf, bill_12ccf, bill_24ccf,
-                    source, source_url, raw_text_hash,
-                    parse_confidence, parse_model, parse_notes
-                ) VALUES (
-                    :pwsid, :utility_name, :state_code, :county,
-                    :rate_effective_date, :rate_structure_type, :rate_class,
-                    :billing_frequency,
-                    :fixed_charge_monthly, :meter_size_inches,
-                    :tier_1_limit_ccf, :tier_1_rate,
-                    :tier_2_limit_ccf, :tier_2_rate,
-                    :tier_3_limit_ccf, :tier_3_rate,
-                    :tier_4_limit_ccf, :tier_4_rate,
-                    :bill_5ccf, :bill_10ccf,
-                    :bill_6ccf, :bill_9ccf, :bill_12ccf, :bill_24ccf,
-                    :source, :source_url, :raw_text_hash,
-                    :parse_confidence, :parse_model, :parse_notes
-                )
-            """), record)
+            schedule = water_rate_to_schedule(record)
+            write_rate_schedule(conn, schedule)
 
         conn.commit()
         stats["inserted"] = len(records)

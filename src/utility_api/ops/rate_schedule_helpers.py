@@ -18,7 +18,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-24
+Modified: 2026-03-31
 
 Dependencies:
     - sqlalchemy
@@ -250,8 +250,12 @@ def water_rate_to_schedule(row: dict) -> dict:
         "volumetric_tiers": json.dumps(tiers) if tiers else None,
         "surcharges": None,
         "bill_5ccf": _clean(row.get("bill_5ccf")),
+        "bill_6ccf": _clean(row.get("bill_6ccf")),
+        "bill_9ccf": _clean(row.get("bill_9ccf")),
         "bill_10ccf": _clean(row.get("bill_10ccf")),
+        "bill_12ccf": _clean(row.get("bill_12ccf")),
         "bill_20ccf": _clean(bill_20ccf),
+        "bill_24ccf": _clean(row.get("bill_24ccf")),
         "conservation_signal": _clean(conservation),
         "tier_count": tier_count,
         "source_url": _clean(row.get("source_url")),
@@ -291,7 +295,8 @@ def write_rate_schedule(conn, record: dict) -> bool:
                 pwsid, source_key, vintage_date, customer_class,
                 billing_frequency, rate_structure_type,
                 fixed_charges, volumetric_tiers, surcharges,
-                bill_5ccf, bill_10ccf, bill_20ccf,
+                bill_5ccf, bill_6ccf, bill_9ccf, bill_10ccf,
+                bill_12ccf, bill_20ccf, bill_24ccf,
                 conservation_signal, tier_count,
                 source_url, scrape_timestamp, confidence,
                 raw_text_hash, parse_model, parse_notes,
@@ -300,7 +305,8 @@ def write_rate_schedule(conn, record: dict) -> bool:
                 :pwsid, :source_key, :vintage_date, :customer_class,
                 :billing_frequency, :rate_structure_type,
                 CAST(:fixed_charges AS jsonb), CAST(:volumetric_tiers AS jsonb), CAST(:surcharges AS jsonb),
-                :bill_5ccf, :bill_10ccf, :bill_20ccf,
+                :bill_5ccf, :bill_6ccf, :bill_9ccf, :bill_10ccf,
+                :bill_12ccf, :bill_20ccf, :bill_24ccf,
                 :conservation_signal, :tier_count,
                 :source_url, :scrape_timestamp, :confidence,
                 :raw_text_hash, :parse_model, :parse_notes,
@@ -314,8 +320,12 @@ def write_rate_schedule(conn, record: dict) -> bool:
                 volumetric_tiers = EXCLUDED.volumetric_tiers,
                 surcharges = EXCLUDED.surcharges,
                 bill_5ccf = EXCLUDED.bill_5ccf,
+                bill_6ccf = EXCLUDED.bill_6ccf,
+                bill_9ccf = EXCLUDED.bill_9ccf,
                 bill_10ccf = EXCLUDED.bill_10ccf,
+                bill_12ccf = EXCLUDED.bill_12ccf,
                 bill_20ccf = EXCLUDED.bill_20ccf,
+                bill_24ccf = EXCLUDED.bill_24ccf,
                 conservation_signal = EXCLUDED.conservation_signal,
                 tier_count = EXCLUDED.tier_count,
                 source_url = EXCLUDED.source_url,

@@ -458,21 +458,22 @@ def _store_discovery(result: DiscoveryResult) -> None:
     """
     schema = settings.utility_schema
     with engine.connect() as conn:
+        # Store discovery result in scrape_registry (Phase 3: no longer staging in water_rates)
         conn.execute(
             text(f"""
-                INSERT INTO {schema}.water_rates (pwsid, utility_name, state_code, source_url,
-                    parse_confidence, parse_notes)
-                VALUES (:pwsid, :name, :state, :url, 'pending',
-                    :notes)
-                ON CONFLICT (pwsid, rate_effective_date)
-                DO UPDATE SET source_url = EXCLUDED.source_url,
-                              parse_notes = EXCLUDED.parse_notes
+                INSERT INTO {schema}.scrape_registry (pwsid, url, url_source, status,
+                    discovery_query, notes)
+                VALUES (:pwsid, :url, 'searxng', 'pending',
+                    :query, :notes)
+                ON CONFLICT (pwsid, url)
+                DO UPDATE SET notes = EXCLUDED.notes,
+                              discovery_query = EXCLUDED.discovery_query,
+                              updated_at = NOW()
             """),
             {
                 "pwsid": result.pwsid,
-                "name": result.utility_name,
-                "state": result.state_code,
                 "url": result.best_url,
+                "query": result.search_query,
                 "notes": f"Discovered via search: {result.search_query}",
             },
         )

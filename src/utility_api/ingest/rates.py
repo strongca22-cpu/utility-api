@@ -50,6 +50,7 @@ from sqlalchemy import text
 
 from utility_api.config import settings
 from utility_api.db import engine
+from utility_api.ops.rate_schedule_helpers import water_rate_to_schedule, write_rate_schedule
 from utility_api.ingest.rate_calculator import calculate_bills_from_parse
 from utility_api.ingest.rate_discovery import discover_rate_url
 from utility_api.ingest.rate_parser import parse_rate_text
@@ -186,75 +187,44 @@ def _store_rate_record(
     bill_10ccf : float | None
         Calculated bill at 10 CCF.
     """
-    schema = settings.utility_schema
     now = datetime.now(timezone.utc)
 
-    with engine.connect() as conn:
-        # Delete existing scraped record for this PWSID + effective date (upsert pattern)
-        conn.execute(text(f"""
-            DELETE FROM {schema}.water_rates
-            WHERE pwsid = :pwsid
-            AND source = 'scraped_llm'
-            AND (rate_effective_date = :eff_date OR rate_effective_date IS NULL)
-        """), {
-            "pwsid": pwsid,
-            "eff_date": parse_result.rate_effective_date,
-        })
+    # Build water_rates-shaped dict for conversion via helpers
+    logger.warning("rates.py _store_rate_record is deprecated; use ParseAgent for new scrapes")
+    record = {
+        "pwsid": pwsid,
+        "utility_name": utility_name,
+        "state_code": state_code,
+        "county": county,
+        "rate_effective_date": parse_result.rate_effective_date,
+        "rate_structure_type": parse_result.rate_structure_type,
+        "rate_class": "residential",
+        "billing_frequency": parse_result.billing_frequency,
+        "fixed_charge_monthly": parse_result.fixed_charge_monthly,
+        "meter_size_inches": _coerce_meter_size(parse_result.meter_size_inches),
+        "tier_1_limit_ccf": parse_result.tier_1_limit_ccf,
+        "tier_1_rate": parse_result.tier_1_rate,
+        "tier_2_limit_ccf": parse_result.tier_2_limit_ccf,
+        "tier_2_rate": parse_result.tier_2_rate,
+        "tier_3_limit_ccf": parse_result.tier_3_limit_ccf,
+        "tier_3_rate": parse_result.tier_3_rate,
+        "tier_4_limit_ccf": parse_result.tier_4_limit_ccf,
+        "tier_4_rate": parse_result.tier_4_rate,
+        "bill_5ccf": bill_5ccf,
+        "bill_10ccf": bill_10ccf,
+        "source": "scraped_llm",
+        "source_url": source_url,
+        "raw_text_hash": raw_text_hash,
+        "parse_confidence": parse_result.parse_confidence,
+        "parse_model": parse_result.parse_model,
+        "parse_notes": parse_result.parse_notes,
+        "scraped_at": now,
+    }
 
-        conn.execute(text(f"""
-            INSERT INTO {schema}.water_rates (
-                pwsid, utility_name, state_code, county,
-                rate_effective_date, rate_structure_type, rate_class, billing_frequency,
-                fixed_charge_monthly, meter_size_inches,
-                tier_1_limit_ccf, tier_1_rate,
-                tier_2_limit_ccf, tier_2_rate,
-                tier_3_limit_ccf, tier_3_rate,
-                tier_4_limit_ccf, tier_4_rate,
-                bill_5ccf, bill_10ccf,
-                source, source_url, raw_text_hash,
-                parse_confidence, parse_model, parse_notes,
-                scraped_at, parsed_at
-            ) VALUES (
-                :pwsid, :name, :state, :county,
-                :eff_date, :struct_type, 'residential', :billing_freq,
-                :fixed_charge, :meter_size,
-                :t1_limit, :t1_rate,
-                :t2_limit, :t2_rate,
-                :t3_limit, :t3_rate,
-                :t4_limit, :t4_rate,
-                :bill_5, :bill_10,
-                'scraped_llm', :url, :text_hash,
-                :confidence, :model, :notes,
-                :scraped_at, :parsed_at
-            )
-        """), {
-            "pwsid": pwsid,
-            "name": utility_name,
-            "state": state_code,
-            "county": county,
-            "eff_date": parse_result.rate_effective_date,
-            "struct_type": parse_result.rate_structure_type,
-            "billing_freq": parse_result.billing_frequency,
-            "fixed_charge": parse_result.fixed_charge_monthly,
-            "meter_size": _coerce_meter_size(parse_result.meter_size_inches),
-            "t1_limit": parse_result.tier_1_limit_ccf,
-            "t1_rate": parse_result.tier_1_rate,
-            "t2_limit": parse_result.tier_2_limit_ccf,
-            "t2_rate": parse_result.tier_2_rate,
-            "t3_limit": parse_result.tier_3_limit_ccf,
-            "t3_rate": parse_result.tier_3_rate,
-            "t4_limit": parse_result.tier_4_limit_ccf,
-            "t4_rate": parse_result.tier_4_rate,
-            "bill_5": bill_5ccf,
-            "bill_10": bill_10ccf,
-            "url": source_url,
-            "text_hash": raw_text_hash,
-            "confidence": parse_result.parse_confidence,
-            "model": parse_result.parse_model,
-            "notes": parse_result.parse_notes,
-            "scraped_at": now,
-            "parsed_at": parse_result.parsed_at,
-        })
+    # Convert to rate_schedules format and upsert
+    schedule = water_rate_to_schedule(record)
+    with engine.connect() as conn:
+        write_rate_schedule(conn, schedule)
         conn.commit()
 
 

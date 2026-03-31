@@ -108,8 +108,7 @@ class BulkIngestAgent(BaseAgent):
             # Update source_catalog
             if not dry_run:
                 self._update_source_catalog(source_key, rows)
-                # Sync to rate_schedules
-                self._sync_rate_schedules()
+                # Phase 3: sync no longer needed — ingests write directly to rate_schedules
 
             self.log_run(
                 status="success",
@@ -152,14 +151,14 @@ class BulkIngestAgent(BaseAgent):
             logger.warning(f"Failed to update source_catalog: {e}")
 
     def _get_source_pwsid_count(self, source_key: str) -> int:
-        """Get actual PWSID count for this source from water_rates."""
+        """Get actual PWSID count for this source from rate_schedules."""
         schema = settings.utility_schema
         try:
             with engine.connect() as conn:
                 count = conn.execute(text(f"""
                     SELECT COUNT(DISTINCT pwsid)
-                    FROM {schema}.water_rates
-                    WHERE source = :key
+                    FROM {schema}.rate_schedules
+                    WHERE source_key = :key
                 """), {"key": source_key}).scalar()
                 return count or 0
         except Exception:
