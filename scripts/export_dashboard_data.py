@@ -283,14 +283,13 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         else:
             data_tier = None
 
-        # For Duke-only PWSIDs, suppress detail panel fields but KEEP bill_10ccf
-        # for the map bill choropleth. Duke values (CC BY-NC-ND 4.0) must not
-        # appear in tooltips/detail panels, but the map color ramp needs them.
+        # For Duke-only PWSIDs, show bill data but flag as low confidence.
+        # Duke bill estimates are unreliable (unit mismatch identified Sprint 25).
         if has_reference_only:
-            source_key = None
-            source_meta_out = {}
-            vintage = None
-            confidence = None
+            source_key = "duke_nieps_10state"
+            source_meta_out = {"display_name": "Duke NIEPS (reference)", "tier": "free_attributed"}
+            vintage = str(row.rate_effective_date) if row.rate_effective_date else None
+            confidence = "low"
         else:
             source_key = row.source_key
             source_meta_out = source_lookup.get(row.source_key or "", {})
@@ -354,6 +353,7 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
             "tier_count": row.tier_count,
             "confidence": confidence,
             "has_reference_only": has_reference_only,
+            "is_reference_estimate": has_reference_only,
             # QA fields
             "source_url": source_url,
             "n_sources": int(n_sources) if n_sources is not None else None,

@@ -165,6 +165,13 @@ export default function DetailPanel({ utility, onClose }) {
               </div>
             )}
 
+            {/* Reference estimate caveat */}
+            {utility.is_reference_estimate && (
+              <div className="mt-3 px-2 py-1.5 rounded bg-amber-900/20 border border-amber-800/30 text-sm text-amber-400">
+                Reference estimate only. Duke NIEPS bill values may be inaccurate due to unit conversion issues in the source data.
+              </div>
+            )}
+
             {/* Source info */}
             <SectionDivider label="Source" />
             <div className="space-y-0.5 text-sm text-slate-400">

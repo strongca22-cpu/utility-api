@@ -131,6 +131,28 @@ def validate_parse_result(result: dict) -> tuple[bool, list[str]]:
     return (len(issues) == 0, issues)
 
 
+def check_bill_consistency(bill_5, bill_10, bill_20, rate_structure_type):
+    """Check if computed bills are suspiciously identical across volumes.
+
+    If bill_5 == bill_10 == bill_20 and the rate structure is not flat,
+    the record likely has volumetric rates stored as bills or a parse error.
+
+    Returns
+    -------
+    bool
+        True if suspicious (should flag as low-confidence).
+    """
+    if bill_5 is None or bill_10 is None or bill_20 is None:
+        return False
+    if bill_5 == 0 or bill_10 == 0 or bill_20 == 0:
+        return False
+    # Identical bills across all volumes is only valid for true flat rates
+    if abs(bill_5 - bill_10) < 0.01 and abs(bill_10 - bill_20) < 0.01:
+        if rate_structure_type not in ("flat", None):
+            return True
+    return False
+
+
 def _build_volumetric_tiers_from_parse(result: dict) -> list[dict]:
     """Convert parsed CCF-based tiers to gallon-based JSONB array."""
     tiers = []
@@ -265,7 +287,9 @@ class ParseAgent(BaseAgent):
         user_message = (
             f"Extract the water rate structure from this {content_type} text.\n\n"
             f"Return a JSON object with these fields: rate_effective_date, "
-            f"rate_structure_type, billing_frequency, fixed_charge_monthly, "
+            f"rate_structure_type (MUST be one of: flat, uniform, increasing_block, "
+            f"decreasing_block, budget_based, seasonal), "
+            f"billing_frequency, fixed_charge_monthly, "
             f"meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, "
             f"tier_2_rate, tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, "
             f"tier_4_rate, parse_confidence, notes.\n\n"
@@ -307,6 +331,12 @@ class ParseAgent(BaseAgent):
             self._update_registry(registry_id, "failed", "failed", cost, model)
             self.log_run(status="failed", notes=f"JSON parse error: {str(e)[:200]}")
             return {"pwsid": pwsid, "success": False, "cost_usd": cost, "error": "json_parse"}
+
+        # Normalize rate_structure_type
+        from utility_api.utils.rate_structure_normalize import normalize_rate_structure_type
+        result["rate_structure_type"] = normalize_rate_structure_type(
+            result.get("rate_structure_type")
+        )
 
         # Validate
         valid, issues = validate_parse_result(result)

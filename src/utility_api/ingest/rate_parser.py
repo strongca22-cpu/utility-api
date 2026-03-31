@@ -63,6 +63,15 @@ Rules:
 - If billing is bimonthly or quarterly, normalize fixed_charge_monthly to monthly (divide by 2 or 3)
 - List tiers in ascending order of consumption
 - For flat/uniform rates (single volumetric price), use tier_1 only with null limit
+- rate_structure_type MUST be exactly one of these 6 values:
+  - "flat" — single fixed price regardless of consumption (no volumetric charge)
+  - "uniform" — fixed charge plus a single volumetric rate (same $/CCF at all volumes)
+  - "increasing_block" — volumetric rate increases at higher consumption tiers
+  - "decreasing_block" — volumetric rate decreases at higher consumption tiers
+  - "budget_based" — rates based on an individualized allocation/budget
+  - "seasonal" — rates vary by season (summer/winter). If also tiered, still use "seasonal"
+  Do NOT use other values like "tiered", "flat_rate", "tiered_volumetric", etc.
+  "tiered" with increasing rates = "increasing_block". Single rate + fixed charge = "uniform".
 - If you cannot determine the rate structure, set parse_confidence to "failed" and explain in notes
 - If the page text doesn't contain rate information, set parse_confidence to "failed"
 - Be precise with numbers — do not round or estimate"""

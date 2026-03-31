@@ -47,6 +47,7 @@ from utility_api.agents.parse import (
     _build_volumetric_tiers_from_parse,
     _compute_bill,
     _parse_date,
+    check_bill_consistency,
     route_model,
     validate_parse_result,
 )
@@ -102,7 +103,9 @@ class BatchAgent(BaseAgent):
             user_message = (
                 f"Extract the water rate structure from this {content_type} text.\n\n"
                 f"Return a JSON object with these fields: rate_effective_date, "
-                f"rate_structure_type, billing_frequency, fixed_charge_monthly, "
+                f"rate_structure_type (MUST be one of: flat, uniform, increasing_block, "
+                f"decreasing_block, budget_based, seasonal), "
+                f"billing_frequency, fixed_charge_monthly, "
                 f"meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, "
                 f"tier_2_rate, tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, "
                 f"tier_4_rate, parse_confidence, notes.\n\n"
@@ -362,6 +365,12 @@ class BatchAgent(BaseAgent):
             valid, issues = validate_parse_result(parsed)
             confidence = parsed.get("parse_confidence", "failed")
 
+            # Normalize rate_structure_type to canonical enum
+            from utility_api.utils.rate_structure_normalize import normalize_rate_structure_type
+            parsed["rate_structure_type"] = normalize_rate_structure_type(
+                parsed.get("rate_structure_type")
+            )
+
             # Build canonical structures
             tiers = _build_volumetric_tiers_from_parse(parsed)
             raw_fc = parsed.get("fixed_charge_monthly", 0) or 0
@@ -378,6 +387,15 @@ class BatchAgent(BaseAgent):
             bill_5 = _compute_bill(3740, tiers, fixed_charge)
             bill_10 = _compute_bill(7480, tiers, fixed_charge)
             bill_20 = _compute_bill(14960, tiers, fixed_charge)
+
+            # Bill consistency check: identical bills at all volumes + non-flat = suspect
+            rate_type = parsed.get("rate_structure_type")
+            if check_bill_consistency(bill_5, bill_10, bill_20, rate_type):
+                logger.warning(
+                    f"  {pwsid}: bill consistency flag — 5/10/20 CCF identical "
+                    f"(${bill_10:.2f}) but type={rate_type}. Downgrading to low."
+                )
+                confidence = "low"
 
             conservation = None
             if len(tiers) >= 2:
