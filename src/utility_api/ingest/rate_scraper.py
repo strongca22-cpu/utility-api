@@ -64,6 +64,149 @@ STRIP_TAGS = [
 MAX_TEXT_LENGTH = 15_000
 
 
+def extract_service_area_section(
+    full_text: str,
+    utility_name: str,
+) -> str | None:
+    """Extract the rate schedule section for a specific service area from a multi-area tariff.
+
+    Looks for "RATE SCHEDULE" section headers and matches the utility name
+    suffix (e.g., "SHORT HILLS" from "NJ AMERICAN WATER - SHORT HILLS") to
+    find the relevant section. Returns the matched section text, or None if
+    no match found.
+
+    Works for NJ American Water, PA PUC, and other multi-service-area tariffs
+    that use named section headers.
+
+    Parameters
+    ----------
+    full_text : str
+        Full extracted PDF text (up to 45k chars from smart extraction).
+    utility_name : str
+        The utility's pws_name from cws_boundaries.
+
+    Returns
+    -------
+    str | None
+        Extracted section text with context header, or None if no match.
+    """
+    import re
+
+    if not full_text or not utility_name:
+        return None
+
+    # Don't attempt on short text — section extraction only helps large tariffs
+    if len(full_text) < 5000:
+        return None
+
+    # Check for multi-section tariff markers
+    # Match standalone section headers like "RATE SCHEDULE A-1" at start of line
+    # but NOT inline cross-references like "shown on Rate Schedule O-2"
+    schedule_pattern = re.compile(
+        r'^\s*RATE\s+SCHEDULE\s+[\w-]+\s*$',
+        re.IGNORECASE | re.MULTILINE,
+    )
+    schedule_headers = list(schedule_pattern.finditer(full_text))
+    if len(schedule_headers) < 2:
+        return None  # Not a multi-section tariff
+
+    # Extract the service area name from utility_name
+    # Patterns: "NJ AMERICAN WATER - SHORT HILLS", "CAL WATER - VISALIA", "AQUA PA - SHENANGO"
+    search_terms = []
+
+    if " - " in utility_name:
+        suffix = utility_name.split(" - ", 1)[1].strip()
+        search_terms.append(suffix.lower())
+        # Also try individual words from suffix (e.g., "COASTAL NORTH" → "coastal", "north")
+        for word in suffix.split():
+            if len(word) > 3:  # Skip short words like "OF", "THE"
+                search_terms.append(word.lower())
+
+    if not search_terms:
+        return None  # No service area identifier to match
+
+    # Find the rate schedule section that mentions our service area
+    best_section = None
+    best_score = 0
+
+    for i, header_match in enumerate(schedule_headers):
+        # Extract text from this header to the next header (or end)
+        start = header_match.start()
+        if i + 1 < len(schedule_headers):
+            end = schedule_headers[i + 1].start()
+        else:
+            end = len(full_text)
+
+        section_text = full_text[start:end]
+
+        # Score: how many of our search terms appear in this section?
+        section_lower = section_text[:2000].lower()  # Check header area
+        score = sum(1 for term in search_terms if term in section_lower)
+
+        if score > best_score:
+            best_score = score
+            best_section = section_text
+
+    if best_section and best_score > 0:
+        # Also include the general/default rate schedule (A-1) for context
+        # if our match is a different schedule
+        general_section = ""
+        if schedule_headers:
+            first_start = schedule_headers[0].start()
+            if len(schedule_headers) > 1:
+                first_end = schedule_headers[1].start()
+            else:
+                first_end = len(full_text)
+            first_section = full_text[first_start:first_end]
+            # Only include if it's different from our best match
+            if first_section != best_section and len(first_section) < 5000:
+                general_section = first_section + "\n\n---\n\n"
+
+        result = (
+            f"[Extracted rate schedule section for: {utility_name}]\n"
+            f"[From multi-service-area tariff document]\n\n"
+            f"{general_section}{best_section}"
+        )
+
+        # Cap at 45k
+        if len(result) > MAX_TEXT_LENGTH * 3:
+            result = result[:MAX_TEXT_LENGTH * 3]
+
+        return result
+
+    # Fallback: if no service area match but the tariff has a clear "general metered"
+    # rate schedule (A-1 pattern), extract that as the default for all PWSIDs.
+    # Most multi-area tariff PWSIDs use the default/general rate schedule.
+    general_pattern = re.compile(
+        r'^\s*RATE\s+SCHEDULE\s+A-?1\s*$',
+        re.IGNORECASE | re.MULTILINE,
+    )
+    general_match = general_pattern.search(full_text)
+    if general_match:
+        start = general_match.start()
+        # Find the next rate schedule header after A-1
+        next_header = None
+        for h in schedule_headers:
+            if h.start() > start + 100:  # Skip A-1 itself
+                next_header = h
+                break
+        end = next_header.start() if next_header else min(start + 10000, len(full_text))
+        general_section = full_text[start:end]
+
+        result = (
+            f"[Default rate schedule (A-1) extracted for: {utility_name}]\n"
+            f"[From multi-service-area tariff — no specific area match found]\n\n"
+            f"{general_section}"
+        )
+
+        if len(result) > MAX_TEXT_LENGTH * 3:
+            result = result[:MAX_TEXT_LENGTH * 3]
+
+        return result
+
+    return None
+
+
 @dataclass
 class ScrapeResult:
     """Result of scraping a single URL."""

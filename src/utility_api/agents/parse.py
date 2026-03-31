@@ -297,7 +297,7 @@ class ParseAgent(BaseAgent):
             f"meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, "
             f"tier_2_rate, tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, "
             f"tier_4_rate, parse_confidence, notes.\n\n"
-            f"Text:\n{raw_text[:15000]}"  # Cap at 15K chars
+            f"Text:\n{raw_text[:45000]}"  # Cap at 15K chars
         )
 
         try:
@@ -365,7 +365,7 @@ class ParseAgent(BaseAgent):
                 f"meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, "
                 f"tier_2_rate, tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, "
                 f"tier_4_rate, parse_confidence, notes.\n\n"
-                f"Text:\n{raw_text[:15000]}"
+                f"Text:\n{raw_text[:45000]}"
             )
             try:
                 retry_response = client.messages.create(

@@ -145,6 +145,18 @@ def process_pwsid(
 
     deep_crawl_children = 0
 
+    # Apply service area section extraction for multi-area tariff PDFs
+    from utility_api.ingest.rate_scraper import extract_service_area_section
+    meta = _get_system_metadata(pwsid, schema)
+    utility_name = meta.get("pws_name", "")
+    for cand in all_candidates:
+        if cand["scraped_text"] and len(cand["scraped_text"]) > 5000:
+            section = extract_service_area_section(cand["scraped_text"], utility_name)
+            if section:
+                cand["scraped_text"] = section
+                cand["text_len"] = len(section)
+                logger.info(f"  Section extracted for {utility_name}: {len(section)} chars")
+
     logger.info(
         f"  {len(starting_urls)} starting URLs fetched, {total_fetches} fetches"
     )
@@ -152,8 +164,7 @@ def process_pwsid(
     # ---------------------------------------------------------------
     # Step 3: Re-score all candidates with scoring v2
     # ---------------------------------------------------------------
-    meta = _get_system_metadata(pwsid, schema)
-    utility_name = meta.get("pws_name", "")
+    # meta + utility_name already loaded in section extraction step above
     city = meta.get("city", "")
     state = meta.get("state_code", pwsid[:2])
 

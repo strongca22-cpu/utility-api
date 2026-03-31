@@ -319,9 +319,17 @@ def discover_and_scrape(targets: list[dict]) -> list[dict]:
         # Cascade retries aren't possible in batch — one shot per PWSID.
         # If it fails, the parse_sweep cron will pick it up later with direct API.
         best = parseable[0]
+        raw_text = best["scraped_text"]
+
+        # Apply service area section extraction for multi-area tariff PDFs
+        from utility_api.ingest.rate_scraper import extract_service_area_section
+        section = extract_service_area_section(raw_text, utility_name)
+        if section:
+            raw_text = section
+
         parse_tasks.append({
             "pwsid": pwsid,
-            "raw_text": best["scraped_text"],
+            "raw_text": raw_text,
             "content_type": best.get("content_type", "html"),
             "source_url": best["url"],
             "registry_id": best["registry_id"],
