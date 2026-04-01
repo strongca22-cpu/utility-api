@@ -1301,8 +1301,12 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Raw LLM response logging:** `last_parse_raw_response` TEXT column on `scrape_registry` (migration 024). Stored at all parse call sites for post-batch diagnostics.
 - [x] **Utility metadata plumbed through batch path:** `pws_name` and `state_code` passed from `batch_task_builder.py` → `BatchAgent.submit()` → user message
 - [x] **Reparse batch submitted:** `msgbatch_01JArCR8gqMf7XnVe3etqS67` — 2,807 tasks / 1,693 PWSIDs / ~$13 est. cost. All url_sources, all failed rows with substantive content and no existing rate_schedule.
+- [x] **Source hierarchy updated:** scraped_llm promoted to priority 1; bulk sources (EFC, Duke, eAR) demoted to fallback/QA. CA anchor logic changed to flag-only (no demotion on divergence).
+- [x] **Orphan parse batch submitted:** `msgbatch_01SEayyJbh6c8prBNDo7dy2T` — 2,496 tasks / 2,274 PWSIDs / 13M pop / ~$12 est. cost. Scraped text from Mar 30-31 that was never sent to parser due to `--since` date filter gap.
 - [ ] **Reparse batch processing** — waiting on Anthropic (~24hr). Process with: `python scripts/run_prompt_reparse.py --process-batch`
-- [ ] **After processing:** Analyze recovery rate by failure category (water/sewer, ordinance, PDF). Inspect `last_parse_raw_response` for remaining failures. Rebuild best_estimate + re-export dashboard.
+- [ ] **Orphan batch processing** — waiting on Anthropic (~24hr). Process with: `python scripts/run_orphan_parse.py --process-batch`
+- [ ] **After both batches:** Analyze recovery rates. Rebuild best_estimate + re-export dashboard.
+- [ ] **Step 2 for orphan gaps:** PWSIDs that still lack rates after orphan batch → feed into full pipeline with `--force` flag on discovery sweep to bypass the "already has serper URL" exclusion. This triggers fresh discovery → scrape ranks 1-5 → cascade parse.
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
