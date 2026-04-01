@@ -6,56 +6,60 @@
 #   number = higher preference.
 #
 # Principle:
-#   Government bulk data > high-confidence LLM scraping > curated surveys
-#   > low-confidence scraping. Within government sources, newer vintage wins.
+#   LLM-scraped rates from actual published rate schedules are the primary
+#   source — most current (59% are 2024+), most complete (full tier structure,
+#   fixed charges, rate type), and derived from the utility's own documents.
+#   Government bulk and survey data serve as fallbacks for PWSIDs not yet
+#   scraped, and as QA cross-references. Long-term: all bulk sources sunset
+#   to QA/reference role as scraping coverage expands.
 #
 # Created: 2026-03-24
-# Modified: 2026-03-30
+# Modified: 2026-04-01 — scraped_llm promoted to priority 1; bulk demoted to fallback
 
 # Default source priority (applies to all states unless overridden)
 # Each entry maps a source key (or pattern) to a base priority number.
 # Lower number = higher priority.
 default:
   priority_order:
-    # Government bulk sources (highest trust)
+    # LLM scraping — primary source. Parsed from actual published rate pages.
+    # Most current vintage, full rate structure detail, highest completeness.
+    - source: "scraped_llm"
+      priority: 1
+      notes: "Primary source. Low-confidence dynamically demoted to priority 6."
+
+    # Government bulk sources — fallback when no scrape available.
+    # Good for QA cross-reference against scraped data.
     - source: "swrcb_ear_2022"
-      priority: 1
+      priority: 3
       confidence: high
+      notes: "CA eAR. QA cross-reference for CA scraped rates."
     - source: "efc_nc_2025"
-      priority: 1
+      priority: 3
       confidence: high
     - source: "swrcb_ear_2021"
-      priority: 2
+      priority: 4
       confidence: high
     - source: "swrcb_ear_2020"
-      priority: 5
+      priority: 6
       confidence: medium
-      notes: "No pre-computed bills, tier-only. Lowest-priority government source."
-
-    # High-confidence LLM scraping (with anchor validation)
-    - source: "scraped_llm"
-      priority: 3
-      confidence_filter: "high"
-      notes: "Priority adjusted dynamically based on anchor agreement."
+      notes: "No pre-computed bills, tier-only. Oldest CA government source."
 
     # Curated third-party surveys
     - source: "owrs"
-      priority: 4
+      priority: 5
       confidence: medium
       notes: "Water-only, curated YAML, but often 5-8 years old."
 
     # Reference datasets — aggregate/static, no rate structure detail.
-    # Always deprioritized vs LLM scrape (which has tiers, fixed charges,
-    # rate structures) and government bulk (official). As LLM scrape scales,
-    # these serve as fallback-only for PWSIDs with no better source.
+    # Fallback-only for PWSIDs with no better source. Long-term: QA role only.
     - source: "duke_nieps_10state"
       priority: 8
       confidence: low
-      notes: "Academic reference. Aggregate bills only, no rate structure. Deprioritize when any alt source exists."
+      notes: "Academic reference. Aggregate bills only, no rate structure."
     - source: "tx_tml_2023"
       priority: 8
       confidence: medium
-      notes: "Texas Municipal League survey. Good data but static snapshot, no rate tiers."
+      notes: "Texas Municipal League survey. Static snapshot, no rate tiers."
     - source: "ky_psc_water_tariffs_2025"
       priority: 8
       confidence: medium
@@ -64,30 +68,31 @@ default:
   # Fallback: any source not in the list gets this priority.
   # EFC state sources (efc_ar_2020, efc_wi_2016, etc.) and state-specific
   # bulk sources (wv_psc_2026, nm_nmed_2025, in_iurc_2024, etc.) all hit
-  # this. They are government/survey data and should beat reference datasets.
+  # this. They serve as fallback when no scraped data exists.
   fallback_priority: 5
 
   # Pattern-based priority overrides for sources not listed above.
   # Checked in order; first match wins. Falls back to fallback_priority.
   source_patterns:
     - pattern: "efc_"
-      priority: 2
-      notes: "EFC state surveys — government bulk data, high trust"
+      priority: 3
+      notes: "EFC state surveys — government bulk, fallback to scrape"
     - pattern: "swrcb_"
-      priority: 2
-      notes: "SWRCB surveys — CA government data"
+      priority: 3
+      notes: "SWRCB surveys — CA government data, fallback to scrape"
 
 # State-specific overrides
 CA:
-  # CA has the richest multi-source landscape
+  # CA has the richest multi-source landscape. eAR serves as QA cross-reference
+  # for scraped rates, not as the anchor truth. Scraped data wins by default.
   anchor_sources:
     - "swrcb_ear_2022"
     - "swrcb_ear_2021"
-  anchor_tolerance: 0.25  # scraped rate must be within 25% of anchor to upgrade
-  notes: "eAR is the anchor truth for CA. Scraped rates upgrade only if high-confidence AND within tolerance."
+  anchor_tolerance: 0.25  # Flag (don't demote) when scraped diverges from eAR
+  notes: "Scraped is primary. eAR is QA cross-reference — large divergence flagged but scrape still wins."
 
 NC:
-  notes: "Single source (EFC). No anchor logic needed."
+  notes: "EFC is fallback. Scraped rates preferred when available."
 
 VA:
-  notes: "Scraped-only. No government bulk source available yet."
+  notes: "Scraped-only. No government bulk source available."

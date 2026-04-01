@@ -8,15 +8,14 @@ Purpose:
     to utility.rate_best_estimate table via ORM.
 
     Generalized from the Sprint 6 CA-only version (scripts/build_best_estimate.py)
-    to handle all states. For single-source states (NC, VA), selection is
-    straightforward. For multi-source states (CA), the anchor principle applies:
-    government data is the anchor, scraped rates upgrade only within tolerance.
+    to handle all states. For multi-source states (CA), government data serves
+    as a QA cross-reference — divergence is flagged but does not demote scrape.
 
     Priority logic (configurable via config/source_priority.yaml):
-    1. Government bulk data (eAR, EFC) — highest trust
-    2. High-confidence LLM scraping with anchor agreement
-    3. Curated third-party (OWRS) — reliable but often old
-    4. Any LLM scraping — fallback
+    1. LLM-scraped rates — primary source (most current, full structure)
+    2. Government bulk data (eAR, EFC) — fallback + QA cross-reference
+    3. Curated third-party (OWRS) — fallback
+    4. Reference datasets (Duke, TML) — last resort
     5. Oldest government vintage — lowest priority
 
 Author: AI-Generated
@@ -218,11 +217,12 @@ def select_best_estimate(group: pd.DataFrame, config: dict, base_priorities: dic
             elif anchor_bill is not None:
                 pct_diff = abs(r["comp_bill"] - anchor_bill) / anchor_bill
                 if pct_diff <= anchor_tolerance:
-                    base_priority = 0  # scraped agrees with anchor → upgrade
-                    notes.append(f"scraped_agrees_with_anchor ({pct_diff:.0%} diff)")
+                    notes.append(f"anchor_agrees ({pct_diff:.0%} diff)")
                 else:
-                    base_priority = max(base_priority, 5)  # scraped diverges → demote
-                    notes.append(f"scraped_diverges_from_anchor ({pct_diff:.0%} diff)")
+                    # Scraped diverges from anchor — flag for QA but do NOT demote.
+                    # Scraped data from actual rate pages is the primary source;
+                    # bulk data serves as cross-reference, not gate.
+                    notes.append(f"anchor_diverges_qa_flag ({pct_diff:.0%} diff)")
             else:
                 # No anchor available — use base priority
                 notes.append("no_anchor_available")
