@@ -52,14 +52,38 @@ from utility_api.config import settings
 from utility_api.db import engine
 
 
-def get_pending_urls(since: str | None = None, limit: int = 500) -> list[dict]:
-    """Get URLs with no scraped text."""
+def get_pending_urls(
+    since: str | None = None,
+    limit: int = 500,
+    rank: int | None = None,
+    rank_min: int | None = None,
+) -> list[dict]:
+    """Get URLs with no scraped text.
+
+    Parameters
+    ----------
+    since : str, optional
+        Only URLs created after this timestamp.
+    limit : int
+        Batch size per query.
+    rank : int, optional
+        Scrape only this exact discovery_rank.
+    rank_min : int, optional
+        Scrape ranks >= this value (e.g., 2 for ranks 2-5).
+    """
     schema = settings.utility_schema
     since_filter = ""
+    rank_filter = ""
     params = {"src": "serper", "limit": limit}
     if since:
         since_filter = "AND sr.created_at >= :since"
         params["since"] = since
+    if rank is not None:
+        rank_filter = "AND sr.discovery_rank = :rank"
+        params["rank"] = rank
+    elif rank_min is not None:
+        rank_filter = "AND sr.discovery_rank >= :rank_min"
+        params["rank_min"] = rank_min
 
     with engine.connect() as conn:
         rows = conn.execute(text(f"""
@@ -69,6 +93,7 @@ def get_pending_urls(since: str | None = None, limit: int = 500) -> list[dict]:
               AND (sr.scraped_text IS NULL OR LENGTH(sr.scraped_text) < 100)
               AND sr.status != 'dead'
               {since_filter}
+              {rank_filter}
             ORDER BY sr.discovery_rank ASC, sr.id ASC
             LIMIT :limit
         """), params).fetchall()
@@ -104,10 +129,15 @@ def main():
                         help="Only scrape URLs created after this timestamp")
     parser.add_argument("--idle-timeout", type=int, default=600,
                         help="Exit after N seconds with no new URLs (default: 600)")
+    parser.add_argument("--rank", type=int, default=None,
+                        help="Scrape only this exact discovery_rank (e.g., 1)")
+    parser.add_argument("--rank-min", type=int, default=None,
+                        help="Scrape ranks >= this value (e.g., 2 for ranks 2-5)")
     args = parser.parse_args()
 
+    rank_label = f"rank={args.rank}" if args.rank else f"rank>={args.rank_min}" if args.rank_min else "all ranks"
     logger.info("=" * 60)
-    logger.info("Bulk Scrape — Pending URLs")
+    logger.info(f"Bulk Scrape — Pending URLs ({rank_label})")
     logger.info(f"Since: {args.since or 'all'}")
     logger.info("=" * 60)
 
@@ -118,7 +148,10 @@ def main():
     last_work_at = time.time()
 
     while True:
-        batch = get_pending_urls(since=args.since, limit=500)
+        batch = get_pending_urls(
+            since=args.since, limit=500,
+            rank=args.rank, rank_min=args.rank_min,
+        )
 
         if not batch:
             idle_seconds = time.time() - last_work_at
