@@ -44,8 +44,8 @@ from utility_api.agents.base import BaseAgent
 from utility_api.config import settings
 from utility_api.db import engine
 
-# Reuse the proven system prompt from Sprint 3
-from utility_api.ingest.rate_parser import SYSTEM_PROMPT
+# Reuse the proven system prompt and shared message builder from rate_parser
+from utility_api.ingest.rate_parser import SYSTEM_PROMPT, build_parse_user_message
 
 # Pricing (as of 2025)
 MODEL_PRICING = {
@@ -283,21 +283,18 @@ class ParseAgent(BaseAgent):
         from anthropic import Anthropic
 
         schema = settings.utility_schema
+        state_code = pwsid[:2] if pwsid else ""
+        utility_name = self._lookup_utility_name(pwsid) or ""
         model = route_model(raw_text)
         logger.info(f"ParseAgent: {pwsid} ({len(raw_text):,} chars) → {model}")
 
         # Call Claude API with prompt caching
         client = Anthropic()
-        user_message = (
-            f"Extract the water rate structure from this {content_type} text.\n\n"
-            f"Return a JSON object with these fields: rate_effective_date, "
-            f"rate_structure_type (MUST be one of: flat, uniform, increasing_block, "
-            f"decreasing_block, budget_based, seasonal), "
-            f"billing_frequency, fixed_charge_monthly, "
-            f"meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, "
-            f"tier_2_rate, tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, "
-            f"tier_4_rate, parse_confidence, notes.\n\n"
-            f"Text:\n{raw_text[:45000]}"  # Cap at 15K chars
+        user_message = build_parse_user_message(
+            raw_text[:45000],
+            utility_name=utility_name,
+            state_code=state_code,
+            content_type=content_type,
         )
 
         try:
@@ -327,12 +324,14 @@ class ParseAgent(BaseAgent):
                 + usage.output_tokens * pricing["output"])
 
         # Parse response
+        raw_json = None
         try:
             raw_json = "{" + response.content[0].text
             result = json.loads(raw_json)
         except (json.JSONDecodeError, IndexError) as e:
             logger.warning(f"  JSON parse failed: {e}")
-            self._update_registry(registry_id, "failed", "failed", cost, model)
+            self._update_registry(registry_id, "failed", "failed", cost, model,
+                                  raw_response=raw_json)
             self.log_run(status="failed", notes=f"JSON parse error: {str(e)[:200]}")
             return {"pwsid": pwsid, "success": False, "cost_usd": cost, "error": "json_parse"}
 
@@ -350,22 +349,12 @@ class ParseAgent(BaseAgent):
         # Sprint 16: Retry with addendum when first attempt fails on substantive content
         if not valid and "no_tier_1_rate" in issues and len(raw_text) > 2000:
             logger.info(f"  Retrying with rate-search addendum (substantive content, {len(raw_text):,} chars)")
-            retry_user_message = (
-                f"Extract the water rate structure from this {content_type} text.\n\n"
-                f"IMPORTANT: A previous extraction attempt found no rate data. "
-                f"Look more carefully for:\n"
-                f"- Rates expressed as $/gallon, $/ccf, $/1000 gallons, per unit\n"
-                f"- Monthly service charges or base charges\n"
-                f"- Water charges listed in a fee schedule or budget document\n"
-                f"- Rates that may be embedded in a table or list format\n"
-                f"If you find ANY numeric water charge, extract it even if "
-                f"the full tier structure is unclear.\n\n"
-                f"Return a JSON object with these fields: rate_effective_date, "
-                f"rate_structure_type, billing_frequency, fixed_charge_monthly, "
-                f"meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, "
-                f"tier_2_rate, tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, "
-                f"tier_4_rate, parse_confidence, notes.\n\n"
-                f"Text:\n{raw_text[:45000]}"
+            retry_user_message = build_parse_user_message(
+                raw_text[:45000],
+                utility_name=utility_name,
+                state_code=state_code,
+                content_type=content_type,
+                retry=True,
             )
             try:
                 retry_response = client.messages.create(
@@ -393,11 +382,13 @@ class ParseAgent(BaseAgent):
                 if retry_valid or retry_result.get("parse_confidence") in ("high", "medium"):
                     logger.info(f"  Retry succeeded: {retry_result.get('parse_confidence')}")
                     result = retry_result
+                    raw_json = retry_json
                     valid = retry_valid
                     issues = retry_issues
                     confidence = result.get("parse_confidence", "failed")
                 else:
                     logger.info(f"  Retry also failed: {retry_issues}")
+                    raw_json = retry_json
             except Exception as e:
                 logger.debug(f"  Retry failed: {e}")
 
@@ -498,7 +489,8 @@ class ParseAgent(BaseAgent):
 
         # Update scrape_registry
         parse_result = "success" if success else "failed"
-        self._update_registry(registry_id, parse_result, confidence, cost, model)
+        self._update_registry(registry_id, parse_result, confidence, cost, model,
+                              raw_response=raw_json)
 
         self.log_run(
             status="success" if success else "failed",
@@ -556,6 +548,24 @@ class ParseAgent(BaseAgent):
         if result:
             return result.scraped_text, result.id, result.url
         return None, None, None
+
+    def _lookup_utility_name(self, pwsid: str) -> str | None:
+        """Look up utility name from cws_boundaries by PWSID.
+
+        Returns pws_name or None if not found.
+        """
+        if not pwsid:
+            return None
+        schema = settings.utility_schema
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(text(f"""
+                    SELECT pws_name FROM {schema}.cws_boundaries
+                    WHERE pwsid = :pwsid LIMIT 1
+                """), {"pwsid": pwsid}).fetchone()
+            return row.pws_name if row else None
+        except Exception:
+            return None
 
     @staticmethod
     def _should_skip_parse(text: str) -> str | None:
@@ -625,8 +635,9 @@ class ParseAgent(BaseAgent):
     def _update_registry(
         self, registry_id: int | None, parse_result: str,
         confidence: str, cost: float, model: str,
+        raw_response: str | None = None,
     ) -> None:
-        """Update scrape_registry with parse outcome and url_quality tier."""
+        """Update scrape_registry with parse outcome, url_quality tier, and raw LLM response."""
         if registry_id is None:
             return
         schema = settings.utility_schema
@@ -651,12 +662,14 @@ class ParseAgent(BaseAgent):
                         last_parse_result = :result,
                         last_parse_confidence = :confidence,
                         last_parse_cost_usd = :cost,
+                        last_parse_raw_response = :raw_response,
                         url_quality = :url_quality,
                         updated_at = :now
                     WHERE id = :id
                 """), {
                     "now": now, "result": parse_result,
                     "confidence": confidence, "cost": cost,
+                    "raw_response": (raw_response or "")[:50000] or None,
                     "url_quality": url_quality, "id": registry_id,
                 })
                 if new_status:

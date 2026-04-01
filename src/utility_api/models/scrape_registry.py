@@ -116,6 +116,10 @@ class ScrapeRegistry(Base):
         Float,
         comment="API cost in USD for this parse attempt",
     )
+    last_parse_raw_response: Mapped[str | None] = mapped_column(
+        Text, nullable=True,
+        comment="Raw LLM response text from last parse attempt (for debugging prompt changes)",
+    )
 
     # Status and retry
     status: Mapped[str] = mapped_column(

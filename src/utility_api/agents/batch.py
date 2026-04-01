@@ -53,7 +53,7 @@ from utility_api.agents.parse import (
 )
 from utility_api.config import settings
 from utility_api.db import engine
-from utility_api.ingest.rate_parser import SYSTEM_PROMPT
+from utility_api.ingest.rate_parser import SYSTEM_PROMPT, build_parse_user_message
 
 
 def _repair_json(raw: str) -> dict | None:
@@ -166,16 +166,11 @@ class BatchAgent(BaseAgent):
 
             model = route_model(raw_text)
 
-            user_message = (
-                f"Extract the water rate structure from this {content_type} text.\n\n"
-                f"Return a JSON object with these fields: rate_effective_date, "
-                f"rate_structure_type (MUST be one of: flat, uniform, increasing_block, "
-                f"decreasing_block, budget_based, seasonal), "
-                f"billing_frequency, fixed_charge_monthly, "
-                f"meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, "
-                f"tier_2_rate, tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, "
-                f"tier_4_rate, parse_confidence, notes.\n\n"
-                f"Text:\n{raw_text[:45000]}"
+            user_message = build_parse_user_message(
+                raw_text[:45000],
+                utility_name=task.get("utility_name", ""),
+                state_code=task.get("state_code", pwsid[:2]),
+                content_type=content_type,
             )
 
             batch_requests.append({
@@ -417,19 +412,21 @@ class BatchAgent(BaseAgent):
             total_cost += cost
 
             # Parse JSON from response (with repair for common LLM formatting errors)
+            raw_json = None
             try:
                 raw_json = "{" + message.content[0].text
                 parsed = json.loads(raw_json)
             except (json.JSONDecodeError, IndexError) as e:
                 # Attempt repair before giving up
-                repaired = _repair_json(raw_json)
+                repaired = _repair_json(raw_json) if raw_json else None
                 if repaired is not None:
                     parsed = repaired
                     logger.info(f"  {pwsid}: JSON repaired (original error: {e})")
                 else:
                     logger.warning(f"  {pwsid}: JSON parse failed: {e}")
                     failed += 1
-                    parse_agent._update_registry(registry_id, "failed", "failed", cost, model)
+                    parse_agent._update_registry(registry_id, "failed", "failed", cost, model,
+                                                 raw_response=raw_json)
                     details.append({"pwsid": pwsid, "status": "json_error"})
                     continue
 
@@ -554,7 +551,8 @@ class BatchAgent(BaseAgent):
                     })
 
                     # Update registry
-                    parse_agent._update_registry(registry_id, "success", confidence, cost, model)
+                    parse_agent._update_registry(registry_id, "success", confidence, cost, model,
+                                                 raw_response=raw_json)
 
                 except Exception as e:
                     logger.warning(f"  {pwsid}: DB write failed: {e}")
@@ -562,7 +560,8 @@ class BatchAgent(BaseAgent):
                     details.append({"pwsid": pwsid, "status": "db_error"})
             else:
                 failed += 1
-                parse_agent._update_registry(registry_id, "failed", confidence, cost, model)
+                parse_agent._update_registry(registry_id, "failed", confidence, cost, model,
+                                             raw_response=raw_json)
                 details.append({"pwsid": pwsid, "status": f"low_confidence:{confidence}"})
 
         # Update batch_jobs

@@ -52,6 +52,21 @@ water rate structure and return a JSON object with the following fields.
 
 Rules:
 - Extract RESIDENTIAL rates only (not commercial, industrial, or irrigation)
+- WATER ONLY: Many utility pages list both water and sewer/wastewater charges together.
+  Extract ONLY the water supply charges. Ignore all sewer, wastewater, stormwater,
+  reclaimed water, and solid waste fees. If a page shows a combined "water & sewer" bill
+  total, do NOT use that number — find the water-only components (base charge + volumetric
+  rate for water service). If you truly cannot separate water from sewer charges, set
+  parse_confidence to "low" and explain in notes what you found.
+- Rates may appear in legal/ordinance format with section numbering
+  (e.g., "Section 52-44(a)(1)"). Ignore the legal formatting and extract the rate
+  values. Ordinances often express tiers as "First X gallons: $Y" or
+  "All over X gallons: $Y per 1,000 gallons" — these are standard tiered structures.
+- Text from PDFs may have garbled table formatting where columns run together on one line
+  or split across lines without clear alignment. Look for patterns of tier labels near
+  dollar amounts and CCF/gallon limits even if they aren't in a clean table layout.
+  Reconstruct the rate structure from context clues — e.g., if you see
+  "Tier 1 0-5 CCF $3.50 Tier 2 5-15 CCF $4.75" on a single line, that is two tiers.
 - If multiple meter sizes are listed, use the smallest standard residential size (typically 5/8" or 3/4")
 - Convert all volumetric rates to $/CCF (1 CCF = 100 cubic feet = 748 gallons)
   - If rates are in $/1,000 gallons: multiply by 0.748 to get $/CCF (since 1 CCF = 748 gal, which is 0.748 thousand gal)
@@ -75,6 +90,87 @@ Rules:
 - If you cannot determine the rate structure, set parse_confidence to "failed" and explain in notes
 - If the page text doesn't contain rate information, set parse_confidence to "failed"
 - Be precise with numbers — do not round or estimate"""
+
+
+# JSON field list used in user messages — single source of truth
+_JSON_FIELDS = (
+    "rate_effective_date, rate_structure_type, billing_frequency, fixed_charge_monthly, "
+    "meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, tier_2_rate, "
+    "tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, tier_4_rate, parse_confidence, notes"
+)
+
+# Retry addendum — prepended to user message on second parse attempt
+_RETRY_ADDENDUM = """IMPORTANT: A previous extraction attempt found no rate data. \
+Look more carefully for:
+- Rates expressed as $/gallon, $/ccf, $/1000 gallons, per unit
+- Monthly service charges or base charges
+- Water charges listed in a fee schedule or budget document
+- Rates that may be embedded in a table or list format
+- Look for water rates SEPARATE from sewer/wastewater charges — many pages combine them. \
+Extract only the water portion.
+- Rates in legal/ordinance format (e.g., "Section 12.04.030") are valid — extract the \
+dollar amounts regardless of legal numbering.
+- If the text appears to be from a PDF with garbled table formatting, reconstruct the \
+rate table from the numbers and keywords present.
+- If you can identify a base/fixed monthly charge and a single volumetric rate but not \
+a full tier structure, extract what you have as a flat or uniform rate. A partial \
+extraction with confidence "medium" is better than a failed extraction.
+If you find ANY numeric water charge, extract it even if the full tier structure is unclear.
+
+"""
+
+
+def build_parse_user_message(
+    page_text: str,
+    utility_name: str = "",
+    state_code: str = "",
+    content_type: str = "html",
+    retry: bool = False,
+) -> str:
+    """Build the user message for rate extraction, shared across all code paths.
+
+    Parameters
+    ----------
+    page_text : str
+        Scraped text content (caller is responsible for any truncation).
+    utility_name : str
+        Utility name for context (omitted if empty).
+    state_code : str
+        Two-letter state code for context.
+    content_type : str
+        "html" or "pdf".
+    retry : bool
+        If True, prepend the retry addendum with more aggressive search hints.
+
+    Returns
+    -------
+    str
+        Complete user message ready to send to the API.
+    """
+    # Context line
+    context_parts = []
+    if utility_name:
+        context_parts.append(utility_name)
+    if state_code:
+        context_parts.append(state_code)
+    context_line = f"Context: {' | '.join(context_parts)}\n\n" if context_parts else ""
+
+    # Retry preamble
+    retry_block = _RETRY_ADDENDUM if retry else ""
+
+    return (
+        f"Extract the residential water rate structure from this {content_type} text.\n\n"
+        f"{retry_block}"
+        f"{context_line}"
+        f"--- BEGIN SCRAPED TEXT ---\n"
+        f"{page_text}\n"
+        f"--- END SCRAPED TEXT ---\n\n"
+        f"Return ONLY a valid JSON object (no markdown, no explanation) with these fields:\n"
+        f"{_JSON_FIELDS}.\n\n"
+        f"If there is no rate information on this page, set parse_confidence to "
+        f'"failed" and explain why in notes.'
+    )
+
 
 EXTRACTION_SCHEMA = {
     "type": "object",
@@ -241,28 +337,10 @@ def parse_rate_text(
             parse_model=model,
         )
 
-    # Build the user message
-    context_parts = []
-    if utility_name:
-        context_parts.append(f"Utility: {utility_name}")
-    if state_code:
-        context_parts.append(f"State: {state_code}")
-    context_line = " | ".join(context_parts)
-
-    user_message = f"""Extract the residential water rate structure from this utility's rate page.
-
-{f"Context: {context_line}" if context_line else ""}
-
---- BEGIN SCRAPED TEXT ---
-{page_text}
---- END SCRAPED TEXT ---
-
-Return ONLY a valid JSON object (no markdown, no explanation) with these fields:
-rate_effective_date, rate_structure_type, billing_frequency, fixed_charge_monthly,
-meter_size_inches, tier_1_limit_ccf, tier_1_rate, tier_2_limit_ccf, tier_2_rate,
-tier_3_limit_ccf, tier_3_rate, tier_4_limit_ccf, tier_4_rate, parse_confidence, notes.
-
-If there is no rate information on this page, set parse_confidence to "failed" and explain why in notes."""
+    # Build the user message via shared builder
+    user_message = build_parse_user_message(
+        page_text, utility_name=utility_name, state_code=state_code,
+    )
 
     try:
         client = _get_anthropic_client()

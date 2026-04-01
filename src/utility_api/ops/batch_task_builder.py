@@ -207,6 +207,8 @@ def build_parse_tasks(
                 "content_type": u.content_type or "html",
                 "source_url": u.source_url or "",
                 "registry_id": u.registry_id,
+                "utility_name": u.pws_name or "",
+                "state_code": u.state_code or "",
             })
 
     # Stats
