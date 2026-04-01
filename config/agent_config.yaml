@@ -17,6 +17,29 @@ batch_api:
   # Max tasks per batch (Anthropic limit TBD, start conservative)
   max_batch_size: 100
 
+  # --- Batch Strategy ---
+  # Controls how many URLs per PWSID are submitted to the Batch API.
+  #
+  # "shotgun" — Submit ALL viable URLs per PWSID in one batch.
+  #   Pros:  Completes in 1 batch cycle (~24hr). Maximum coverage.
+  #   Cons:  ~18% cost overhead from redundant parses on PWSIDs
+  #          where an earlier rank would have succeeded.
+  #   Cost:  ~$0.008/success (at $0.002/task batch pricing)
+  #
+  # "cascade" — Submit only rank 1. After batch completes, submit rank 2
+  #   for failures only, then rank 3, etc. Each round excludes successes.
+  #   Pros:  Minimum cost — only pays for attempts that might succeed.
+  #   Cons:  Takes N days (one 24hr batch cycle per rank).
+  #   Cost:  ~$0.006/success
+  #
+  # "rank1_only" — Submit only the best-scored URL per PWSID. No cascade.
+  #   Pros:  Cheapest single-pass. Good for initial discovery sweeps.
+  #   Cons:  Misses ~49% of parseable content (rank 2/3 win rate).
+  #   Cost:  ~$0.004/success (but fewer total successes)
+  #
+  # Override per-run: --strategy shotgun|cascade|rank1_only
+  default_strategy: shotgun
+
 source_checking:
   # Default interval between source freshness checks (days)
   default_interval_days: 90

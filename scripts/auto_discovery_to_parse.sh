@@ -57,7 +57,7 @@ echo ""
 # Scrape new URLs and submit to Anthropic Batch API for parsing.
 # Batch pricing is 50% cheaper than direct API. Results auto-processed
 # by poll_scenario_a.sh when the batch completes (~24hr SLA).
-python scripts/submit_discovery_batch.py 2>&1
+python scripts/submit_discovery_batch.py --strategy shotgun 2>&1
 SUBMIT_EXIT=$?
 
 if [ $SUBMIT_EXIT -eq 0 ]; then
