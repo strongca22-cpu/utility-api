@@ -139,7 +139,10 @@ def main():
     for c in candidates:
         by_pwsid.setdefault(c["pwsid"], []).append(c)
 
-    # For each PWSID: scrape if needed, re-score, pick best
+    # For each PWSID: scrape if needed, submit ALL viable URLs (shotgun mode).
+    # Shotgun submits every URL that has text and scores >= 30. First success
+    # wins via ON CONFLICT in rate_schedules. Cost overhead vs true cascade
+    # is ~18% ($3/3k PWSIDs) but completes in 1 day instead of 4.
     parse_tasks = []
     skipped_no_text = 0
     scraped_new = 0
@@ -149,9 +152,7 @@ def main():
             logger.info(f"  Progress: {i+1}/{len(by_pwsid)} PWSIDs, "
                         f"{len(parse_tasks)} tasks, {scraped_new} scraped")
 
-        best = None
-        best_score = -1
-
+        pwsid_has_task = False
         for u in urls:
             # Scrape if no text
             if not u.get("scraped_text") or (u.get("text_len") or 0) < 100:
@@ -177,31 +178,28 @@ def main():
             boost = compute_content_boost(u.get("scraped_text", ""))
             score = min(base + boost, 100)
 
-            if score > best_score and score >= 30:
-                best_score = score
-                best = u
+            if score >= 30:
+                raw_text = u["scraped_text"]
 
-        if best and best.get("scraped_text"):
-            raw_text = best["scraped_text"]
+                # Section extraction for multi-area PDFs
+                try:
+                    from utility_api.ingest.rate_scraper import extract_service_area_section
+                    section = extract_service_area_section(raw_text, pws_name)
+                    if section:
+                        raw_text = section
+                except Exception:
+                    pass
 
-            # Section extraction for multi-area PDFs
-            try:
-                from utility_api.ingest.rate_scraper import extract_service_area_section
-                pws_name = best.get("pws_name", "")
-                section = extract_service_area_section(raw_text, pws_name)
-                if section:
-                    raw_text = section
-            except Exception:
-                pass
+                parse_tasks.append({
+                    "pwsid": pwsid,
+                    "raw_text": raw_text[:45000],
+                    "content_type": u.get("content_type", "html"),
+                    "source_url": u["url"],
+                    "registry_id": u["registry_id"],
+                })
+                pwsid_has_task = True
 
-            parse_tasks.append({
-                "pwsid": pwsid,
-                "raw_text": raw_text[:45000],
-                "content_type": best.get("content_type", "html"),
-                "source_url": best["url"],
-                "registry_id": best["registry_id"],
-            })
-        else:
+        if not pwsid_has_task:
             skipped_no_text += 1
 
     logger.info(f"\nParse tasks collected: {len(parse_tasks)}")
