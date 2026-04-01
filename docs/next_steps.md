@@ -1294,6 +1294,16 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **water_rates deprecation Phase 3:** All 10 ingest modules redirected to write directly to rate_schedules. rate_discovery.py staging moved to scrape_registry. BulkIngestAgent sync removed.
 - [x] **water_rates deprecation Phase 4:** All active reads redirected to rate_schedules — best_estimate.py (3 backfill blocks removed), coverage.py (UNION simplified), API routers, cli/ops.py (4 queries), 6 scripts. water_rates preserved as read-only legacy.
 
+### Sprint 27 — Prompt Consolidation & Reparse (2026-04-01)
+- [x] **Unified user message builder:** `build_parse_user_message()` in `rate_parser.py` — all 3 code paths (direct, ParseAgent, batch) now use a single shared function with utility context, text delimiters, and explicit JSON-only instructions
+- [x] **System prompt rules added:** water/sewer charge separation (50% of right-content failures), ordinance/legal format recognition (8%), PDF garbled table reconstruction
+- [x] **Retry addendum strengthened:** water/sewer reminder, ordinance acceptance, PDF reconstruction, permissive partial extraction guidance
+- [x] **Raw LLM response logging:** `last_parse_raw_response` TEXT column on `scrape_registry` (migration 024). Stored at all parse call sites for post-batch diagnostics.
+- [x] **Utility metadata plumbed through batch path:** `pws_name` and `state_code` passed from `batch_task_builder.py` → `BatchAgent.submit()` → user message
+- [x] **Reparse batch submitted:** `msgbatch_01JArCR8gqMf7XnVe3etqS67` — 2,807 tasks / 1,693 PWSIDs / ~$13 est. cost. All url_sources, all failed rows with substantive content and no existing rate_schedule.
+- [ ] **Reparse batch processing** — waiting on Anthropic (~24hr). Process with: `python scripts/run_prompt_reparse.py --process-batch`
+- [ ] **After processing:** Analyze recovery rate by failure category (water/sewer, ordinance, PDF). Inspect `last_parse_raw_response` for remaining failures. Rebuild best_estimate + re-export dashboard.
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
