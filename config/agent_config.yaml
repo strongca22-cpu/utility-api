@@ -38,7 +38,7 @@ discovery:
   delay_between_utilities: 2           # seconds between PWSIDs (was 15 for SearXNG)
   max_utilities_per_session: 100       # Serper can handle much higher throughput
   max_queries_per_run: 2500            # matches free tier cap
-  url_score_threshold: 45              # minimum score to import to scrape_registry (was 50, lowered Sprint 25)
+  url_score_threshold: 30              # minimum score to import to scrape_registry (was 50→45→30; 5.6% of cascade wins came from 30-44 range, and cost of storing extra URLs is near zero)
   urls_per_pwsid: 5                    # top 5 with rank tagging (was 3; funnel analysis showed 4.8 avg above threshold, rank 2-3 win 49% of cascades)
   gap_state_threshold_pct: 20          # states below this % coverage are targeted
   min_population: 3000                 # skip tiny systems
