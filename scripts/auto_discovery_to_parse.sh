@@ -49,23 +49,31 @@ done
 
 echo ""
 echo "============================================================"
-echo "Discovery sweep complete — launching cascade parse"
+echo "Discovery sweep complete — scraping + submitting batch"
 echo "$(date -Iseconds)"
 echo "============================================================"
 echo ""
 
-# Run cascade parse (all unparsed PWSIDs with Serper URLs)
-python scripts/run_cascade_parse.py 2>&1
-PARSE_EXIT=$?
+# Scrape new URLs and submit to Anthropic Batch API for parsing.
+# Batch pricing is 50% cheaper than direct API. Results auto-processed
+# by poll_scenario_a.sh when the batch completes (~24hr SLA).
+python scripts/submit_discovery_batch.py 2>&1
+SUBMIT_EXIT=$?
 
-if [ $PARSE_EXIT -eq 0 ]; then
+if [ $SUBMIT_EXIT -eq 0 ]; then
     echo ""
     echo "============================================================"
-    echo "CASCADE PARSE COMPLETE — $(date -Iseconds)"
+    echo "BATCH SUBMITTED — $(date -Iseconds)"
     echo "============================================================"
-    echo "Best estimate rebuilt. Dashboard data exported."
+    echo "Batch will process at Anthropic (~24hr SLA)."
+    echo "Start poller to auto-process results:"
+    echo "  tmux new-session -d -s discovery_poll ./scripts/poll_scenario_a.sh"
+    echo ""
+    echo "Starting poller automatically..."
+    cd "$PROJECT_ROOT"
+    ./scripts/poll_scenario_a.sh 2>&1 | tee -a logs/discovery_poll.log
 else
     echo ""
-    echo "WARNING: cascade parse exited with code $PARSE_EXIT"
+    echo "WARNING: batch submission exited with code $SUBMIT_EXIT"
     echo "Check logs for errors."
 fi
