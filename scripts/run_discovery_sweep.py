@@ -60,8 +60,12 @@ from utility_api.db import engine
 QUERIES_PER_PWSID = 4
 
 
-def get_unsearched_pwsids(min_pop: int = 1000, max_pop: int | None = None) -> list[dict]:
-    """Get PWSIDs that have never been searched by Serper.
+def get_unsearched_pwsids(
+    min_pop: int = 1000,
+    max_pop: int | None = None,
+    include_searched: bool = False,
+) -> list[dict]:
+    """Get PWSIDs without rates, optionally including already-searched ones.
 
     Parameters
     ----------
@@ -69,6 +73,8 @@ def get_unsearched_pwsids(min_pop: int = 1000, max_pop: int | None = None) -> li
         Minimum population threshold.
     max_pop : int, optional
         Maximum population (exclusive). None = no upper limit.
+    include_searched : bool
+        If True, include PWSIDs already in scrape_registry (re-search).
 
     Returns
     -------
@@ -82,6 +88,14 @@ def get_unsearched_pwsids(min_pop: int = 1000, max_pop: int | None = None) -> li
         pop_clause += " AND c.population_served < :max_pop"
         params["max_pop"] = max_pop
 
+    search_filter = ""
+    if not include_searched:
+        search_filter = f"""
+              AND NOT EXISTS (
+                SELECT 1 FROM {schema}.scrape_registry sr
+                WHERE sr.pwsid = c.pwsid AND sr.url_source = 'serper'
+              )"""
+
     with engine.connect() as conn:
         rows = conn.execute(text(f"""
             SELECT c.pwsid, c.state_code, c.population_served, c.pws_name
@@ -92,10 +106,7 @@ def get_unsearched_pwsids(min_pop: int = 1000, max_pop: int | None = None) -> li
                 SELECT 1 FROM {schema}.rate_schedules rs
                 WHERE rs.pwsid = c.pwsid
               )
-              AND NOT EXISTS (
-                SELECT 1 FROM {schema}.scrape_registry sr
-                WHERE sr.pwsid = c.pwsid AND sr.url_source = 'serper'
-              )
+              {search_filter}
             ORDER BY c.population_served DESC
         """), params).fetchall()
 
@@ -201,6 +212,8 @@ def main():
                         help="Preview targets, no API calls")
     parser.add_argument("--gap-only", action="store_true",
                         help="Only search gap PWSIDs (pop >= 3k), skip Scenario B")
+    parser.add_argument("--force", action="store_true",
+                        help="Re-search PWSIDs even if already in scrape_registry")
     args = parser.parse_args()
 
     logger.info("=" * 60)
@@ -209,14 +222,14 @@ def main():
     logger.info("=" * 60)
 
     # Tier 1: Gap PWSIDs (pop >= 3k)
-    gap_targets = get_unsearched_pwsids(min_pop=3000)
+    gap_targets = get_unsearched_pwsids(min_pop=3000, include_searched=args.force)
     logger.info(f"\nTier 1 — Gap (pop >= 3k): {len(gap_targets)} PWSIDs")
 
     gap_result = run_discovery(gap_targets, label="Gap >=3k", dry_run=args.dry_run)
 
     # Tier 2: Scenario B (pop 1k-3k)
     if not args.gap_only:
-        scenb_targets = get_unsearched_pwsids(min_pop=1000, max_pop=3000)
+        scenb_targets = get_unsearched_pwsids(min_pop=1000, max_pop=3000, include_searched=args.force)
         logger.info(f"\nTier 2 — Scenario B (pop 1k-3k): {len(scenb_targets)} PWSIDs")
 
         scenb_result = run_discovery(scenb_targets, label="Scenario B 1k-3k", dry_run=args.dry_run)
