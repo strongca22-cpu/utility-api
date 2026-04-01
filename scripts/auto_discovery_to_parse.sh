@@ -39,11 +39,15 @@ echo "Auto Discovery → Parse Pipeline"
 echo "Started: $(date -Iseconds)"
 echo "============================================================"
 echo ""
-echo "Waiting for discovery_sweep tmux session to complete..."
+echo "Waiting for discovery_sweep and bulk_scrape to complete..."
 
-# Poll until discovery_sweep session is gone
-while tmux has-session -t discovery_sweep 2>/dev/null; do
-    echo "[$(date +%H:%M)] discovery_sweep still running. Next check in ${POLL_INTERVAL}s..."
+# Poll until both sessions are gone
+while tmux has-session -t discovery_sweep 2>/dev/null || tmux has-session -t bulk_scrape 2>/dev/null; do
+    DS="done"
+    BS="done"
+    tmux has-session -t discovery_sweep 2>/dev/null && DS="running"
+    tmux has-session -t bulk_scrape 2>/dev/null && BS="running"
+    echo "[$(date +%H:%M)] discovery=$DS, scrape=$BS. Next check in ${POLL_INTERVAL}s..."
     sleep "$POLL_INTERVAL"
 done
 
