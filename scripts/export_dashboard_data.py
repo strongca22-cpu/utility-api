@@ -447,6 +447,17 @@ def build_coverage_stats(stats: dict) -> dict:
         for name, count in sorted(stats["by_source"].items(), key=lambda x: -x[1])
     ]
 
+    # Lower 48 metrics — core demographic market (excludes AK, HI, PR, territories)
+    excluded_states = {"AK", "HI", "PR", "GU", "VI", "AS", "MP"}
+    l48_states = [
+        st for st in by_state
+        if st["state"] not in excluded_states and not st["state"][:1].isdigit()
+    ]
+    l48_pop_total = sum(st["pop_total"] for st in l48_states)
+    l48_pop_covered = sum(st["pop_covered"] for st in l48_states)
+    l48_total_cws = sum(st["total"] for st in l48_states)
+    l48_covered = sum(st["covered"] for st in l48_states)
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "total_cws": total,
@@ -459,6 +470,13 @@ def build_coverage_stats(stats: dict) -> dict:
         "pct_population": round(100 * pop_covered / pop_total, 1) if pop_total > 0 else 0,
         "by_state": by_state,
         "by_source": by_source,
+        # Lower 48 — primary coverage metric
+        "lower_48_total_cws": l48_total_cws,
+        "lower_48_with_rate_data": l48_covered,
+        "lower_48_pct_covered": round(100 * l48_covered / l48_total_cws, 1) if l48_total_cws > 0 else 0,
+        "lower_48_population_total": l48_pop_total,
+        "lower_48_population_covered": l48_pop_covered,
+        "lower_48_pct_population": round(100 * l48_pop_covered / l48_pop_total, 1) if l48_pop_total > 0 else 0,
         # QA summary counts
         "total_flagged": stats.get("total_flagged", 0),
         "total_stale": stats.get("total_stale", 0),
@@ -606,7 +624,10 @@ def main():
         logger.info(f"With rate data:      {coverage['with_rate_data']:,} ({coverage['pct_covered']}%)")
         logger.info(f"Reference only:      {coverage['with_reference_only']:,}")
         logger.info(f"No data:             {coverage['no_data']:,}")
-        logger.info(f"Population coverage: {coverage['pct_population']}%")
+        logger.info(f"Population coverage: {coverage['pct_population']}% (all)")
+        logger.info(f"--- Lower 48 (primary) ---")
+        logger.info(f"Lower 48 CWS:        {coverage['lower_48_with_rate_data']:,} / {coverage['lower_48_total_cws']:,} ({coverage['lower_48_pct_covered']}%)")
+        logger.info(f"Lower 48 pop:        {coverage['lower_48_pct_population']}%")
         logger.info(f"QA: {coverage['total_flagged']} flagged, {coverage['total_stale']} stale, {coverage['total_high_variance']} high-variance")
 
 

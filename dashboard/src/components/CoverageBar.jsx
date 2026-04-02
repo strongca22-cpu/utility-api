@@ -92,6 +92,15 @@ export default function CoverageBar({ stats, staticStats }) {
           )}
         </span>
 
+        {stats.lower_48_pct_population > 0 && (
+          <span className="border-l border-slate-700 pl-3 ml-1 flex items-center gap-1">
+            <span className="text-xs text-slate-500">L48:</span>
+            <span className="text-emerald-400 font-semibold">
+              {formatPct(stats.lower_48_pct_population)}
+            </span>
+          </span>
+        )}
+
         {refreshLabel && (
           <span className="text-slate-500 text-xs ml-auto">
             {refreshLabel}
@@ -173,6 +182,15 @@ export default function CoverageBar({ stats, staticStats }) {
           </span>
         )}
       </span>
+
+      {stats.lower_48_pct_population > 0 && (
+        <span className="border-l border-slate-700 pl-3 ml-1 flex items-center gap-1">
+          <span className="text-xs text-slate-500">L48:</span>
+          <span className="text-emerald-400 font-semibold">
+            {formatPct(stats.lower_48_pct_population)}
+          </span>
+        </span>
+      )}
 
       {refreshLabel && (
         <span className="text-slate-500 text-xs ml-auto">

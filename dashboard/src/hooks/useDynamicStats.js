@@ -25,6 +25,11 @@ export function useDynamicStats(geojson, settings) {
     let popFree = 0;
     let popPremium = 0;
 
+    // Lower 48 (excludes AK, HI, PR, territories, tribal numeric codes)
+    const excludedStates = new Set(["AK", "HI", "PR", "GU", "VI", "AS", "MP"]);
+    let l48PopTotal = 0;
+    let l48PopCovered = 0;
+
     // QA counts
     let flaggedCount = 0;
     let staleCount = 0;
@@ -59,6 +64,16 @@ export function useDynamicStats(geojson, settings) {
         noData++;
       }
 
+      // Lower 48 population tracking
+      const st = p.state || "";
+      const isL48 = st.length === 2 && !excludedStates.has(st) && !/^\d/.test(st);
+      if (isL48) {
+        l48PopTotal += pop;
+        if (tier === "free" || tier === "premium" || tier === "reference") {
+          l48PopCovered += pop;
+        }
+      }
+
       // QA stats (counted regardless of tier filter)
       if (p.needs_review) flaggedCount++;
       if (p.is_stale && p.has_rate_data) staleCount++;
@@ -81,6 +96,10 @@ export function useDynamicStats(geojson, settings) {
       population_free: popFree,
       population_premium: popPremium,
       pct_population: popTotal > 0 ? (visiblePop / popTotal) * 100 : 0,
+      // Lower 48 — primary metric
+      lower_48_population_total: l48PopTotal,
+      lower_48_population_covered: l48PopCovered,
+      lower_48_pct_population: l48PopTotal > 0 ? (l48PopCovered / l48PopTotal) * 100 : 0,
       // QA
       flagged_count: flaggedCount,
       stale_count: staleCount,

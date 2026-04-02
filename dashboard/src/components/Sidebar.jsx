@@ -160,6 +160,15 @@ export default function Sidebar({ dynamicStats }) {
                   </span>{" "}
                   ({formatPct(dynamicStats.pct_population || 0)})
                 </div>
+                {dynamicStats.lower_48_pct_population > 0 && (
+                  <div className="mt-1 pt-1 border-t border-slate-700">
+                    Lower 48:{" "}
+                    <span className="text-emerald-400 font-semibold">
+                      {formatPct(dynamicStats.lower_48_pct_population)}
+                    </span>{" "}
+                    pop
+                  </div>
+                )}
               </>
             )}
           </div>
