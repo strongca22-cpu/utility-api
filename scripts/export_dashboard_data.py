@@ -59,6 +59,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from utility_api.db import engine  # noqa: E402
+from utility_api.ops.best_estimate import load_source_priority, resolve_display_tier  # noqa: E402
 
 # Constants
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "dashboard" / "public" / "data"
@@ -91,6 +92,7 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         tolerance: ST_Simplify tolerance (None for full resolution)
     """
     source_lookup = build_source_lookup(conn)
+    priority_config = load_source_priority()
 
     # Build geometry expression — simplified or full
     if tolerance is not None:
@@ -266,17 +268,12 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         # Source metadata from catalog
         source_meta = source_lookup.get(row.source_key or "", {})
 
-        # Assign data_tier based on source
-        # - "reference": Duke NIEPS (CC BY-NC-ND, internal only)
-        # - "premium": LLM-scraped (proprietary)
-        # - "free": government surveys, EFC, eAR, PUC filings
-        # - null: no rate data
-        if has_reference_only:
+        # Assign data_tier from config/source_priority.yaml
+        # Config-driven: premium (scraped), free (government/survey), reference (license-restricted)
+        if has_rate_data and row.source_key:
+            data_tier = resolve_display_tier(row.source_key, priority_config)
+        elif has_reference_only:
             data_tier = "reference"
-        elif row.source_key == "scraped_llm":
-            data_tier = "premium"
-        elif has_rate_data:
-            data_tier = "free"
         else:
             data_tier = None
 

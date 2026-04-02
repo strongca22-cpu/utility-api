@@ -117,6 +117,52 @@ def resolve_source_priority(
     return defaults.get("fallback_priority", 99)
 
 
+def get_source_display_tiers(config: dict) -> dict[str, str]:
+    """Build source_key → display_tier mapping from config.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of source keys to their display tier (premium, free, reference).
+    """
+    tiers = {}
+    for entry in config.get("default", {}).get("priority_order", []):
+        if "display_tier" in entry:
+            tiers[entry["source"]] = entry["display_tier"]
+    return tiers
+
+
+def resolve_display_tier(source: str, config: dict) -> str:
+    """Resolve display_tier for a source, including pattern-based fallbacks.
+
+    Parameters
+    ----------
+    source : str
+        The source_key to look up.
+    config : dict
+        Full source priority config.
+
+    Returns
+    -------
+    str
+        Display tier: 'premium', 'free', or 'reference'.
+    """
+    # 1. Exact match from priority_order entries
+    for entry in config.get("default", {}).get("priority_order", []):
+        if entry.get("source") == source and "display_tier" in entry:
+            return entry["display_tier"]
+
+    # 2. Pattern-based overrides
+    defaults = config.get("default", {})
+    for pattern_entry in defaults.get("source_patterns", []):
+        pattern = pattern_entry.get("pattern", "")
+        if pattern and source.startswith(pattern) and "display_tier" in pattern_entry:
+            return pattern_entry["display_tier"]
+
+    # 3. Fallback
+    return defaults.get("fallback_display_tier", "free")
+
+
 # --- Bill Extraction ---
 
 def get_comparable_bill(row: pd.Series) -> float | None:

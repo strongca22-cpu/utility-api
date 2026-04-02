@@ -5,6 +5,15 @@
 #   when multiple sources exist for a single PWSID. Lower priority
 #   number = higher preference.
 #
+#   Also controls display_tier — how each source appears in the dashboard.
+#   This is the single source of truth for both selection priority and
+#   dashboard tier assignment.
+#
+# display_tier values:
+#   "premium"   — LLM-scraped rates (proprietary, blue in QA mode)
+#   "free"      — Government/survey bulk data (green in dashboard)
+#   "reference" — Academic/licensed data not for paid products (amber)
+#
 # Principle:
 #   LLM-scraped rates from actual published rate schedules are the primary
 #   source — most current (59% are 2024+), most complete (full tier structure,
@@ -14,71 +23,172 @@
 #   to QA/reference role as scraping coverage expands.
 #
 # Created: 2026-03-24
-# Modified: 2026-04-01 — scraped_llm promoted to priority 1; bulk demoted to fallback
+# Modified: 2026-04-02 — added display_tier; registered all known sources
 
 # Default source priority (applies to all states unless overridden)
 # Each entry maps a source key (or pattern) to a base priority number.
 # Lower number = higher priority.
 default:
   priority_order:
-    # LLM scraping — primary source. Parsed from actual published rate pages.
-    # Most current vintage, full rate structure detail, highest completeness.
+    # --- Primary: LLM scraping ---
     - source: "scraped_llm"
       priority: 1
+      display_tier: "premium"
       notes: "Primary source. Low-confidence dynamically demoted to priority 6."
 
-    # Government bulk sources — fallback when no scrape available.
-    # Good for QA cross-reference against scraped data.
+    # --- Government bulk: CA SWRCB eAR ---
     - source: "swrcb_ear_2022"
       priority: 3
+      display_tier: "free"
       confidence: high
-      notes: "CA eAR. QA cross-reference for CA scraped rates."
-    - source: "efc_nc_2025"
-      priority: 3
-      confidence: high
+      notes: "CA eAR 2022. QA cross-reference for CA scraped rates."
     - source: "swrcb_ear_2021"
       priority: 4
+      display_tier: "free"
       confidence: high
     - source: "swrcb_ear_2020"
       priority: 6
+      display_tier: "free"
       confidence: medium
       notes: "No pre-computed bills, tier-only. Oldest CA government source."
 
-    # Curated third-party surveys
+    # --- Government bulk: EFC state surveys ---
+    - source: "efc_nc_2025"
+      priority: 3
+      display_tier: "free"
+      confidence: high
+    - source: "efc_ar_2020"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_ia_2023"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_wi_2016"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_ga_2019"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_oh_2019"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_ms_2022"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_az_2014"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_al_2018"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_fl_2020"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_ma_2017"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_il_2018"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_vt_2021"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_nh_2016"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_ct_2018"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_me_2018"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_mo_2015"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_hi_2020"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_de_2018"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+    - source: "efc_sc_2014"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+
+    # --- Curated third-party surveys ---
     - source: "owrs"
       priority: 5
+      display_tier: "free"
       confidence: medium
       notes: "Water-only, curated YAML, but often 5-8 years old."
 
-    # Reference datasets — aggregate/static, no rate structure detail.
-    # Fallback-only for PWSIDs with no better source. Long-term: QA role only.
-    - source: "duke_nieps_10state"
-      priority: 8
-      confidence: low
-      notes: "Academic reference. Aggregate bills only, no rate structure."
+    # --- State regulatory filings ---
+    - source: "wv_psc_2026"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+      notes: "West Virginia PSC tariff data. 2026 vintage."
+    - source: "nm_nmed_rate_survey_2025"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+      notes: "NM NMED rate survey. Bills only, no tier structure."
+    - source: "in_iurc_water_billing_2024"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+      notes: "Indiana IURC billing data. Bills only, no tier structure."
+    - source: "ky_psc_water_tariffs_2025"
+      priority: 5
+      display_tier: "free"
+      confidence: medium
+      notes: "Kentucky PSC tariff filings. Structured, KY only."
     - source: "tx_tml_2023"
       priority: 8
+      display_tier: "free"
       confidence: medium
-      notes: "Texas Municipal League survey. Static snapshot, no rate tiers."
-    - source: "ky_psc_water_tariffs_2025"
+      notes: "Texas Municipal League survey. Static snapshot."
+
+    # --- Academic reference (license-restricted) ---
+    - source: "duke_nieps_10state"
       priority: 8
+      display_tier: "reference"
       confidence: medium
-      notes: "Kentucky PSC tariff filings. Structured but limited to KY."
+      notes: "CC BY-NC-ND 4.0. Full rate structure. Vintage 2019-2021."
 
-  # Fallback: any source not in the list gets this priority.
-  # EFC state sources (efc_ar_2020, efc_wi_2016, etc.) and state-specific
-  # bulk sources (wv_psc_2026, nm_nmed_2025, in_iurc_2024, etc.) all hit
-  # this. They serve as fallback when no scraped data exists.
+  # Fallback: any source not in the list gets this priority and tier.
   fallback_priority: 5
+  fallback_display_tier: "free"
 
-  # Pattern-based priority overrides for sources not listed above.
-  # Checked in order; first match wins. Falls back to fallback_priority.
+  # Pattern-based overrides for sources not listed above.
+  # Checked in order; first match wins.
   source_patterns:
     - pattern: "efc_"
       priority: 3
+      display_tier: "free"
       notes: "EFC state surveys — government bulk, fallback to scrape"
     - pattern: "swrcb_"
       priority: 3
+      display_tier: "free"
       notes: "SWRCB surveys — CA government data, fallback to scrape"
 
 # State-specific overrides
