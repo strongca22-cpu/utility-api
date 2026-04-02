@@ -1303,10 +1303,30 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Reparse batch submitted:** `msgbatch_01JArCR8gqMf7XnVe3etqS67` — 2,807 tasks / 1,693 PWSIDs / ~$13 est. cost. All url_sources, all failed rows with substantive content and no existing rate_schedule.
 - [x] **Source hierarchy updated:** scraped_llm promoted to priority 1; bulk sources (EFC, Duke, eAR) demoted to fallback/QA. CA anchor logic changed to flag-only (no demotion on divergence).
 - [x] **Orphan parse batch submitted:** `msgbatch_01SEayyJbh6c8prBNDo7dy2T` — 2,496 tasks / 2,274 PWSIDs / 13M pop / ~$12 est. cost. Scraped text from Mar 30-31 that was never sent to parser due to `--since` date filter gap.
-- [ ] **Reparse batch processing** — waiting on Anthropic (~24hr). Process with: `python scripts/run_prompt_reparse.py --process-batch`
-- [ ] **Orphan batch processing** — waiting on Anthropic (~24hr). Process with: `python scripts/run_orphan_parse.py --process-batch`
-- [ ] **After both batches:** Analyze recovery rates. Rebuild best_estimate + re-export dashboard.
-- [ ] **Step 2 for orphan gaps:** PWSIDs that still lack rates after orphan batch → feed into full pipeline with `--force` flag on discovery sweep to bypass the "already has serper URL" exclusion. This triggers fresh discovery → scrape ranks 1-5 → cascade parse.
+- [x] **Reparse batch processed:** 131/2,807 (4.7%). Content was the problem, not prompts. 125 new PWSIDs, 4M pop.
+- [x] **Orphan batch processed:** 1,113/2,496 (44.6%). 1,082 new PWSIDs, 4.8M pop.
+- [x] **Rank 1 batch processed:** 1,054/3,200 (32.9%). Pipeline rank 1 with new prompts.
+- [x] **Tier A bulk replace:** 2/521 (0.4%). Existing text was wrong content — confirmed dead end.
+- [x] **Parallel scraper created:** `scripts/bulk_scrape_parallel.py` — modulo-partitioned workers. 20 workers on 24-core system.
+- [x] **Lower 48 primary metric:** Dashboard shows L48 pop coverage as primary KPI. Currently 87.0% displayed (90.3% raw DB).
+- [x] **Rank 2 batch submitted:** `msgbatch_01V6pooL84nzTphfu6Q6ZeVd` — 2,776 tasks, ~$5.55.
+- [x] **Tier C discovery launched:** 3,101 bulk-only PWSIDs >= 3k (never Serper-searched). Includes Chicago, Phoenix, Cleveland, Charlotte. ~12k queries.
+
+#### In Flight (auto-chained, tmux:chain_r3c + tmux:bulk_discover)
+- [ ] **Rank 3 scrape** — 20 workers, ~6,183 URLs. Auto-submits batch when done.
+- [ ] **Tier C scrape** — starts after rank 3, scrapes discovery results. Auto-submits batch when done.
+- [ ] **Rank 2 batch processing** — at Anthropic, process when returned.
+- [ ] **Rank 3 batch processing** — will be at Anthropic after auto-submit.
+- [ ] **Tier C batch processing** — will be at Anthropic after auto-submit.
+
+#### Incomplete — Next Session
+- [ ] **Ranks 4/5 scrape + batch** — not yet started. ~13,800 URLs. Lower priority (3rd/4th choice URLs).
+- [ ] **Tier C for 1k-3k pop** — 1,889 PWSIDs not yet discovered. ~7,556 Serper queries.
+- [ ] **Deep crawl trigger improvements** — 465 "rates behind link" pages need link-following after parse failure.
+- [ ] **Validation relaxation** — 88-133 near-complete parses rejected by strict validator.
+- [ ] **Sonnet routing for PDFs** — 10pp success rate advantage over Haiku on PDFs.
+- [ ] **Duke NIEPS QA cross-reference** — use Duke as benchmark to validate scraped data quality.
+- [ ] **Orphan step 2** — re-discover with --force for PWSIDs that still lack rates.
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
