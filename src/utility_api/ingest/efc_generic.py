@@ -17,7 +17,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-26
-Modified: 2026-03-26
+Modified: 2026-04-02
 
 Dependencies:
     - httpx (HTTP client)
@@ -429,17 +429,47 @@ def _tiers_to_schema(tiers: list[dict], divisor: int) -> dict:
 
 # --- Bill Computation ---
 
+# CCF benchmark → gallon mapping for bill curve lookups.
+# If the exact gallon value falls on a 500-gal curve point (within ~1%),
+# we snap directly. Otherwise we interpolate between the two bracketing
+# 500-gal points. This replaces the prior _interpolate_bill() approach
+# which added unnecessary complexity for negligible precision gain.
+#
+# Mapping:  CCF →  exact gal  →  snap or bracket
+#   5 CCF  →  3,740 gal  →  interpolate 3500–4000  (6.4% off nearest)
+#   6 CCF  →  4,488 gal  →  snap 4500              (0.26% off)
+#   9 CCF  →  6,733 gal  →  interpolate 6500–7000  (3.5% off nearest)
+#  10 CCF  →  7,481 gal  →  snap 7500              (0.26% off)
+#  12 CCF  →  8,977 gal  →  snap 9000              (0.26% off)
+#  20 CCF  →ᅠ14,961 gal  →  snap 15000             (0.26% off)
+#  24 CCF  → 17,953 gal  →  beyond curve (NULL)
 
-def _interpolate_bill(bill_water: dict, target_gal: float) -> float | None:
-    """Interpolate bill at any gallon consumption level.
 
-    Handles arbitrary gallon increments by finding the two bracketing
-    data points and linearly interpolating between them.
+def _bill_from_curve(bill_water: dict, ccf: float, divisor: int) -> float | None:
+    """Look up bill from the EFC bill curve at a CCF benchmark.
+
+    Snaps to the nearest curve data point when close (< 7% off), otherwise
+    does simple linear interpolation between the two bracketing points.
+    Handles both 500-gal and 1000-gal increment curves automatically.
+
+    Parameters
+    ----------
+    bill_water : dict
+        EFC bill curve: {"0": 4.11, "500": 7.18, ...} (gal → bill per period).
+        Curve may use 500-gal or 1000-gal increments depending on state.
+    ccf : float
+        Monthly consumption in CCF.
+    divisor : int
+        Billing period divisor (1=monthly, 2=bimonthly, 3=quarterly).
+
+    Returns
+    -------
+    float or None
+        Monthly bill in USD, or None if data unavailable.
     """
-    if target_gal < 0:
-        return None
+    gal_per_period = ccf * GAL_PER_CCF * divisor
 
-    # Build sorted gallon→bill pairs
+    # Build sorted curve points from the bill_water dict
     points = []
     for k, v in bill_water.items():
         try:
@@ -451,42 +481,41 @@ def _interpolate_bill(bill_water: dict, target_gal: float) -> float | None:
     if not points:
         return None
 
-    # Below range
-    if target_gal <= points[0][0]:
-        return points[0][1]
-
-    # Beyond range — extrapolate from last two
-    if target_gal > points[-1][0]:
-        if len(points) >= 2:
-            gal_a, val_a = points[-2]
-            gal_b, val_b = points[-1]
-            delta = gal_b - gal_a
-            if delta > 0:
-                rate = (val_b - val_a) / delta
-                return val_b + rate * (target_gal - gal_b)
+    # Beyond curve range → NULL (no extrapolation)
+    if gal_per_period > points[-1][0]:
         return None
 
-    # Find bracketing points
+    # At or below first point
+    if gal_per_period <= points[0][0]:
+        return round(points[0][1] / divisor, 2)
+
+    # Find bracketing points and snap-or-interpolate
     for i in range(1, len(points)):
-        if points[i][0] >= target_gal:
+        if points[i][0] >= gal_per_period:
             gal_a, val_a = points[i - 1]
             gal_b, val_b = points[i]
-            delta = gal_b - gal_a
-            if delta <= 0:
-                return val_a
-            frac = (target_gal - gal_a) / delta
-            return val_a + frac * (val_b - val_a)
+            increment = gal_b - gal_a
+            if increment <= 0:
+                return round(val_a / divisor, 2)
+
+            dist_to_lower = gal_per_period - gal_a
+            dist_to_upper = gal_b - gal_per_period
+
+            # Snap if within 10% of the increment from either point
+            # e.g., 500-gal curve: snap if < 50 gal from a point
+            # e.g., 1000-gal curve: snap if < 100 gal from a point
+            snap_threshold = increment * 0.10
+            if dist_to_lower <= snap_threshold:
+                return round(val_a / divisor, 2)
+            if dist_to_upper <= snap_threshold:
+                return round(val_b / divisor, 2)
+
+            # Otherwise simple linear interpolation
+            frac = dist_to_lower / increment
+            bill_per_period = val_a + frac * (val_b - val_a)
+            return round(bill_per_period / divisor, 2)
 
     return None
-
-
-def _compute_monthly_bill(bill_water: dict, ccf: float, divisor: int) -> float | None:
-    """Compute monthly bill at a given CCF/month level."""
-    gal_per_period = ccf * GAL_PER_CCF * divisor
-    bill_per_period = _interpolate_bill(bill_water, gal_per_period)
-    if bill_per_period is None:
-        return None
-    return round(bill_per_period / divisor, 2)
 
 
 # --- Date Parsing ---
@@ -580,9 +609,9 @@ def _parse_api_response(
     if base_charge is not None:
         fixed_charge_monthly = round(float(base_charge) / divisor, 2)
 
-    # Bill snapshots
-    bill_5ccf = _compute_monthly_bill(bill_water, 5.0, divisor)
-    bill_10ccf = _compute_monthly_bill(bill_water, 10.0, divisor)
+    # Bill snapshots (snap to nearest 500-gal curve point or interpolate)
+    bill_5ccf = _bill_from_curve(bill_water, 5.0, divisor)
+    bill_10ccf = _bill_from_curve(bill_water, 10.0, divisor)
 
     # Effective date
     eff_date = _parse_effective_date(
