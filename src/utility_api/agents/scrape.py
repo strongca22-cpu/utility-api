@@ -431,6 +431,41 @@ class ScrapeAgent(BaseAgent):
                     })
                     conn.commit()
 
+            # Mark exhausted URLs as dead after 2 failed attempts.
+            # Prevents infinite retry loops on 0-char PDFs, broken sites, etc.
+            if char_count < 100:
+                current_retry = getattr(row, "retry_count", 0) or 0
+                new_retry = current_retry + 1
+                if new_retry >= 2:
+                    with engine.connect() as conn:
+                        conn.execute(text(f"""
+                            UPDATE {schema}.scrape_registry SET
+                                status = 'dead',
+                                retry_count = :retry,
+                                notes = COALESCE(notes, '') || ' exhausted_after_' || :retry || '_attempts',
+                                updated_at = :now
+                            WHERE id = :id
+                        """), {
+                            "retry": new_retry,
+                            "now": datetime.now(timezone.utc),
+                            "id": row.id,
+                        })
+                        conn.commit()
+                    logger.info(f"  Marked dead after {new_retry} attempts ({char_count} chars)")
+                else:
+                    with engine.connect() as conn:
+                        conn.execute(text(f"""
+                            UPDATE {schema}.scrape_registry SET
+                                retry_count = :retry,
+                                updated_at = :now
+                            WHERE id = :id
+                        """), {
+                            "retry": new_retry,
+                            "now": datetime.now(timezone.utc),
+                            "id": row.id,
+                        })
+                        conn.commit()
+
             raw_texts.append({
                 "registry_id": row.id,
                 "pwsid": row.pwsid,
