@@ -1365,6 +1365,22 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] **Resolve NULL billing_frequency** — 57 records flagged for review
 - [ ] **Re-run H2H as scraped coverage grows** — N=20 is insufficient for statistical inference
 
+### Sprint 28 — KY PSC Bulk Source Audit (2026-04-02)
+- [x] **KY PSC audit:** ky_psc_water_tariffs_2025 — 84 records audited
+- [x] **JSONB fixed:** `frequency` key stripped from all 84 fixed_charges. 175 inter-tier 1-gallon gaps closed.
+- [x] **Bill bug fixed:** KY0300387 (Daviess County) bills recomputed from $4.52 → $52.24 at 10 CCF. Root cause: LLM over-reported first_tier_gallons.
+- [x] **Confidence upgraded:** 70 records medium → high (bill in [10,200], tiers >= 2). 13 uniform stay medium. 1 outlier flagged.
+- [x] **Key finding:** KY uses "minimum bill includes first N gallons" pattern — tier 1 starts above 0. Generic `compute_bill_at_gallons()` doesn't handle this.
+- [x] **83% decreasing block** — KY utilities favor volume discounts (opposite of CA conservation pricing).
+- [x] **Report:** `docs/ky_psc_audit_report.md`
+- [x] **Script:** `scripts/migrate_ky_psc_to_comparable.py`
+
+#### Remaining KY PSC Work
+- [ ] **Fix ingest code:** Remove `frequency` from fixed_charges in `ky_psc_ingest.py` line 358
+- [ ] **Tighten LLM prompt:** Add sanity check for first_tier_gallons > 5000
+- [ ] **Investigate KY0590220:** $333 at 10 CCF — verify against actual tariff PDF
+- [ ] **Audit WV PSC:** Same ingest pattern, likely same issues (frequency key, 1-gal gaps)
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
