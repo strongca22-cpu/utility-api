@@ -58,6 +58,7 @@ def worker_main(
     rank: int | None,
     rank_min: int | None,
     idle_timeout: int,
+    any_source: bool = False,
 ) -> dict:
     """Single worker process — scrapes its partition of pending URLs.
 
@@ -99,11 +100,15 @@ def worker_main(
     def get_batch(limit: int = 100) -> list[dict]:
         """Get pending URLs for this worker's partition."""
         params = {
-            "src": "serper",
             "limit": limit,
             "total": total_workers,
             "worker": worker_id,
         }
+
+        source_filter = ""
+        if not any_source:
+            source_filter = "AND sr.url_source = :src"
+            params["src"] = "serper"
 
         since_filter = ""
         if since:
@@ -122,9 +127,9 @@ def worker_main(
             rows = conn.execute(text(f"""
                 SELECT sr.id, sr.pwsid, sr.url, sr.content_type, sr.discovery_rank
                 FROM {schema}.scrape_registry sr
-                WHERE sr.url_source = :src
-                  AND (sr.scraped_text IS NULL OR LENGTH(sr.scraped_text) < 100)
+                WHERE (sr.scraped_text IS NULL OR LENGTH(sr.scraped_text) < 100)
                   AND sr.status != 'dead'
+                  {source_filter}
                   AND MOD(sr.id, :total) = :worker
                   {since_filter}
                   {rank_filter}
@@ -222,6 +227,8 @@ Examples:
                         help="Scrape ranks >= this value")
     parser.add_argument("--idle-timeout", type=int, default=120,
                         help="Per-worker idle timeout in seconds (default: 120)")
+    parser.add_argument("--any-source", action="store_true",
+                        help="Scrape all url_sources, not just serper")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show partition sizes, no scraping")
 
@@ -239,7 +246,12 @@ Examples:
         from utility_api.db import engine
 
         schema = settings.utility_schema
-        params = {"src": "serper"}
+        params = {}
+
+        source_filter = ""
+        if not args.any_source:
+            source_filter = "AND sr.url_source = :src"
+            params["src"] = "serper"
 
         since_filter = ""
         if args.since:
@@ -260,9 +272,9 @@ Examples:
                 r = conn.execute(text(f"""
                     SELECT count(*) as cnt
                     FROM {schema}.scrape_registry sr
-                    WHERE sr.url_source = :src
-                      AND (sr.scraped_text IS NULL OR LENGTH(sr.scraped_text) < 100)
+                    WHERE (sr.scraped_text IS NULL OR LENGTH(sr.scraped_text) < 100)
                       AND sr.status != 'dead'
+                      {source_filter}
                       AND MOD(sr.id, :total) = :worker
                       {since_filter}
                       {rank_filter}
@@ -281,7 +293,7 @@ Examples:
         results = pool.starmap(
             worker_main,
             [
-                (w, args.workers, args.since, args.rank, args.rank_min, args.idle_timeout)
+                (w, args.workers, args.since, args.rank, args.rank_min, args.idle_timeout, args.any_source)
                 for w in range(args.workers)
             ],
         )
