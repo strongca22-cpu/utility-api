@@ -1437,6 +1437,22 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 #### Remaining NM NMED Work
 - [ ] **Investigate NM3561101:** bill_10ccf=$263.21 — verify against NMED PDF
 
+### Sprint 28 — IN IURC Bulk Source Audit (2026-04-02)
+- [x] **IN IURC audit:** in_iurc_water_billing_2024 — 58 records audited
+- [x] **JSONB clean:** Empty arrays (bill_only). No fixes needed.
+- [x] **Bills already CCF-normalized:** Ingest does proportional scaling from 4,000 gal. No additional normalization.
+- [x] **bill_20ccf backfilled:** 58 records via proportional model (2 × bill_10ccf).
+- [x] **Confidence unchanged:** All 58 remain "medium" (bill_only, 0 tiers).
+- [x] **No outliers.** All bills in [$11.22, $128.37].
+- [x] **H2H (N=41 raw pairs):** Better overlap than estimated. Mixed results, some excellent matches alongside large divergences.
+- [x] **Report:** `docs/in_iurc_audit_report.md`
+- [x] **Script:** `scripts/migrate_in_iurc_to_comparable.py`
+
+### Batch B Complete — All 9 Bulk Sources Audited
+All bulk sources have now been through the Sprint 28 audit pattern:
+- Duke NIEPS (3,177) | EFC (5,611) | CA eAR (581) | KY PSC (84) | WV PSC (241)
+- TX TML (476) | OWRS (387) | NM NMED (175) | IN IURC (58)
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
