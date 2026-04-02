@@ -12,7 +12,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-26
-Modified: 2026-03-26
+Modified: 2026-04-02
 
 Dependencies:
     - pymupdf (fitz) — PDF text extraction
@@ -348,13 +348,23 @@ def _convert_to_rate_schedule(parsed: dict, utility_name: str) -> dict:
             "rate_per_1000_gal": round(rate_per_1000, 4),
         })
 
+    # Ensure tier contiguity: prev max_gal == next min_gal (no 1-gal gaps)
+    for i in range(1, len(volumetric_tiers)):
+        prev_max = volumetric_tiers[i - 1].get("max_gal")
+        curr_min = volumetric_tiers[i].get("min_gal")
+        if (
+            prev_max is not None
+            and curr_min is not None
+            and curr_min - prev_max == 1
+        ):
+            volumetric_tiers[i]["min_gal"] = prev_max
+
     # Fixed charges JSONB
     fixed_charges_jsonb = None
     if fixed_charge is not None:
         fixed_charges_jsonb = json.dumps([{
             "name": "Minimum Bill",
             "amount": fixed_charge,
-            "frequency": "monthly",
             "meter_size": "5/8\"",
         }])
 
@@ -377,7 +387,17 @@ def _convert_to_rate_schedule(parsed: dict, utility_name: str) -> dict:
         # Subtract gallons included in minimum bill
         first_tier_gal = parsed.get("first_tier_gallons", 0)
         if first_tier_gal:
-            remaining = max(0, gallons - float(first_tier_gal))
+            first_tier_gal = float(first_tier_gal)
+            # Sanity check: included gallons > 5,000 is almost certainly the
+            # LLM confusing tier boundary with included volume. A $5-50
+            # minimum bill covering 5,000+ gal is economically implausible.
+            if first_tier_gal > 5000:
+                logger.warning(
+                    f"  {utility_name}: first_tier_gallons={first_tier_gal} > 5000 — "
+                    f"ignoring (likely LLM confusion with tier boundary)"
+                )
+                first_tier_gal = 0
+            remaining = max(0, gallons - first_tier_gal)
 
         for tier in volumetric_tiers:
             if remaining <= 0:
