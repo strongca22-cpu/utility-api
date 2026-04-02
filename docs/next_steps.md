@@ -1326,6 +1326,7 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] **Validation relaxation** — 88-133 near-complete parses rejected by strict validator.
 - [ ] **Sonnet routing for PDFs** — 10pp success rate advantage over Haiku on PDFs.
 - [x] **Duke NIEPS QA cross-reference** — completed Sprint 28. 108 scraped errors flagged (5x+ diff), 60 NULL extraction failures, 319 possible tier under-extractions. Duke data patched for comparability: contiguous tiers, deduped, nuanced confidence. Dashboard updated to display Duke as legitimate reference data with CC BY-NC-ND licensing notice.
+- [x] **Config-driven display_tier** — `config/source_priority.yaml` now controls both selection priority AND dashboard tier (premium/free/reference). All 31 source_keys registered. Changing a source tier is a one-line YAML edit.
 - [ ] **Orphan step 2** — re-discover with --force for PWSIDs that still lack rates.
 
 ### Later
