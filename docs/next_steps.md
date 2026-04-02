@@ -1376,10 +1376,21 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Script:** `scripts/migrate_ky_psc_to_comparable.py`
 
 #### Remaining KY PSC Work
-- [ ] **Fix ingest code:** Remove `frequency` from fixed_charges in `ky_psc_ingest.py` line 358
-- [ ] **Tighten LLM prompt:** Add sanity check for first_tier_gallons > 5000
+- [x] **Fix ingest code:** Removed `frequency` key, added contiguity enforcement, added first_tier_gallons sanity check (commit 27f71ae)
 - [ ] **Investigate KY0590220:** $333 at 10 CCF — verify against actual tariff PDF
-- [ ] **Audit WV PSC:** Same ingest pattern, likely same issues (frequency key, 1-gal gaps)
+
+### Sprint 28 — WV PSC Bulk Source Audit (2026-04-02)
+- [x] **WV PSC audit:** wv_psc_2026 — 241 records audited
+- [x] **JSONB already clean:** Uses `water_rate_to_schedule()` helper, canonical format from the start. No fixes needed.
+- [x] **Confidence recalibrated downward:** 155 records high → medium (all 1-tier; high requires tier_count >= 2). 1 high → low ($3 flat). 3 flagged for review (bill outliers).
+- [x] **Key finding:** WV is 100% single-tier or flat (2-point slope method limitation). Zero records qualify for "high."
+- [x] **H2H chaotic:** 34 pairs, no systematic bias, extreme outliers both directions. Not useful for QA.
+- [x] **Report:** `docs/wv_psc_audit_report.md`
+- [x] **Script:** `scripts/migrate_wv_psc_to_comparable.py`
+
+#### Remaining WV PSC Work
+- [ ] **Investigate WV3302814:** $3 flat rate — verify against PSC filing
+- [ ] **Investigate WV3300806/WV3301912:** $251/$237 at 10 CCF — flagged for review
 
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
