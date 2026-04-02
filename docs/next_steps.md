@@ -1346,6 +1346,25 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] **Flag GA vintage anomalies:** 2 records with vintage = 1500
 - [ ] **AZ/NH outlier investigation:** max bills $9,315 / $3,414 at 10 CCF
 
+### Sprint 28 — CA eAR Bulk Source Audit (2026-04-02)
+- [x] **eAR audit (all 3 vintages):** swrcb_ear_2020, swrcb_ear_2021, swrcb_ear_2022 — 581 records audited
+- [x] **Tier inflation verified:** fix_ear_tier_inflation.py (2026-03-24) confirmed effective. 0 inflated tiers remain. 100 records documented in parse_notes.
+- [x] **JSONB format clean:** Canonical keys only, no contiguity gaps, no duplicates, no `frequency` key. No structural fixes needed.
+- [x] **Confidence recalibrated:** 202 records changed. 52 (2020) medium→low (post-inflation-fix, no bills). 146 (2021+2022) high→medium (1-tier uniforms + NULL billing_frequency). 3 low→medium upgrades.
+- [x] **58 records flagged for review:** 57 NULL billing_frequency, 1 identical bills across volumes.
+- [x] **Head-to-head comparison:** N=20 overlap (eAR 2022 vs scraped). Median +33.8% scraped higher — partly explained by benchmark mismatch (bill_10ccf vs bill_12ccf), vintage gaps, and sewer contamination in 23 scraped CA records.
+- [x] **Key finding:** eAR has BOTH explicit tiers AND pre-computed bills (unique among bulk sources). No overlapping bill benchmarks with scraped/EFC (eAR uses 6/9/12/24 CCF, not 5/10/20).
+- [x] **Scraped error surfaced:** CA4810007 has inflated tier in scraped_llm (0-2,600 CCF). eAR + Duke agree on ~$55-65 bill.
+- [x] **Report:** `docs/ca_ear_audit_report.md`
+- [x] **Script:** `scripts/migrate_ear_to_comparable.py` (confidence recalibration)
+
+#### Remaining eAR Audit Work
+- [ ] **Add bill_10ccf to eAR ingest** — compute from clean tier structures during ingest for cross-source comparability
+- [ ] **Fix scraped CA4810007** — tier limit 2,600 CCF is obviously inflated, bill $183 is wrong
+- [ ] **Investigate "Allocation" rate structures** — consider adding `budget_based` as canonical rate_structure_type
+- [ ] **Resolve NULL billing_frequency** — 57 records flagged for review
+- [ ] **Re-run H2H as scraped coverage grows** — N=20 is insufficient for statistical inference
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
