@@ -1409,6 +1409,20 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] **Vintage refresh:** TML publishes annually; 2025 ingest would close vintage gap
 - [ ] **Investigate scraped_llm $120.29 repeated value** — 642 PWSIDs have identical bill_10ccf=$120.29 (template/default?)
 
+### Sprint 28 — OWRS Bulk Source Audit (2026-04-02)
+- [x] **OWRS audit:** owrs — 387 records audited (381 unique CA PWSIDs)
+- [x] **JSONB already clean:** Uses `water_rate_to_schedule()` helper. Canonical keys, zero contiguity issues, no fixes needed.
+- [x] **Bills already at CCF benchmarks:** Calculated from tier structures in ingest, no normalization needed.
+- [x] **Confidence recalibrated:** 104 records high → medium (1-tier cap). 267 multi-tier records correctly remain high.
+- [x] **Budget-based rates (16):** Collapsed to single uniform tier. Already at medium. No change needed.
+- [x] **H2H (N=183):** OWRS systematically lower than scraped (72% of pairs). Median diff 35.1%. Vintage gap (2002-2021 vs 2024-2025).
+- [x] **Report:** `docs/owrs_audit_report.md`
+- [x] **Script:** `scripts/migrate_owrs_to_comparable.py`
+
+#### Remaining OWRS Work
+- [ ] **Check for OWRS updates** — California Data Collaborative may have published post-2021 data
+- [ ] **Richer budget-based modeling** — 16 records lose allocation structure in current collapse
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
