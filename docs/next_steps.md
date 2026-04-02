@@ -1325,7 +1325,7 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] **Deep crawl trigger improvements** — 465 "rates behind link" pages need link-following after parse failure.
 - [ ] **Validation relaxation** — 88-133 near-complete parses rejected by strict validator.
 - [ ] **Sonnet routing for PDFs** — 10pp success rate advantage over Haiku on PDFs.
-- [ ] **Duke NIEPS QA cross-reference** — use Duke as benchmark to validate scraped data quality.
+- [x] **Duke NIEPS QA cross-reference** — completed Sprint 28. 108 scraped errors flagged (5x+ diff), 60 NULL extraction failures, 319 possible tier under-extractions. Duke data patched for comparability: contiguous tiers, deduped, nuanced confidence. Dashboard updated to display Duke as legitimate reference data with CC BY-NC-ND licensing notice.
 - [ ] **Orphan step 2** — re-discover with --force for PWSIDs that still lack rates.
 
 ### Later
