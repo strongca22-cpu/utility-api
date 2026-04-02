@@ -1359,7 +1359,7 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Script:** `scripts/migrate_ear_to_comparable.py` (confidence recalibration)
 
 #### Remaining eAR Audit Work
-- [ ] **Add bill_10ccf to eAR ingest** — compute from clean tier structures during ingest for cross-source comparability
+- [x] **Backfill bill_5ccf/bill_10ccf from tiers** — 460 records updated via `scripts/backfill_ear_bills.py`. Enables apples-to-apples H2H. Median +12% scraped higher (2021-2022).
 - [ ] **Fix scraped CA4810007** — tier limit 2,600 CCF is obviously inflated, bill $183 is wrong
 - [ ] **Investigate "Allocation" rate structures** — consider adding `budget_based` as canonical rate_structure_type
 - [ ] **Resolve NULL billing_frequency** — 57 records flagged for review
