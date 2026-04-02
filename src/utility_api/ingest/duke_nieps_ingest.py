@@ -19,7 +19,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-26
-Modified: 2026-03-26
+Modified: 2026-04-02
 
 Dependencies:
     - openpyxl (Excel parsing)
@@ -327,7 +327,6 @@ def _extract_rate_structure(
                 fixed_charges_jsonb.append({
                     "name": "Service Charge",
                     "amount": fixed_charge,
-                    "frequency": "monthly",
                     "meter_size": f'{ms_val}"' if ms_val else "5/8\"",
                 })
 
@@ -380,8 +379,25 @@ def _extract_rate_structure(
             "rate_per_1000_gal": round(rate_per_1000_gal, 4),
         })
 
-    # Sort by min_gal, assign tier numbers
+    # Sort by min_gal, deduplicate, make contiguous, assign tier numbers
     tiers.sort(key=lambda t: t["min_gal"])
+
+    # Deduplicate tiers with identical boundaries + rate
+    seen = set()
+    unique_tiers = []
+    for t in tiers:
+        key = (t.get("min_gal"), t.get("max_gal"), t.get("rate_per_1000_gal"))
+        if key not in seen:
+            seen.add(key)
+            unique_tiers.append(t)
+    tiers = unique_tiers
+
+    # Make tier boundaries contiguous (tier N+1 min = tier N max)
+    for i in range(1, len(tiers)):
+        prev_max = tiers[i - 1].get("max_gal")
+        if prev_max is not None:
+            tiers[i]["min_gal"] = prev_max
+
     for i, t in enumerate(tiers):
         t["tier"] = i + 1
 
@@ -475,6 +491,30 @@ def _conservation_signal(tiers: list[dict] | None) -> float | None:
     if len(rates) < 2:
         return None
     return round(max(rates) / min(rates), 3)
+
+
+def _assign_confidence(bill_10ccf: float | None, tier_count: int) -> str:
+    """Assign nuanced confidence based on data quality signals.
+
+    Parameters
+    ----------
+    bill_10ccf : float | None
+        Monthly bill at 10 CCF.
+    tier_count : int
+        Number of volumetric tiers.
+
+    Returns
+    -------
+    str
+        'high', 'medium', or 'low'.
+    """
+    if bill_10ccf is None:
+        return "low"
+    if 10 <= bill_10ccf <= 200 and tier_count >= 2:
+        return "high"
+    if 5 <= bill_10ccf <= 500:
+        return "medium"
+    return "low"
 
 
 # --- Main Ingest ---
@@ -623,7 +663,9 @@ def run_duke_nieps_ingest(
                 "conservation_signal": cons_signal,
                 "tier_count": rate_struct["tier_count"],
                 "source_url": source_url,
-                "confidence": "high",  # manually-collected data
+                "confidence": _assign_confidence(
+                    bill_10, rate_struct["tier_count"]
+                ),
                 "parse_notes": f"Duke NIEPS 10-state; {state_upper}; CC BY-NC-ND 4.0; free_attributed",
                 "needs_review": False,
             })

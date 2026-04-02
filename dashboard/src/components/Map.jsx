@@ -327,9 +327,9 @@ function buildOpacityExpression(settings) {
     // Premium tier
     ["==", ["get", "data_tier"], "premium"],
     showPremium ? base : 0,
-    // Reference tier
+    // Reference tier (Duke NIEPS — valid data, license-restricted)
     ["==", ["get", "data_tier"], "reference"],
-    showRef ? base * 0.8 : 0,
+    showRef ? base : 0,
     // No data (data_tier is null)
     showNoData ? base * 0.25 : 0,
   ];

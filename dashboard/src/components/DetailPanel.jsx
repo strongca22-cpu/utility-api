@@ -166,10 +166,10 @@ export default function DetailPanel({ utility, onClose }) {
               </div>
             )}
 
-            {/* Reference estimate caveat */}
+            {/* Duke NIEPS licensing notice */}
             {utility.is_reference_estimate && (
               <div className="mt-3 px-2 py-1.5 rounded bg-amber-900/20 border border-amber-800/30 text-sm text-amber-400">
-                Reference estimate only. Duke NIEPS bill values may be inaccurate due to unit conversion issues in the source data.
+                Duke NIEPS academic dataset (CC BY-NC-ND 4.0). Vintage: 2019–2021. Not available in premium product.
               </div>
             )}
 
@@ -213,7 +213,7 @@ export default function DetailPanel({ utility, onClose }) {
             </p>
             {utility.has_reference_only && (
               <p className="mt-2 text-sm text-amber-500/80">
-                Reference data available (Duke NIEPS, internal only)
+                Duke NIEPS reference data available (CC BY-NC-ND 4.0, vintage 2019–2021)
               </p>
             )}
           </>

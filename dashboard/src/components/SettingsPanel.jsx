@@ -56,7 +56,7 @@ export default function SettingsPanel({ settings, onChange, onClose }) {
           />
           <TierCheckbox
             label="Reference"
-            sublabel="Duke NIEPS (internal only)"
+            sublabel="Duke NIEPS (CC BY-NC-ND)"
             color={TIER_COLORS.reference}
             checked={settings.showReference}
             onChange={(v) => onChange({ ...settings, showReference: v })}

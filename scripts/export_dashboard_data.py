@@ -13,7 +13,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-26
-Modified: 2026-03-30
+Modified: 2026-04-02
 
 Dependencies:
     - sqlalchemy
@@ -221,10 +221,7 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         _bill10est = row.bill_estimate_10ccf
         _bill10_valid = _bill10 is not None and not (isinstance(_bill10, float) and math.isnan(_bill10))
         _bill10est_valid = _bill10est is not None and not (isinstance(_bill10est, float) and math.isnan(_bill10est))
-        has_rate_data = (
-            (_bill10_valid or _bill10est_valid)
-            and not has_reference_only
-        )
+        has_rate_data = _bill10_valid or _bill10est_valid
 
         # Accumulate stats
         stats["population_total"] += pop
@@ -283,25 +280,21 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
         else:
             data_tier = None
 
-        # For Duke-only PWSIDs, show bill data but flag as low confidence.
-        # Duke bill estimates are unreliable (unit mismatch identified Sprint 25).
-        if has_reference_only:
+        # Source metadata — use DB values for all sources including Duke.
+        # Duke data is CC BY-NC-ND (reference tier), but the rates are valid
+        # after the comparability migration (Sprint 28). Confidence comes from DB.
+        source_key = row.source_key
+        source_meta_out = source_lookup.get(row.source_key or "", {})
+        if has_reference_only and not source_key:
             source_key = "duke_nieps_10state"
-            source_meta_out = {"display_name": "Duke NIEPS (reference)", "tier": "free_attributed"}
-            vintage = str(row.rate_effective_date) if row.rate_effective_date else None
-            confidence = "low"
-        else:
-            source_key = row.source_key
-            source_meta_out = source_lookup.get(row.source_key or "", {})
-            vintage = str(row.rate_effective_date) if row.rate_effective_date else None
-            confidence = row.confidence
+            source_meta_out = source_lookup.get("duke_nieps_10state", {})
+        vintage = str(row.rate_effective_date) if row.rate_effective_date else None
+        confidence = row.confidence
 
-        # Compute QA fields
-        source_url = None
-        if not has_reference_only:
-            source_url = row.source_url or row.schedule_source_url
-            if source_url and isinstance(source_url, float) and math.isnan(source_url):
-                source_url = None
+        # Compute QA fields — show source_url for all sources including Duke
+        source_url = row.source_url or row.schedule_source_url
+        if source_url and isinstance(source_url, float) and math.isnan(source_url):
+            source_url = None
 
         is_stale = False
         if vintage:
@@ -357,12 +350,12 @@ def export_geojson(conn, output_path: Path, tolerance: float | None) -> dict:
             # QA fields
             "source_url": source_url,
             "n_sources": int(n_sources) if n_sources is not None else None,
-            "selection_notes": row.selection_notes if not has_reference_only else None,
+            "selection_notes": row.selection_notes,
             "needs_review": needs_review,
             "review_reason": row.review_reason if needs_review else None,
             "conservation_signal": _round(row.conservation_signal),
             "last_scraped": row.scrape_timestamp.isoformat() if hasattr(row, "scrape_timestamp") and row.scrape_timestamp else None,
-            "parse_model": row.parse_model if not has_reference_only else None,
+            "parse_model": row.parse_model,
             "is_stale": is_stale,
             "bill_range_min": bill_range_min,
             "bill_range_max": bill_range_max,
