@@ -1329,6 +1329,23 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [x] **Config-driven display_tier** — `config/source_priority.yaml` now controls both selection priority AND dashboard tier (premium/free/reference). All 31 source_keys registered. Changing a source tier is a one-line YAML edit.
 - [ ] **Orphan step 2** — re-discover with --force for PWSIDs that still lack rates.
 
+### Sprint 28 — EFC Bulk Source Audit (2026-04-02)
+- [x] **EFC pilot audit (4 largest states):** efc_ar_2020, efc_ia_2023, efc_wi_2016, efc_ga_2019 — 2,226 PWSIDs audited
+- [x] **JSONB format clean:** No extra keys, no contiguity gaps, no duplicate tiers. No structural fixes needed.
+- [x] **Confidence recalibrated:** 1,220 records high → medium (all 1-tier/uniform structures per Duke criteria)
+- [x] **Head-to-head comparison:** N=36 overlap with scraped_llm. Median +19% scraped higher (partly vintage gap). AR flagged systematic.
+- [x] **Bill calc simplified:** `_bill_from_curve()` replaces complex interpolation. Snap-to-curve-point when close, simple interpolation otherwise. Handles 500-gal and 1000-gal curves.
+- [x] **Key finding:** EFC bills are ground truth (from curve); tiers are reverse-engineered best-guess. Bill recalculation from tiers would introduce 6.2% median error — skipped.
+- [x] **Deprecated modules archived:** efc_fl_ingest.py, efc_nc_ingest.py → ingest/legacy/
+- [x] **Report:** `docs/efc_pilot_audit_report.md`
+- [x] **Scripts:** `scripts/efc_qa_analysis.py`, `scripts/migrate_efc_to_comparable.py` (generalized for any EFC source)
+
+#### Remaining EFC Audit Work
+- [ ] **Run confidence recalibration on all 18 EFC states:** `python scripts/migrate_efc_to_comparable.py --all-efc`
+- [ ] **Grow overlap:** Re-run `efc_qa_analysis.py` as scraped_llm coverage expands into EFC states
+- [ ] **Flag GA vintage anomalies:** 2 records with vintage = 1500
+- [ ] **AZ/NH outlier investigation:** max bills $9,315 / $3,414 at 10 CCF
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
