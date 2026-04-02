@@ -1423,6 +1423,20 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] **Check for OWRS updates** — California Data Collaborative may have published post-2021 data
 - [ ] **Richer budget-based modeling** — 16 records lose allocation structure in current collapse
 
+### Sprint 28 — NM NMED Bulk Source Audit (2026-04-02)
+- [x] **NM NMED audit:** nm_nmed_rate_survey_2025 — 175 records audited
+- [x] **JSONB clean:** Empty arrays (bill_only). No fixes needed.
+- [x] **Bills already CCF-normalized:** Ingest does proportional scaling from 6,000 gal. No additional normalization.
+- [x] **bill_20ccf backfilled:** 175 records via proportional model (2 × bill_10ccf).
+- [x] **Confidence unchanged:** All 175 remain "medium" (bill_only, 0 tiers).
+- [x] **1 outlier flagged:** NM3561101 bill_10ccf=$263.21.
+- [x] **H2H (N=18):** Best of Batch B at 23.7% median diff. Small sample.
+- [x] **Report:** `docs/nm_nmed_audit_report.md`
+- [x] **Script:** `scripts/migrate_nm_nmed_to_comparable.py`
+
+#### Remaining NM NMED Work
+- [ ] **Investigate NM3561101:** bill_10ccf=$263.21 — verify against NMED PDF
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
