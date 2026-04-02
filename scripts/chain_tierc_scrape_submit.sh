@@ -25,9 +25,9 @@ python scripts/bulk_scrape_parallel.py \
     2>&1
 log "Tier C scrape complete."
 
-log "Submitting Tier C parse batch..."
+log "Submitting Tier C parse batch (rank 1 only)..."
 python scripts/submit_discovery_batch.py \
-    --strategy shotgun \
+    --strategy rank1_only \
     --label "bulk_replace_c" \
     2>&1
 log "Tier C batch submitted."
