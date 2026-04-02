@@ -56,8 +56,11 @@ SCRAPE_HEADERS = {
 # HTML elements to strip (navigation, headers, footers, scripts)
 STRIP_TAGS = [
     "script", "style", "nav", "header", "footer", "noscript",
-    "iframe", "form", "button", "input", "select", "textarea",
+    "iframe", "button", "input", "select", "textarea",
     "svg", "img", "video", "audio",
+    # NOTE: "form" deliberately excluded. ASP.NET/Sitefinity CMS wraps the
+    # entire page in <form id="main">. Stripping it destroys all content.
+    # This affected SCWA (1.1M pop) and likely other ASP.NET utility sites.
 ]
 
 # Max text length to send to Claude API (chars) — keeps cost manageable
@@ -354,11 +357,15 @@ def _scrape_with_playwright(url: str, timeout_ms: int = 30_000) -> ScrapeResult:
                 )
                 page = context.new_page()
 
-                # Navigate and wait for content to render
-                page.goto(url, timeout=timeout_ms, wait_until="networkidle")
+                # Navigate with "load" wait — NOT "networkidle".
+                # Chat widgets and analytics scripts keep the network busy
+                # indefinitely on many utility sites, causing networkidle
+                # to time out. "load" fires when the page itself is loaded;
+                # the explicit wait afterward lets JS frameworks render.
+                page.goto(url, timeout=timeout_ms, wait_until="load")
 
-                # Give dynamic content a moment to settle
-                page.wait_for_timeout(2000)
+                # Wait for JS frameworks to render dynamic content
+                page.wait_for_timeout(5000)
 
                 # Get the rendered HTML
                 html = page.content()
