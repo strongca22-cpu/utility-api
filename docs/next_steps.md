@@ -1392,6 +1392,23 @@ That's the entire contract. Comments are ignored. Non-string values are skipped.
 - [ ] **Investigate WV3302814:** $3 flat rate — verify against PSC filing
 - [ ] **Investigate WV3300806/WV3301912:** $251/$237 at 10 CCF — flagged for review
 
+### Sprint 28 — TX TML Bulk Source Audit (2026-04-02)
+- [x] **TX TML audit:** tx_tml_2023 — 476 records audited
+- [x] **Bill normalization:** TML reports at 5,000/10,000 gal, not 5/10 CCF. 2-point linear interpolation model (F + R) applied to normalize all 476 records to standard CCF benchmarks. Original gallon values preserved in parse_notes.
+- [x] **471 records:** 2-point model (both bills available). **5 records:** 1-point proportional scaling.
+- [x] **bill_20ccf populated:** All 476 records via extrapolation (flagged in parse_notes).
+- [x] **23 records with negative implied fixed charge** (increasing block pattern) — interpolation valid within data range.
+- [x] **1 outlier flagged:** TX0700059 normalized bill_10ccf=$204.95 > $200.
+- [x] **Confidence unchanged:** All 476 remain "medium" (correct for bill_only, 0 tiers).
+- [x] **H2H (N=160):** TML systematically lower than scraped (79% of pairs). Median diff 41%. Driven by vintage gap (2023 vs 2024-2025) and methodology differences.
+- [x] **Report:** `docs/tx_tml_audit_report.md`
+- [x] **Script:** `scripts/migrate_tx_tml_to_comparable.py`
+
+#### Remaining TX TML Work
+- [ ] **Investigate TX0700059:** normalized bill_10ccf=$204.95 — verify against city rate schedule
+- [ ] **Vintage refresh:** TML publishes annually; 2025 ingest would close vintage gap
+- [ ] **Investigate scraped_llm $120.29 repeated value** — 642 PWSIDs have identical bill_10ccf=$120.29 (template/default?)
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
