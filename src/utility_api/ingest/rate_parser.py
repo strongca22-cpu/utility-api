@@ -92,6 +92,19 @@ Rules:
 - Be precise with numbers — do not round or estimate"""
 
 
+# Domain blacklist — near-100% parse failure rate across thousands of attempts.
+# URLs from these domains are skipped at batch submission time.
+# They stay in scrape_registry (never delete data) but are deprioritized.
+DOMAIN_BLACKLIST = {
+    "www.ny.gov",                           # 143/143 failures (100%) — state portal
+    "www.nyc.gov",                          # 130/136 failures (95.6%) — city portal
+    "houstonwaterbills.houstontx.gov",      # 133/133 failures (100%) — bill calculator
+    "psc.wi.gov",                           # 93/93 failures (100%) — regulatory filings
+    "www.louisianawater.com",               # 82/82 failures (100%) — utility portal
+    "dam.assets.ohio.gov",                  # 171/176 failures (97.2%) — document archive
+}
+
+
 # JSON field list used in user messages — single source of truth
 _JSON_FIELDS = (
     "rate_effective_date, rate_structure_type, billing_frequency, fixed_charge_monthly, "
