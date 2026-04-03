@@ -276,13 +276,14 @@ def _clean_html_text(soup: BeautifulSoup) -> str:
     # Collapse multiple spaces
     text = re.sub(r"[ \t]{2,}", " ", text)
 
-    # Remove very short lines (likely nav items, breadcrumbs)
+    # Remove very short lines (likely nav items, breadcrumbs).
+    # Keep lines with dollar amounts (e.g., "$1.50") even if short — these are
+    # rate values from table cells that are critical for extraction.
     lines = text.split("\n")
     filtered_lines = []
     for line in lines:
         stripped = line.strip()
-        # Keep lines with substance (>5 chars) or blank lines (for paragraph breaks)
-        if len(stripped) > 5 or stripped == "":
+        if len(stripped) > 3 or stripped == "" or "$" in stripped:
             filtered_lines.append(stripped)
 
     text = "\n".join(filtered_lines)
