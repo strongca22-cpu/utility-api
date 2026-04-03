@@ -1474,6 +1474,42 @@ All bulk sources have now been through the Sprint 28 audit pattern:
 - `scripts/rescrape_bugfix_ny.py` — targeted Sprint 27 bug-fix rescrape
 - `scripts/chain_ny_locality.sh` — automated chain (TC-R2 → rescrape → batch → process)
 
+### Sprint 29 — CO Deep Dive: Locality Discovery + Gap Audit (2026-04-03)
+
+**Gap status:** 30 PWSIDs, 1.48M pop, 78.1% coverage (155/185 PWSIDs >= 3k pop)
+
+#### Pipeline Fixes (applies to all states, not just CO)
+- [x] **Playwright JS wait extended:** 5s → 12s. CivicPlus/municipal CMS rate tables load values via AJAX after initial page load. Broomfield, Dacono, Highlands Ranch all had table headers but empty rate cells.
+- [x] **Discovery state disambiguation:** `-40` penalty for wrong-state `.gov` domains (`lafayette.in.gov`, `psc.ky.gov` for CO PWSIDs). Queries now use full state name ("Colorado" not "CO"). `_get_city_from_name()` handles "X CITY OF" (CO/western convention) with FT→Fort expansion.
+- [x] **Locality extraction CO fixes:** "X CITY OF"/"X TOWN OF" suffix pattern, WWWA/MD NO suffixes, CSU/YMCA institutional filter, abbreviation expansion (FT/MT/ST/CNTY), ambiguous CO city names in disambiguation list.
+
+#### Direct Recoveries
+- [x] **Highlands Ranch WSD (103k pop):** Reparsed id=5143 (highlandsranchwater.org/rates) — budget-based, 3 tiers, $108.18 @10CCF, medium confidence. Text had actual $/1000 gal values but was parsed pre-Sprint 23 (no stored response).
+- [x] **Genesee WSD entity fix:** id=59162 (geneseewater.colorado.gov/rates-and-fees) was assigned to CO0150700 (Lamar). Reassigned to CO0130035 (Genesee WSD).
+
+#### In Progress
+- [ ] **CO rescrape (48 URLs):** tmux `co_rescrape` — 32 JS thin/empty-table + 16 PDF 403 failures
+- [ ] **CO locality discovery (27 PWSIDs):** tmux `co_locality` — 108 Serper queries, ~$0.11
+- [ ] **Process rescrape results:** Auto-submit to parse sweep after rescrape completes
+- [ ] **Process locality URLs:** Scrape newly discovered URLs, submit parse batch
+
+#### Pending
+- [ ] **Curation file evaluation:** `docs/denver_cos_metro_rate_curation.json` has 34 curated utilities but only 1 PWSID resolved in gap. Most curated URLs 404'd. Needs refresh.
+- [ ] **CivicPlus table extraction:** Even with 12s wait, some CivicPlus tables (Broomfield, Dacono, Lafayette CO) still don't render rate cell values. May need table-specific Playwright selector wait or alternative scraping approach.
+
+#### Key Findings
+- **CO gap is dominated by wrong-URL discovery + JS rendering failures**, not missing URLs or parse bugs
+- **50+ scrape_registry entries were wrong-entity** (Indiana Lafayette, Kentucky PUC, Arizona Mesa for CO PWSIDs)
+- **~30 had JS-rendered table structures** but empty rate value cells
+- **Only 1 true reparse candidate** (Highlands Ranch) — rest were correctly rejected
+- **Workers:** Structural limit is RAM/CPU per Playwright Chromium instance, not code architecture. Desktop already runs 20 workers. VPS (4GB+ RAM) could add 10-15 more.
+
+#### Key Files
+- `scripts/rescrape_co_gap.py` — CO gap rescrape (JS thin + PDF 403)
+- `src/utility_api/agents/discovery.py` — state mismatch penalty + full state name queries
+- `src/utility_api/agents/locality_discovery.py` — CO suffix/institutional fixes
+- `src/utility_api/ingest/rate_scraper.py` — Playwright wait 5s → 12s
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
