@@ -14,7 +14,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-04-02
-Modified: 2026-04-02
+Modified: 2026-04-03 (Sprint 29: CO-specific suffix/institutional patterns)
 
 Dependencies:
     - sqlalchemy
@@ -135,6 +135,11 @@ _SUFFIXES = [
     "W.D",
     "CWS",
     "WSA",
+    # Sprint 29: CO-specific suffixes
+    "WWWA",  # Water/Wastewater Authority (e.g. ARAPAHOE CNTY WWWA)
+    "WWSA",  # Water/Wastewater Service Authority
+    "MD NO",  # Metropolitan District No. X (e.g. SUPERIOR MD NO 1)
+    "MD",     # Metropolitan District (e.g. SUPERIOR MD)
 ]
 
 _PREFIXES = [
@@ -236,6 +241,8 @@ def extract_municipality(pws_name: str, county: str | None = None) -> str | None
         "CORRECTIONAL", "PRISON", "MILITARY", "AIR FORCE", "NAVAL",
         "U.S.M.A.", "USMA", "FORT DRUM", "WEST POINT",
         "CAMP ", "BASE ",
+        # Sprint 29: CO-specific institutional patterns
+        "CSU MAIN", "CSU CAMPUS", "YMCA ", "HOUSING CAMPUS",
     ]
     if any(marker in name for marker in institutional_markers):
         return None
@@ -245,6 +252,8 @@ def extract_municipality(pws_name: str, county: str | None = None) -> str | None
     cleaned = _DISTRICT_NUM_RE.sub("", name).strip()
     # "1, 2, 4" trailing comma-separated district numbers
     cleaned = _COMMA_DISTRICT_RE.sub("", cleaned).strip()
+    # Sprint 29: "NO 1", "NO 11" — e.g. "SUPERIOR MD NO 1"
+    cleaned = re.sub(r"\s+NO\s+\d+\s*$", "", cleaned, flags=re.IGNORECASE).strip()
 
     # --- Step 4: Strip ALL parenthetical content ---
     # "(VILLAGE)", "(PURCHASE TROY)", "(SCWA)", "(QUEENSBURY)", "(C)", "(V)" etc.
@@ -262,6 +271,13 @@ def extract_municipality(pws_name: str, county: str | None = None) -> str | None
     for prefix in _PREFIXES:
         if cleaned.upper().startswith(prefix):
             cleaned = cleaned[len(prefix):].strip()
+            break
+
+    # --- Step 6b (Sprint 29): Handle "X CITY OF" / "X TOWN OF" suffix ---
+    # CO/western US SDWIS convention: "AURORA CITY OF", "FT COLLINS CITY OF"
+    for trailing in ["CITY AND COUNTY OF", "CITY OF", "TOWN OF", "VILLAGE OF"]:
+        if cleaned.upper().endswith(f" {trailing}"):
+            cleaned = cleaned[: -(len(trailing) + 1)].strip()
             break
 
     # --- Step 7: Handle "CITY" as suffix (e.g., "WHITE PLAINS CITY", "TROY CITY") ---
@@ -313,6 +329,14 @@ def extract_municipality(pws_name: str, county: str | None = None) -> str | None
     # Only reject truly degenerate cases
     if len(cleaned) <= 1:
         return None
+
+    # --- Step 16b (Sprint 29): Expand common abbreviations ---
+    # FT → Fort, MT → Mount, ST → Saint (before title-casing)
+    cleaned = re.sub(r"\bFT\b", "FORT", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bMT\b", "MOUNT", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bST\b", "SAINT", cleaned, flags=re.IGNORECASE)
+    # CNTY → County
+    cleaned = re.sub(r"\bCNTY\b", "COUNTY", cleaned, flags=re.IGNORECASE)
 
     # Title-case the result
     result = _title_case_locality(cleaned)
@@ -373,22 +397,29 @@ def build_locality_queries(
     list[str]
         Up to 4 search query strings for Serper.
     """
+    # Sprint 29: Use full state name for disambiguation (same as discovery.py)
+    from utility_api.agents.discovery import _STATE_NAMES
+    state_full = _STATE_NAMES.get(state_code.upper(), state_code) if state_code else state_code
+
     # Short or very common names need county context to disambiguate
     # (e.g., "Lee" alone returns results for Lee County FL, Lee MA, etc.)
     needs_disambiguation = len(municipality) <= 5 or municipality.lower() in {
         "troy", "clinton", "liberty", "cambridge", "avon", "malta",
         "highland", "warsaw", "carthage", "herkimer", "westchester",
+        # Sprint 29: CO ambiguous names
+        "aurora", "lafayette", "superior", "fountain", "brush",
+        "lamar", "hayden", "palisade", "yuma", "lakewood",
     }
 
     if needs_disambiguation and county:
         # Add county to narrow results geographically
-        geo_context = f"{county} County {state_code}"
+        geo_context = f"{county} County {state_full}"
         queries = [
             # Q1: Municipality + county + water rates (most specific)
             f'"{municipality}" {geo_context} water rates',
 
             # Q2: Municipality + state + water utility
-            f'"{municipality}" {state_code} water utility rates',
+            f'"{municipality}" {state_full} water utility rates',
 
             # Q3: Municipality + county + rate schedule (catches PDFs)
             f'"{municipality}" {geo_context} water rate schedule',
@@ -399,16 +430,16 @@ def build_locality_queries(
     else:
         queries = [
             # Q1: Direct municipality + water rates + state
-            f'"{municipality}" water rates {state_code}',
+            f'"{municipality}" water rates {state_full}',
 
             # Q2: Municipality + utility billing (catches billing/account pages)
-            f'"{municipality}" water utility billing rates',
+            f'"{municipality}" {state_full} water utility billing rates',
 
             # Q3: Municipality + rate schedule (catches PDF rate schedules)
-            f'"{municipality}" water department rate schedule',
+            f'"{municipality}" {state_full} water department rate schedule',
 
             # Q4: Site-restricted to .gov (strongly prefers municipal .gov domains)
-            f'site:.gov "{municipality}" water rates',
+            f'site:.gov "{municipality}" "{state_full}" water rates',
         ]
 
     return queries
