@@ -1,13 +1,13 @@
 {
-  "generated_at": "2026-04-03T18:42:46.973569+00:00",
+  "generated_at": "2026-04-03T19:03:01.635621+00:00",
   "total_cws": 44643,
-  "with_rate_data": 18146,
+  "with_rate_data": 18149,
   "with_reference_only": 1,
-  "no_data": 26496,
-  "pct_covered": 40.6,
+  "no_data": 26493,
+  "pct_covered": 40.7,
   "population_total": 323012075,
-  "population_covered": 303949029,
-  "pct_population": 94.1,
+  "population_covered": 304617289,
+  "pct_population": 94.3,
   "by_state": [
     {
       "state": "01",
@@ -460,6 +460,16 @@
       "pop_pct": 87.7
     },
     {
+      "state": "CO",
+      "total": 759,
+      "covered": 240,
+      "reference_only": 0,
+      "pct": 31.6,
+      "pop_total": 7068743,
+      "pop_covered": 6190584,
+      "pop_pct": 87.6
+    },
+    {
       "state": "OK",
       "total": 840,
       "covered": 311,
@@ -498,16 +508,6 @@
       "pop_total": 693380,
       "pop_covered": 552386,
       "pop_pct": 79.7
-    },
-    {
-      "state": "CO",
-      "total": 759,
-      "covered": 237,
-      "reference_only": 0,
-      "pct": 31.2,
-      "pop_total": 7068743,
-      "pop_covered": 5522324,
-      "pop_pct": 78.1
     },
     {
       "state": "PR",
@@ -633,7 +633,7 @@
   "by_source": [
     {
       "source": "LLM-Scraped Water Rates (Claude API)",
-      "pwsids": 12583
+      "pwsids": 12586
     },
     {
       "source": "Duke NIEPS Water Affordability Data Repository (10-State)",
@@ -749,12 +749,12 @@
     }
   ],
   "lower_48_total_cws": 43696,
-  "lower_48_with_rate_data": 17940,
+  "lower_48_with_rate_data": 17943,
   "lower_48_pct_covered": 41.1,
   "lower_48_population_total": 317326609,
-  "lower_48_population_covered": 299700701,
-  "lower_48_pct_population": 94.4,
+  "lower_48_population_covered": 300368961,
+  "lower_48_pct_population": 94.7,
   "total_flagged": 97,
-  "total_stale": 10628,
+  "total_stale": 10624,
   "total_high_variance": 3044
 }
