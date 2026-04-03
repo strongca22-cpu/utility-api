@@ -431,6 +431,35 @@ def _extract_pdf_text(url: str, timeout: float = 30.0) -> ScrapeResult:
         ) as client:
             response = client.get(url)
             response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 403:
+            # Retry with browser User-Agent — some sites block bots on PDFs
+            logger.info(f"PDF 403 from {url} — retrying with browser headers")
+            try:
+                browser_headers = {
+                    "User-Agent": (
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "*/*",
+                }
+                with httpx.Client(
+                    headers=browser_headers, timeout=timeout, follow_redirects=True
+                ) as client:
+                    response = client.get(url)
+                    response.raise_for_status()
+            except httpx.HTTPError as e2:
+                return ScrapeResult(
+                    url=url, text="", text_hash="", content_type="application/pdf",
+                    status_code=403, is_pdf=True,
+                    error=f"PDF download failed: {e2}",
+                )
+        else:
+            return ScrapeResult(
+                url=url, text="", text_hash="", content_type="application/pdf",
+                status_code=e.response.status_code, is_pdf=True,
+                error=f"PDF download failed: {e}",
+            )
     except httpx.HTTPError as e:
         return ScrapeResult(
             url=url, text="", text_hash="", content_type="application/pdf",
