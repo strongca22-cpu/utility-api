@@ -1453,6 +1453,27 @@ All bulk sources have now been through the Sprint 28 audit pattern:
 - Duke NIEPS (3,177) | EFC (5,611) | CA eAR (581) | KY PSC (84) | WV PSC (241)
 - TX TML (476) | OWRS (387) | NM NMED (175) | IN IURC (58)
 
+### Sprint 28 — Locality Discovery Pipeline (2026-04-02)
+- [x] **LocalityDiscoveryAgent:** Municipality name extraction from PWSID formal names
+  - Strips suffixes (WATER WORKS, CONSOLIDATED WD, CSA, etc.), prefixes (CITY OF, TOWN OF), parentheticals
+  - Detects and skips private companies (Veolia, Aqua, etc.) and institutions (universities, prisons, military)
+  - County-aware query disambiguation for short/ambiguous names (Lee, Troy, Clinton)
+  - 92% extraction rate on NY test (70/76 valid municipalities)
+- [x] **NY pilot:** 70 PWSIDs → 266 new URLs discovered → 248 scraped → rank 1 batch submitted (35 tasks, 35/35 complete)
+- [x] **Bug-fix rescrape audit:** 183 prior URLs across 69 NY PWSIDs affected by Sprint 27 scraper bugs
+  - 72 form stripping, 55 dollar stripping, 45 PDF 403, 34 JS timeout
+  - Notable: SCWA rate page (34k pop, 38 chars before fix), WJWW PDFs (60k pop, never fetched)
+- [x] **Automated chain:** `chain_ny_locality.sh` — waits for TC-R2, processes batches, rescrapes, submits, polls
+- [ ] **Process results:** locality r1 batch complete, r2-5 + bugfix batches pending in chain
+- [ ] **Generalize:** If NY pilot succeeds (>30% hit rate), extend to other gap states
+- [ ] **Pipeline integration:** Add locality discovery as final cascade step in `pipeline/process.py`
+
+#### Key Files
+- `src/utility_api/agents/locality_discovery.py` — agent + extract_municipality + scoring
+- `scripts/run_locality_discovery.py` — batch runner with dry-run
+- `scripts/rescrape_bugfix_ny.py` — targeted Sprint 27 bug-fix rescrape
+- `scripts/chain_ny_locality.sh` — automated chain (TC-R2 → rescrape → batch → process)
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
