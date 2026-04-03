@@ -1510,6 +1510,51 @@ All bulk sources have now been through the Sprint 28 audit pattern:
 - `src/utility_api/agents/locality_discovery.py` — CO suffix/institutional fixes
 - `src/utility_api/ingest/rate_scraper.py` — Playwright wait 5s → 12s
 
+### Sprint 29 — NV Targeted Investigation: 5 Gap PWSIDs, 730k Pop (2026-04-03)
+
+**Gap status:** 5 PWSIDs, 729,935 pop, 86.5% coverage (32/37 NV systems >= 3k pop)
+
+#### Root Cause Analysis
+- **All 5 PWSIDs had been through multiple batch rounds** (discovery R1-R5, cascade, prompt reparse, bulk replace) — all failed
+- **NV0000175 (NLV, 377k) + NV0000076 (Henderson, 337k):** Correct URLs found by discovery, but Akamai Bot Manager returns 403/Access Denied for all automated requests (httpx, Playwright, WebFetch). Even Playwright with Chrome UA gets blocked.
+- **NV0002216 (Douglas County, 6.5k):** Correct URL found, but JS-rendered CivicPlus site returns only 148 chars (Google Translate widget)
+- **NV0005062 (Southern Desert Correctional, 6.2k):** Institutional — NDOC prison, no public water rates exist
+- **NV0000920 (Mountain Falls/GBWC, 4.2k):** PUC-regulated private utility, tariff listing page at `myutility.us` is JS-rendered
+
+#### Las Vegas Metro Water Structure (context)
+- SNWA = regional wholesaler (Lake Mead intake, treatment)
+- LVVWD = retail for unincorporated Clark County + operates SNWA infra
+- Henderson, NLV, Boulder City = buy wholesale from SNWA, set own retail rates via city council ordinance
+- NV PUC does NOT regulate municipal utilities — only private (GBWC)
+
+#### Completed
+- [x] **Full audit** of scrape_registry for all 5 gap PWSIDs — URLs, parse results, HTTP status, retry history
+- [x] **Classification** of each PWSID (wrong URL / right URL bot-blocked / JS-rendered / institutional)
+- [x] **Locality discovery dry-run** — confirmed it won't help (correct URLs already found for all 4 viable PWSIDs)
+- [x] **Manual browser save** — user saved NLV + Henderson rate pages as HTML from real browser
+- [x] **Curated text extraction** — clean rate text extracted from HTML, registered in scrape_registry as `url_source='curated'`, `url_quality='confirmed_rate_page'`
+- [x] **Parse batch submitted:** `msgbatch_0125BrwR1FrYNQGrp8Tj52k3` (2 tasks, state_filter=`nv_curated_investigation`)
+
+#### Rate Data Extracted
+
+**NLV (3/4" SFR):** 4-tier water ($2.48/$3.21/$4.18/$5.40 per 1,000 gal), daily service $0.44, 2-tier flat sewer ($18.96 / +$18.00)
+**Henderson (SFR):** 4-tier water ($1.84/$3.06/$4.32/$11.32 per 1,000 gal), daily service $0.647 (3/4"), wastewater $31.61/mo flat, SNWA surcharges ($0.67/kgal commodity + $10.65 infra + $6.32 drought + 0.25% reliability)
+
+#### Pending
+- [ ] **Process batch results** when `msgbatch_0125BrwR1FrYNQGrp8Tj52k3` completes (~24h)
+- [ ] **PDF rate schedules:** Both NLV and Henderson full rate PDFs also Akamai-blocked — need browser save if desired as secondary sources
+- [ ] **Douglas County (6.5k):** Browser save of `douglascountynv.gov/water_and_sewer_rates/` or rate ordinance PDF
+- [ ] **GBWC/Mountain Falls (4.2k):** Browser save of `myutility.us/greatbasinwater/regulatory/rates-tariffs` for water tariff PDF
+- [ ] **Southern Desert Correctional (6.2k):** Flag as institutional/excluded in coverage tracking
+
+#### Expected Impact
+- **+713k pop** when batch parses successfully (NLV 376,515 + Henderson 336,534)
+- NV coverage: 86.5% → ~97%+ systems
+- Lower 48 pop coverage: ~96.7% → ~97.0%
+
+#### Key Finding
+**Akamai Bot Manager is a systemic blocker** for Las Vegas metro municipal sites (both NLV and Henderson use Granicus CMS + Akamai CDN). The project's scraping infra (httpx + Playwright headless) cannot bypass this. Manual browser-save is the only viable approach for these sites. This may affect other Granicus-hosted municipal sites nationally.
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
