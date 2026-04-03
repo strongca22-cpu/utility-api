@@ -11,7 +11,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-23
-Modified: 2026-03-23
+Modified: 2026-04-03
 
 Dependencies:
     - httpx
@@ -365,8 +365,14 @@ def _scrape_with_playwright(url: str, timeout_ms: int = 30_000) -> ScrapeResult:
                 # the explicit wait afterward lets JS frameworks render.
                 page.goto(url, timeout=timeout_ms, wait_until="load")
 
-                # Wait for JS frameworks to render dynamic content
-                page.wait_for_timeout(5000)
+                # Wait for JS frameworks to render dynamic content.
+                # CivicPlus and similar municipal CMS platforms load rate
+                # table cell values via AJAX after the initial page load.
+                # 5s was insufficient — table headers rendered but rate
+                # values in <td> cells were missing (Broomfield, Dacono,
+                # etc.). 12s covers the AJAX round-trip on slow municipal
+                # servers.  No added cost — just wall-clock time.
+                page.wait_for_timeout(12000)
 
                 # Get the rendered HTML
                 html = page.content()

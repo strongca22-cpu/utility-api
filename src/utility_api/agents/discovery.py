@@ -14,7 +14,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-24
-Modified: 2026-03-29 (Sprint 24: Serper integration, rank tagging, remove LLM scoring)
+Modified: 2026-04-03 (Sprint 29: State mismatch penalty, full state name in queries)
 
 Dependencies:
     - requests (via SerperSearchClient)
@@ -201,37 +201,43 @@ def build_search_queries(
     if " - " in utility_name:
         service_area = utility_name.split(" - ", 1)[1].strip()
 
+    # Sprint 29: Use full state name for disambiguation.
+    # Google treats bare "CO" as an optional prefix and returns Indiana,
+    # Kentucky, etc. for ambiguous city names like Lafayette, Morgan County.
+    # Full name ("Colorado") is unambiguous.
+    state_full = _STATE_NAMES.get(state.upper(), state) if state else state
+
     # Q1 — Highest precision: quoted full name + rates + state
     # For multi-area, use full name so "CAL AM - SUBURBAN ROSEMONT" gets
     # specific results, not generic CAL AM pages
     q1_name = utility_name if service_area else best_name
-    queries.append(f'"{q1_name}" water rates {state}')
+    queries.append(f'"{q1_name}" water rates {state_full}')
 
     # Q2 — City/area + state + rate schedule
     city_meta = _get_city_from_name(utility_name, county)
     if service_area:
         # Multi-area: use the service area name as the geographic anchor
-        queries.append(f'{service_area} {state} water rate schedule')
+        queries.append(f'{service_area} {state_full} water rate schedule')
     elif city_meta:
-        queries.append(f'{city_meta} {state} water rate schedule')
+        queries.append(f'{city_meta} {state_full} water rate schedule')
     elif county:
-        queries.append(f'{county} County {state} water rate schedule')
+        queries.append(f'{county} County {state_full} water rate schedule')
 
     # Q3 — Broader utility + fees query (use the company name, not area)
-    queries.append(f'{best_name} water utility rates fees {state}')
+    queries.append(f'{best_name} water utility rates fees {state_full}')
 
     # Q4 — Varies by owner type for targeted results
     if owner_type == "P":  # private/IOU
         # Private utilities have CPUC/PUC tariff filings
         q4_name = utility_name if service_area else best_name
-        queries.append(f'"{q4_name}" tariff rate schedule filetype:pdf')
+        queries.append(f'"{q4_name}" tariff rate schedule {state_full} filetype:pdf')
     elif service_area:
         # Multi-area: use service area + utility name for specificity
-        queries.append(f'{best_name} "{service_area}" water rates {state}')
+        queries.append(f'{best_name} "{service_area}" water rates {state_full}')
     elif county:
-        queries.append(f'{county} county {state} water rates')
+        queries.append(f'{county} county {state_full} water rates')
     else:
-        queries.append(f'{best_name} water department rates {state}')
+        queries.append(f'{best_name} water department rates {state_full}')
 
     return queries[:4]
 
@@ -241,14 +247,81 @@ def _get_city_from_name(utility_name: str, county: str | None) -> str | None:
 
     Returns None if we can't confidently extract a city name.
     """
-    # If name starts with "CITY OF X" or "TOWN OF X", extract X
+    # Pattern 1: "CITY OF X" or "TOWN OF X" (eastern US convention)
     m = re.match(r"(?:CITY|TOWN|VILLAGE)\s+OF\s+(.+?)(?:\s*[-,]|$)", utility_name, re.IGNORECASE)
     if m:
         return m.group(1).strip().title()
+
+    # Pattern 2: "X CITY OF" or "X TOWN OF" (CO/western US SDWIS convention)
+    # e.g. "AURORA CITY OF", "FT COLLINS CITY OF", "LOVELAND CITY OF"
+    m2 = re.match(r"(.+?)\s+(?:CITY|TOWN|VILLAGE)\s+OF\s*$", utility_name, re.IGNORECASE)
+    if m2:
+        city = m2.group(1).strip().title()
+        # Expand common abbreviations
+        city = re.sub(r"\bFt\b", "Fort", city)
+        city = re.sub(r"\bMt\b", "Mount", city)
+        city = re.sub(r"\bSt\b", "Saint", city)
+        return city
+
     return None
 
 
-# --- URL Relevance Scoring (v2 — Sprint 21, updated Sprint 24) ---
+# --- State code → full name mapping (for queries + scoring) ---
+
+_STATE_NAMES = {
+    "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
+    "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
+    "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho",
+    "IL": "Illinois", "IN": "Indiana", "IA": "Iowa", "KS": "Kansas",
+    "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
+    "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi",
+    "MO": "Missouri", "MT": "Montana", "NE": "Nebraska", "NV": "Nevada",
+    "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
+    "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma",
+    "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina",
+    "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah",
+    "VT": "Vermont", "VA": "Virginia", "WA": "Washington", "WV": "West Virginia",
+    "WI": "Wisconsin", "WY": "Wyoming", "DC": "District of Columbia",
+}
+
+# Reverse: full name → code (for detecting state in URLs/text)
+_STATE_CODES_BY_NAME = {v.lower(): k for k, v in _STATE_NAMES.items()}
+
+
+def _detect_state_from_hostname(hostname: str) -> str | None:
+    """Detect US state from a .gov or .us hostname.
+
+    Catches patterns like:
+        lafayette.in.gov → IN
+        psc.ky.gov → KY
+        geneseewater.colorado.gov → CO
+        mesacortinawater.colorado.gov → CO
+        ci.lamar.co.us → CO  (ambiguous but common)
+
+    Returns 2-letter state code or None if indeterminate.
+    """
+    parts = hostname.lower().split(".")
+
+    # Pattern 1: XX.gov where XX is a 2-letter state code
+    # e.g. lafayette.in.gov, psc.ky.gov, fountain.colorado.gov
+    if len(parts) >= 3 and parts[-1] == "gov":
+        candidate = parts[-2]
+        if len(candidate) == 2 and candidate.upper() in _STATE_NAMES:
+            return candidate.upper()
+        # Full state name as subdomain: fountain.colorado.gov
+        if candidate in _STATE_CODES_BY_NAME:
+            return _STATE_CODES_BY_NAME[candidate]
+
+    # Pattern 2: XX.us domains — e.g. co.larimer.co.us
+    if len(parts) >= 3 and parts[-1] == "us":
+        candidate = parts[-2]
+        if len(candidate) == 2 and candidate.upper() in _STATE_NAMES:
+            return candidate.upper()
+
+    return None
+
+
+# --- URL Relevance Scoring (v2 — Sprint 21, updated Sprint 24, Sprint 29) ---
 
 # Domains that are never water utility rate pages
 _AGGREGATOR_DOMAINS = frozenset([
@@ -408,6 +481,15 @@ def score_url_relevance(
                 "election", "job", "career", "bid", "rfp"]:
         if neg in combined:
             score -= 20
+
+    # --- Layer 8: State mismatch penalty (Sprint 29) ---
+    # Detect .XX.gov and .XX.us domains that belong to a different state.
+    # lafayette.in.gov → IN, psc.ky.gov → KY, mesaaz.gov → no match (city).
+    # A wrong-state .gov page is almost never the right rate page.
+    if state:
+        url_state = _detect_state_from_hostname(hostname)
+        if url_state and url_state != state.upper():
+            score -= 40  # Heavy penalty: wrong-state .gov domain
 
     return max(0, min(100, score))
 
