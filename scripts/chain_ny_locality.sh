@@ -60,7 +60,7 @@ import sys
 sys.path.insert(0, 'src')
 from utility_api.agents.batch import BatchAgent
 agent = BatchAgent()
-result = agent.collect_results('msgbatch_019FMYcpEwA4ri9zrfkcCey6')
+result = agent.process_batch('msgbatch_019FMYcpEwA4ri9zrfkcCey6')
 succeeded = result.get('succeeded', 0)
 failed = result.get('failed', 0)
 print(f'  ny_locality_r1: {succeeded} succeeded, {failed} failed')
@@ -231,7 +231,7 @@ import sys
 sys.path.insert(0, 'src')
 from utility_api.agents.batch import BatchAgent
 agent = BatchAgent()
-result = agent.collect_results('$batch_id')
+result = agent.process_batch('$batch_id')
 succeeded = result.get('succeeded', 0)
 failed = result.get('failed', 0)
 print(f'  $label: {succeeded} succeeded, {failed} failed')
