@@ -11,7 +11,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-04-01
-Modified: 2026-04-01
+Modified: 2026-04-03
 
 Dependencies:
     - utility_api.agents.scrape (ScrapeAgent)
@@ -20,17 +20,22 @@ Dependencies:
     - multiprocessing
 
 Usage:
-    # 10 workers, rank 1 only
+    # 10 workers, rank 1 only (single node)
     python scripts/bulk_scrape_parallel.py --workers 10 --rank 1 --since "2026-03-31 17:15:00"
 
     # 8 workers, all ranks
     python scripts/bulk_scrape_parallel.py --workers 8
+
+    # Multi-node: desktop (IDs 0-19) + VPS (IDs 20-23) = 24 total
+    python scripts/bulk_scrape_parallel.py --workers 24 --worker-start 0 --worker-end 19
+    python scripts/bulk_scrape_parallel.py --workers 24 --worker-start 20 --worker-end 23
 
     # Dry run
     python scripts/bulk_scrape_parallel.py --workers 10 --rank 1 --dry-run
 
 Notes:
     - Workers partition by sr.id % N = worker_id (zero overlap)
+    - --worker-start/--worker-end allow multi-node setups (each node spawns a subset)
     - Each worker logs to logs/scrape_worker_{id}.log
     - Summary printed when all workers finish
     - Safe to Ctrl+C — workers terminate gracefully
@@ -109,6 +114,10 @@ def worker_main(
         if not any_source:
             source_filter = "AND sr.url_source = :src"
             params["src"] = "serper"
+        else:
+            # Exclude domain_guess/domain_guesser — speculative URL guesses,
+            # not search results. These have very low yield and waste scrape time.
+            source_filter = "AND sr.url_source NOT IN ('domain_guess', 'domain_guesser')"
 
         since_filter = ""
         if since:
@@ -213,12 +222,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Single node (backward compatible)
   python scripts/bulk_scrape_parallel.py --workers 10 --rank 1 --since "2026-03-31 17:15:00"
-  python scripts/bulk_scrape_parallel.py --workers 8 --rank 1 --dry-run
+
+  # Multi-node: desktop runs IDs 0-19, VPS runs IDs 20-23, 24 total
+  python scripts/bulk_scrape_parallel.py --workers 24 --worker-start 0 --worker-end 19
+  python scripts/bulk_scrape_parallel.py --workers 24 --worker-start 20 --worker-end 23
+
+  # Dry run
+  python scripts/bulk_scrape_parallel.py --workers 24 --worker-start 20 --worker-end 23 --dry-run
 """,
     )
     parser.add_argument("--workers", type=int, default=10,
-                        help="Number of parallel workers (default: 10)")
+                        help="Total number of workers across all nodes (default: 10)")
+    parser.add_argument("--worker-start", type=int, default=None,
+                        help="First worker ID to spawn on this node (default: 0)")
+    parser.add_argument("--worker-end", type=int, default=None,
+                        help="Last worker ID to spawn on this node (default: --workers-1)")
     parser.add_argument("--since", default=None,
                         help="Only scrape URLs created after this timestamp")
     parser.add_argument("--rank", type=int, default=None,
@@ -234,8 +254,20 @@ Examples:
 
     args = parser.parse_args()
 
+    # Multi-node partitioning: default to spawning all workers locally
+    if args.worker_start is None:
+        args.worker_start = 0
+    if args.worker_end is None:
+        args.worker_end = args.workers - 1
+    if args.worker_start < 0 or args.worker_end >= args.workers:
+        parser.error(f"worker-start/end must be in [0, {args.workers - 1}]")
+    if args.worker_start > args.worker_end:
+        parser.error("worker-start must be <= worker-end")
+    local_count = args.worker_end - args.worker_start + 1
+
     print("=" * 60)
-    print(f"Parallel Bulk Scraper — {args.workers} workers")
+    print(f"Parallel Bulk Scraper — {local_count} local workers "
+          f"(IDs {args.worker_start}-{args.worker_end} of {args.workers} total)")
     print(f"Started: {datetime.now(timezone.utc).isoformat()}")
     print("=" * 60)
 
@@ -252,6 +284,8 @@ Examples:
         if not args.any_source:
             source_filter = "AND sr.url_source = :src"
             params["src"] = "serper"
+        else:
+            source_filter = "AND sr.url_source NOT IN ('domain_guess', 'domain_guesser')"
 
         since_filter = ""
         if args.since:
@@ -267,7 +301,8 @@ Examples:
             params["rank_min"] = args.rank_min
 
         with engine.connect() as conn:
-            for w in range(args.workers):
+            total_pending = 0
+            for w in range(args.worker_start, args.worker_end + 1):
                 p = {**params, "total": args.workers, "worker": w}
                 r = conn.execute(text(f"""
                     SELECT count(*) as cnt
@@ -280,21 +315,23 @@ Examples:
                       {rank_filter}
                 """), p).fetchone()
                 print(f"  Worker {w}: {r.cnt:,} pending URLs")
+                total_pending += r.cnt
 
-        total = sum(1 for _ in range(args.workers))  # just for format
-        print(f"\n[DRY RUN] Would launch {args.workers} workers. Exiting.")
+        print(f"\n  Total pending for this node: {total_pending:,}")
+        print(f"\n[DRY RUN] Would launch {local_count} workers "
+              f"(IDs {args.worker_start}-{args.worker_end} of {args.workers} global). Exiting.")
         return
 
     # Launch workers
     started = time.time()
-    pool = multiprocessing.Pool(processes=args.workers)
+    pool = multiprocessing.Pool(processes=local_count)
 
     try:
         results = pool.starmap(
             worker_main,
             [
                 (w, args.workers, args.since, args.rank, args.rank_min, args.idle_timeout, args.any_source)
-                for w in range(args.workers)
+                for w in range(args.worker_start, args.worker_end + 1)
             ],
         )
     except KeyboardInterrupt:
