@@ -11,7 +11,7 @@ Purpose:
 
 Author: AI-Generated
 Created: 2026-03-23
-Modified: 2026-04-03
+Modified: 2026-04-03 (table-to-markdown extraction)
 
 Dependencies:
     - httpx
@@ -226,10 +226,59 @@ class ScrapeResult:
     raw_html: str | None = None  # Preserved for deep crawl link extraction
 
 
+def _table_to_markdown(table_tag) -> str:
+    """Convert an HTML <table> to a pipe-delimited markdown table.
+
+    Preserves column alignment so the LLM parser can correctly pair
+    header labels with cell values (e.g., meter size with service charge,
+    tier label with rate per 1,000 gal).
+
+    Parameters
+    ----------
+    table_tag : bs4.element.Tag
+        A BeautifulSoup <table> element.
+
+    Returns
+    -------
+    str
+        Markdown-formatted table text.
+    """
+    rows = []
+    for tr in table_tag.find_all("tr"):
+        cells = []
+        for td in tr.find_all(["td", "th"]):
+            # Collapse whitespace within each cell
+            cell_text = td.get_text(separator=" ", strip=True)
+            cell_text = re.sub(r"\s+", " ", cell_text)
+            cells.append(cell_text)
+        if cells:
+            rows.append(cells)
+
+    if not rows:
+        return ""
+
+    # Normalize column count (pad short rows)
+    max_cols = max(len(r) for r in rows)
+    for row in rows:
+        while len(row) < max_cols:
+            row.append("")
+
+    # Build markdown table
+    lines = []
+    for i, row in enumerate(rows):
+        lines.append("| " + " | ".join(row) + " |")
+        if i == 0:
+            # Add separator after header row
+            lines.append("| " + " | ".join("---" for _ in row) + " |")
+
+    return "\n".join(lines)
+
+
 def _clean_html_text(soup: BeautifulSoup) -> str:
     """Extract clean visible text from parsed HTML.
 
     Strips navigation, scripts, and other non-content elements.
+    Converts HTML tables to markdown format to preserve column structure.
     Collapses whitespace and removes very short lines.
 
     Parameters
@@ -267,6 +316,15 @@ def _clean_html_text(soup: BeautifulSoup) -> str:
             main_content = max(candidates, key=lambda el: len(el.get_text(strip=True)))
         else:
             main_content = soup.body or soup
+
+    # Convert HTML tables to markdown format before text extraction.
+    # This preserves column alignment so the parser can correctly pair
+    # header labels (e.g., "Daily Service Charge", "Current Rate") with
+    # their values, rather than flattening them into an ambiguous sequence.
+    for table in main_content.find_all("table"):
+        md_text = _table_to_markdown(table)
+        if md_text:
+            table.replace_with(BeautifulSoup(f"\n{md_text}\n", "html.parser"))
 
     # Get text with some structure preservation
     text = main_content.get_text(separator="\n", strip=True)
