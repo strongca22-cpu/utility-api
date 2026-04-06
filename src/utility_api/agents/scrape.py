@@ -1061,6 +1061,24 @@ class ScrapeAgent(BaseAgent):
             "charge", "price", "cost", "water bill",
         ]
 
+        # Strong rate-document signals: filenames/text patterns that almost
+        # always indicate an actual rate schedule (vs. a news article that
+        # happens to mention "rate"). These get a large positive boost so
+        # real rate documents rank above generic keyword matches.
+        strong_signals = [
+            "rate schedule", "rate sheet", "tariff", "fee schedule",
+            "water rates", "sewer rates", "rates and charges",
+            "utility rates", "water utility rate",
+        ]
+
+        # Mild negative signals: link types that are usually noise on a
+        # rate page (news articles, calendar events). Kept small (-15) so
+        # they're outweighed by any genuine rate signal — strategic plans,
+        # meeting minutes, etc. CAN legitimately contain rate data.
+        soft_negative_paths = [
+            "/news/", "/blog/", "/press/", "/calendar/",
+        ]
+
         candidates = []
         for link in soup.find_all("a", href=True):
             href = link.get("href", "")
@@ -1085,9 +1103,24 @@ class ScrapeAgent(BaseAgent):
                 if kw in href_lower:
                     link_score += 15
 
-            # PDF bonus
+            # Strong document signal bonus — phrases that indicate a rate
+            # schedule, not just text that mentions "rate"
+            for signal in strong_signals:
+                if signal in link_text:
+                    link_score += 50
+                if signal in href_lower:
+                    link_score += 40
+
+            # PDF bonus (rate schedules are commonly published as PDFs)
             if href_lower.endswith(".pdf") and link_score > 0:
-                link_score += 10
+                link_score += 30  # was 10 — PDFs are strong rate document candidates
+
+            # Mild penalty for obvious noise paths (news, blog, calendar).
+            # Small enough that a real rate signal still wins.
+            for seg in soft_negative_paths:
+                if seg in href_lower:
+                    link_score -= 15
+                    break
 
             if link_score > 0:
                 candidates.append({
