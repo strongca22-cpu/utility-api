@@ -1555,6 +1555,35 @@ All bulk sources have now been through the Sprint 28 audit pattern:
 #### Key Finding
 **Akamai Bot Manager is a systemic blocker** for Las Vegas metro municipal sites (both NLV and Henderson use Granicus CMS + Akamai CDN). The project's scraping infra (httpx + Playwright headless) cannot bypass this. Manual browser-save is the only viable approach for these sites. This may affect other Granicus-hosted municipal sites nationally.
 
+### Sprint 30 — CO WS1 Auto-Parse + Denver Water Distributor Methodology (2026-04-06)
+
+**Coverage delta:** CO 254 → 257 PWSIDs with rates (+138k pop net)
+**Full summary:** `docs/session_summaries/2026-04-06_sprint30_co_ws1_dw_distributors.md`
+
+#### Completed
+- [x] **WS1 closed for 4 of 5 PWSIDs:** Yuma ($53.05), Fort Morgan ($125.07), Platte Canyon ($43.61, partial), Palisade ($55.00 manual entry from KJCT8 article + Water Rate Notice PDF)
+- [x] **`scripts/scrape_batch_ws1_co.py`** — reusable WS1 workflow: promote pending → scrape → batch parse → process
+- [x] **Wrong-entity contamination cleanup:** deleted 6 rate_schedules rows (Mesa-Cortina x2, Evergreen Metro x3, American Water Indiana x1) misattributed to Palisade, Bear Creek WSD, North Lincoln WSD
+- [x] **Denver Water distributor methodology established** — Total Service distributors don't have separate PWSIDs (rolled into Denver Water Board CO0116001), Read-and-Bill distributors get DW base + local surcharge, Master Meter use normal pipeline
+- [x] **`scripts/load_denver_water_distributors.py`** — bulk loader with DW 2026 rate structure ($20.91 fixed + 3-tier $3.03/$5.45/$7.26, AWC=5,000 gal published minimum)
+- [x] **5 DW Read-and-Bill distributors loaded** with base rate $49.58: Southgate (55k), SW Metro (48.6k), Bear Creek (30k), North Lincoln (1k), Country Homes (100)
+
+#### Deferred (next chats)
+- [ ] **DW Read-and-Bill surcharge lookup:** scrape each of the 5 newly-loaded distributors for their local surcharge. Known anchors: Southgate +$14.97, Platte Canyon +$18.00 (needs add to existing parse), SW Metro/Bear Creek/North Lincoln/Country Homes unknown
+- [ ] **Superior MD No 1 (CO0107725, 17.9k pop):** NOT on Denver Water distributor list, superiorcolorado.gov blocks all automated requests (Akamai-class). Needs manual browser save or alternative approach
+- [ ] **WS2 Manual WebFetch:** Loveland (95k), Aspen (31k)
+- [ ] **WS4 Locality scrape:** 10 wrong-entity PWSIDs from Sprint 29 audit (Berthoud, East Larimer County WD, Brush, etc.)
+
+#### Methodology improvements identified
+- [ ] **parse_sweep priority dict:** add `serper` and `locality_discovery` to bucket 3-4 (currently fall into bucket 7 default)
+- [ ] **ParseAgent multi-PWSID safeguard:** prevent multi-district rate documents from propagating to multiple PWSIDs without confirmation (root cause of Bear Creek/North Lincoln/Palisade contamination)
+
+#### Key Findings
+- **Total Service distributor scope is moot** — Denver Water Total Service distributors don't appear as separate PWSIDs in SDWIS, so the originally-feared "84 distributors needing special handling" was actually ~5 Read-and-Bill that needed loading
+- **AWC = 5,000 gal** chosen as published minimum from Denver Water (conservative anchor — produces higher bill estimates, defensible methodology)
+- **Wrong-entity contamination is a systemic risk**, not isolated — pattern is parser using multi-district rate documents and propagating to all matched PWSIDs
+- **Akamai-class blocking confirmed for superiorcolorado.gov** — same pattern as Sprint 29 NV findings (Granicus + Akamai)
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
