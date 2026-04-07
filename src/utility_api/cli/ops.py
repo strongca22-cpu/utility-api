@@ -374,6 +374,35 @@ def build_best_estimate(
         typer.echo("\nTip: Run 'ua-ops refresh-coverage' to update the coverage mat view.")
 
 
+@app.command("snapshot")
+def snapshot_cmd(
+    reason: str = typer.Option(
+        ...,
+        "--reason",
+        "-r",
+        help="Short tag describing why the snapshot is being taken (e.g. "
+        "'manual_pre_migration'). Used in the output filename.",
+    ),
+):
+    """Take a Tier 2 pre-write snapshot of the critical rate tables.
+
+    Writes gzipped CSVs to ~/backups/utility-api/snapshots/. Use BEFORE any
+    risky/destructive operation. The daily pg_dump (Tier 1) covers the
+    long-term record; this is for fast, targeted recovery of recent state.
+
+    See docs/backup_system.md for the full backup design.
+    """
+    from utility_api.ops.snapshot import snapshot_critical_tables
+
+    paths = snapshot_critical_tables(reason=reason)
+    if not paths:
+        typer.echo("ERROR: no snapshots written", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"\nWrote {len(paths)} snapshot(s):")
+    for table, path in paths.items():
+        typer.echo(f"  {table:25s} {path}")
+
+
 @app.command("scrape-status")
 def scrape_status(
     state: str = typer.Option(None, "--state", "-s", help="Filter by state code"),

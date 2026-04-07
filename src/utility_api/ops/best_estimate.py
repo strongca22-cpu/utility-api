@@ -348,6 +348,7 @@ def run_best_estimate(
     state_filter: str | None = None,
     dry_run: bool = False,
     write_csv: bool = False,
+    snapshot: bool = True,
 ) -> dict:
     """Build best-estimate rate selection for all PWSIDs.
 
@@ -359,6 +360,9 @@ def run_best_estimate(
         Preview only, don't write to DB.
     write_csv : bool
         Also write CSV output.
+    snapshot : bool
+        If True (default), take a Tier 2 pre-write snapshot of the critical
+        tables before TRUNCATE/DELETE. Set False in tests to skip.
 
     Returns
     -------
@@ -470,6 +474,20 @@ def run_best_estimate(
                 f"[{r.confidence}] {r.selection_notes}"
             )
         return stats
+
+    # --- Tier 2 pre-write snapshot ---
+    # Take a gzipped CSV snapshot of the critical tables BEFORE the destructive
+    # TRUNCATE/DELETE below. Failure here MUST NOT block the rebuild — log and
+    # continue. See src/utility_api/ops/snapshot.py and docs/backup_system.md.
+    if snapshot:
+        try:
+            from utility_api.ops.snapshot import snapshot_critical_tables
+
+            snap_paths = snapshot_critical_tables(reason="best_estimate_rebuild")
+            for tbl, p in snap_paths.items():
+                logger.info(f"  snapshot[{tbl}] = {p}")
+        except Exception as e:
+            logger.warning(f"Tier 2 snapshot failed (continuing): {e}")
 
     # --- Write to database ---
     with engine.connect() as conn:

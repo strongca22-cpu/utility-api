@@ -1602,7 +1602,7 @@ All bulk sources have now been through the Sprint 28 audit pattern:
 #### Deferred (each gets its own chat per single-task rule)
 - [ ] **Move `/tmp/r0_matcher_v2.py` into repo** as `scripts/recover_orphan_urls.py` with proper CLAUDE.md header — housekeeping
 - [ ] **R0 v3 matcher** for the 763 residual scraped_llm orphans (319 weak_unique deferred + 444 ties/zero-hits). Better scoring, multi-document detection. Could recover another 200-400.
-- [ ] **Backup system implementation** — chat prompt drafted at `/tmp/chat_prompt_utility_api_backups_v0.md`. Three tiers: daily `pg_dump`, pre-write snapshots wired into `BestEstimateAgent`, offsite copy. Storage to `~/backups/utility-api/` outside the project tree.
+- [x] **Backup system implementation (2026-04-06)** — Tier 1 (daily `pg_dump`) and Tier 2 (pre-write snapshots wired into `run_best_estimate`) shipped and verified. Tier 3 (offsite) documented with Tailscale-first recommendation but **NOT installed** — awaiting user choice between Tailscale rsync vs B2 rclone. See `docs/backup_system.md`. Cron line for Tier 1 also documented but **NOT installed** — user needs to run `crontab -e` and paste the line. Verified: 1.2 GB dump in ~3 min, full restore to scratch PostGIS container with 100% row count match across all critical tables; snapshot fires correctly before `run_best_estimate` rebuild.
 - [ ] **Defensive `ON CONFLICT` patch** — 4-line fix in `src/utility_api/agents/parse.py:439-450` and `src/utility_api/agents/batch.py:511-522` to refresh `source_url = EXCLUDED.source_url` and `scrape_timestamp = EXCLUDED.scrape_timestamp` on conflict. Prevents future URL drift on re-parse.
 - [ ] **Resume Sprint 28 MI gap closure** from Checkpoint A (now fully unblocked)
 
