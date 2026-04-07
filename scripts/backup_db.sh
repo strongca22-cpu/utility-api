@@ -36,6 +36,13 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Use the project's venv python explicitly. Cron runs with a minimal env and
+# does NOT inherit `.venv` activation, so falling back to `python3` from PATH
+# would resolve to /usr/bin/python3 which doesn't have utility_api installed.
+# If you move the venv, update this path.
+readonly VENV_PYTHON="${REPO_ROOT}/.venv/bin/python"
+
 readonly BACKUP_ROOT="${HOME}/backups/utility-api"
 readonly DAILY_DIR="${BACKUP_ROOT}/daily"
 readonly WEEKLY_DIR="${BACKUP_ROOT}/weekly"
@@ -75,7 +82,12 @@ PG_ENV_TMP="$(mktemp -t utility_api_pgenv.XXXXXX)"
 trap 'rm -f "${PG_ENV_TMP}"' EXIT
 
 cd "${REPO_ROOT}"
-python3 - >"${PG_ENV_TMP}" <<'PYEOF' || { echo "python failed to read settings" >&2; exit 1; }
+
+if [[ ! -x "${VENV_PYTHON}" ]]; then
+    fail "venv python not found at ${VENV_PYTHON} — recreate the venv or update VENV_PYTHON in this script"
+fi
+
+"${VENV_PYTHON}" - >"${PG_ENV_TMP}" <<'PYEOF' || { echo "python failed to read settings" >&2; exit 1; }
 from urllib.parse import urlparse
 from utility_api.config import settings
 
