@@ -510,6 +510,8 @@ class BatchAgent(BaseAgent):
                             )
                             ON CONFLICT (pwsid, source_key, vintage_date, customer_class)
                             DO UPDATE SET
+                                source_url = EXCLUDED.source_url,
+                                scrape_timestamp = EXCLUDED.scrape_timestamp,
                                 fixed_charges = EXCLUDED.fixed_charges,
                                 volumetric_tiers = EXCLUDED.volumetric_tiers,
                                 bill_5ccf = EXCLUDED.bill_5ccf,
