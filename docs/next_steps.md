@@ -1584,6 +1584,34 @@ All bulk sources have now been through the Sprint 28 audit pattern:
 - **Wrong-entity contamination is a systemic risk**, not isolated — pattern is parser using multi-district rate documents and propagating to all matched PWSIDs
 - **Akamai-class blocking confirmed for superiorcolorado.gov** — same pattern as Sprint 29 NV findings (Granicus + Akamai)
 
+### source_url Integrity Audit + R0 Recovery (2026-04-06)
+
+**Coverage delta:** `rate_best_estimate.source_url` 9.0% → **95.1%** populated (1,662 → 17,658 of 18,575)
+**Full summary:** `docs/session_summaries/2026-04-06_source_url_audit_and_recovery.md`
+
+#### Completed
+- [x] **Audit identified 91% NULL defect** spanning all sources, not just MI
+- [x] **Root cause: stale Python imports** in long-running daemons (parse_sweep started Mar 29, before Sprint 25 source_url commit on Mar 30)
+- [x] **Killed `bulk_scrape_parallel`** (parent + 20 workers) — trailing scraper, low value
+- [x] **Killed `parse_sweep.py`** — the actual stale-import culprit
+- [x] **Re-ran `BestEstimateAgent` from fresh process** → 86.1% URL coverage (15,984 of 18,575)
+- [x] **R0 fingerprint matcher** at `/tmp/r0_matcher_v2.py` — re-linked 1,880 orphan rate_schedules rows to source URLs by searching cached scraped_text for numeric + phrase fingerprints. **$0 cost, 0 LLM calls, 0 web fetches.**
+- [x] **Final state: 95.1% URL coverage** in rate_best_estimate (17,658 of 18,575). Per-source: all bulk sources at 100%, scraped_llm at 95%, only `tx_tml_2023` (171 rows) is genuine source-level loss.
+- [x] **Pre-rebuild and pre-R0 snapshots** to `data/backups/` (gitignored, will move to `~/backups/` when backup system lands)
+
+#### Deferred (each gets its own chat per single-task rule)
+- [ ] **Move `/tmp/r0_matcher_v2.py` into repo** as `scripts/recover_orphan_urls.py` with proper CLAUDE.md header — housekeeping
+- [ ] **R0 v3 matcher** for the 763 residual scraped_llm orphans (319 weak_unique deferred + 444 ties/zero-hits). Better scoring, multi-document detection. Could recover another 200-400.
+- [ ] **Backup system implementation** — chat prompt drafted at `/tmp/chat_prompt_utility_api_backups_v0.md`. Three tiers: daily `pg_dump`, pre-write snapshots wired into `BestEstimateAgent`, offsite copy. Storage to `~/backups/utility-api/` outside the project tree.
+- [ ] **Defensive `ON CONFLICT` patch** — 4-line fix in `src/utility_api/agents/parse.py:439-450` and `src/utility_api/agents/batch.py:511-522` to refresh `source_url = EXCLUDED.source_url` and `scrape_timestamp = EXCLUDED.scrape_timestamp` on conflict. Prevents future URL drift on re-parse.
+- [ ] **Resume Sprint 28 MI gap closure** from Checkpoint A (now fully unblocked)
+
+#### Key Findings
+- **Long-running daemons holding stale imports are a silent regression vector.** Restart on every meaningful code change OR add a module-reload mechanism.
+- **The full provenance chain (URL → text → parse → rate) was preserved in the database** — just stored in two places without a foreign key. Recovery cost: $0 (vs $41 batch reparse, vs $74 fetch+reparse).
+- **`tx_tml_2023` is the only genuine source-level URL loss** (171 rows). All other sources are 95-100% covered.
+- **Cross-state contamination is real but bounded** — `kcmn.us` (Minnesota) was found weakly matching non-MN PWSIDs via generic round-number values. R0 conservative tier exclusion avoided baking these in.
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers
