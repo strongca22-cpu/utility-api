@@ -1,13 +1,13 @@
 {
-  "generated_at": "2026-04-06T17:48:48.412865+00:00",
+  "generated_at": "2026-04-07T05:09:20.653237+00:00",
   "total_cws": 44643,
-  "with_rate_data": 18411,
+  "with_rate_data": 18480,
   "with_reference_only": 1,
-  "no_data": 26231,
-  "pct_covered": 41.2,
+  "no_data": 26162,
+  "pct_covered": 41.4,
   "population_total": 323012075,
-  "population_covered": 307640094,
-  "pct_population": 95.2,
+  "population_covered": 307834950,
+  "pct_population": 95.3,
   "by_state": [
     {
       "state": "01",
@@ -180,16 +180,6 @@
       "pop_pct": 97.3
     },
     {
-      "state": "IL",
-      "total": 1632,
-      "covered": 812,
-      "reference_only": 0,
-      "pct": 49.8,
-      "pop_total": 12024613,
-      "pop_covered": 11672902,
-      "pop_pct": 97.1
-    },
-    {
       "state": "TN",
       "total": 448,
       "covered": 361,
@@ -198,6 +188,16 @@
       "pop_total": 7852384,
       "pop_covered": 7612926,
       "pop_pct": 97.0
+    },
+    {
+      "state": "IL",
+      "total": 1632,
+      "covered": 811,
+      "reference_only": 0,
+      "pct": 49.7,
+      "pop_total": 12024613,
+      "pop_covered": 11655616,
+      "pop_pct": 96.9
     },
     {
       "state": "NC",
@@ -228,6 +228,16 @@
       "pop_total": 4556638,
       "pop_covered": 4404351,
       "pop_pct": 96.7
+    },
+    {
+      "state": "04",
+      "total": 12,
+      "covered": 8,
+      "reference_only": 0,
+      "pct": 66.7,
+      "pop_total": 64094,
+      "pop_covered": 61823,
+      "pop_pct": 96.5
     },
     {
       "state": "WV",
@@ -370,6 +380,16 @@
       "pop_pct": 93.7
     },
     {
+      "state": "VA",
+      "total": 910,
+      "covered": 260,
+      "reference_only": 0,
+      "pct": 28.6,
+      "pop_total": 7376131,
+      "pop_covered": 6868078,
+      "pop_pct": 93.1
+    },
+    {
       "state": "NM",
       "total": 557,
       "covered": 242,
@@ -377,16 +397,6 @@
       "pct": 43.4,
       "pop_total": 1917519,
       "pop_covered": 1781158,
-      "pop_pct": 92.9
-    },
-    {
-      "state": "VA",
-      "total": 910,
-      "covered": 259,
-      "reference_only": 0,
-      "pct": 28.5,
-      "pop_total": 7376131,
-      "pop_covered": 6851178,
       "pop_pct": 92.9
     },
     {
@@ -510,6 +520,16 @@
       "pop_pct": 87.7
     },
     {
+      "state": "06",
+      "total": 41,
+      "covered": 18,
+      "reference_only": 0,
+      "pct": 43.9,
+      "pop_total": 101888,
+      "pop_covered": 82905,
+      "pop_pct": 81.4
+    },
+    {
       "state": "ND",
       "total": 293,
       "covered": 92,
@@ -520,6 +540,16 @@
       "pop_pct": 79.7
     },
     {
+      "state": "08",
+      "total": 113,
+      "covered": 32,
+      "reference_only": 0,
+      "pct": 28.3,
+      "pop_total": 134228,
+      "pop_covered": 105969,
+      "pop_pct": 78.9
+    },
+    {
       "state": "PR",
       "total": 70,
       "covered": 27,
@@ -528,6 +558,16 @@
       "pop_total": 2501547,
       "pop_covered": 1922950,
       "pop_pct": 76.9
+    },
+    {
+      "state": "05",
+      "total": 57,
+      "covered": 21,
+      "reference_only": 0,
+      "pct": 36.8,
+      "pop_total": 92383,
+      "pop_covered": 67098,
+      "pop_pct": 72.6
     },
     {
       "state": "WY",
@@ -550,14 +590,14 @@
       "pop_pct": 66.1
     },
     {
-      "state": "04",
-      "total": 12,
-      "covered": 5,
+      "state": "09",
+      "total": 150,
+      "covered": 37,
       "reference_only": 0,
-      "pct": 41.7,
-      "pop_total": 64094,
-      "pop_covered": 40075,
-      "pop_pct": 62.5
+      "pct": 24.7,
+      "pop_total": 334321,
+      "pop_covered": 212322,
+      "pop_pct": 63.5
     },
     {
       "state": "10",
@@ -568,46 +608,6 @@
       "pop_total": 55009,
       "pop_covered": 28438,
       "pop_pct": 51.7
-    },
-    {
-      "state": "06",
-      "total": 41,
-      "covered": 9,
-      "reference_only": 0,
-      "pct": 22.0,
-      "pop_total": 101888,
-      "pop_covered": 47008,
-      "pop_pct": 46.1
-    },
-    {
-      "state": "09",
-      "total": 150,
-      "covered": 16,
-      "reference_only": 0,
-      "pct": 10.7,
-      "pop_total": 334321,
-      "pop_covered": 153715,
-      "pop_pct": 46.0
-    },
-    {
-      "state": "05",
-      "total": 57,
-      "covered": 8,
-      "reference_only": 0,
-      "pct": 14.0,
-      "pop_total": 92383,
-      "pop_covered": 40573,
-      "pop_pct": 43.9
-    },
-    {
-      "state": "08",
-      "total": 113,
-      "covered": 9,
-      "reference_only": 0,
-      "pct": 8.0,
-      "pop_total": 134228,
-      "pop_covered": 53504,
-      "pop_pct": 39.9
     },
     {
       "state": "AK",
@@ -633,7 +633,7 @@
   "by_source": [
     {
       "source": "LLM-Scraped Water Rates (Claude API)",
-      "pwsids": 13225
+      "pwsids": 13353
     },
     {
       "source": "Duke NIEPS Water Affordability Data Repository (10-State)",
@@ -688,10 +688,6 @@
       "pwsids": 139
     },
     {
-      "source": "CA SWRCB Electronic Annual Report 2022",
-      "pwsids": 130
-    },
-    {
       "source": "efc_nh_2016",
       "pwsids": 130
     },
@@ -709,7 +705,11 @@
     },
     {
       "source": "efc_fl_2020",
-      "pwsids": 85
+      "pwsids": 84
+    },
+    {
+      "source": "CA SWRCB Electronic Annual Report 2022",
+      "pwsids": 73
     },
     {
       "source": "efc_ma_2017",
@@ -742,19 +742,15 @@
     {
       "source": "efc_de_2018",
       "pwsids": 9
-    },
-    {
-      "source": "CA SWRCB Electronic Annual Report 2021",
-      "pwsids": 1
     }
   ],
   "lower_48_total_cws": 43696,
   "lower_48_with_rate_data": 18204,
   "lower_48_pct_covered": 41.7,
   "lower_48_population_total": 317326609,
-  "lower_48_population_covered": 303364766,
+  "lower_48_population_covered": 303364380,
   "lower_48_pct_population": 95.6,
   "total_flagged": 95,
-  "total_stale": 10508,
-  "total_high_variance": 3391
+  "total_stale": 10514,
+  "total_high_variance": 3440
 }

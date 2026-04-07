@@ -1569,10 +1569,13 @@ All bulk sources have now been through the Sprint 28 audit pattern:
 - [x] **5 DW Read-and-Bill distributors loaded** with base rate $49.58: Southgate (55k), SW Metro (48.6k), Bear Creek (30k), North Lincoln (1k), Country Homes (100)
 
 #### Deferred (next chats)
-- [ ] **DW Read-and-Bill surcharge lookup:** scrape each of the 5 newly-loaded distributors for their local surcharge. Known anchors: Southgate +$14.97, Platte Canyon +$18.00 (needs add to existing parse), SW Metro/Bear Creek/North Lincoln/Country Homes unknown
+- [x] **DW Read-and-Bill surcharge lookup (2026-04-07)** — `scripts/apply_dw_distributor_surcharges.py` and `docs/session_summaries/2026-04-07_dw_distributor_surcharge_lookup.md`. 5 of 7 PWSIDs updated (154,133 pop accuracy improvement): Southgate +$14.97, SW Metro +$12.00 (newly discovered via 2026 budget highlights), Platte Canyon +$18.00 (overwrote partial parse), Bear Creek +$8.00 (page conflict noted), North Lincoln +$18.00 CIS (Total Service Agreement language flagged for methodology review). Country Homes left at DW base (no web presence). **Willows confirmed standalone integrated rates, NOT a DW pass-through** — methodology finding: not all RB distributors publish "DW + surcharge", some publish fully integrated rates. Add `integrated_rates_published` flag to RB_DISTRIBUTORS in the loader.
 - [ ] **Superior MD No 1 (CO0107725, 17.9k pop):** NOT on Denver Water distributor list, superiorcolorado.gov blocks all automated requests (Akamai-class). Needs manual browser save or alternative approach
 - [ ] **WS2 Manual WebFetch:** Loveland (95k), Aspen (31k)
 - [ ] **WS4 Locality scrape:** 10 wrong-entity PWSIDs from Sprint 29 audit (Berthoud, East Larimer County WD, Brush, etc.)
+- [ ] **Country Homes Land Co (CO0103186, 100 pop)** — contact Denver Water billing or Arapahoe County records to confirm any local fee
+- [ ] **Re-verify Platte Canyon Infrastructure Fee for 2026** — most recent confirmed value is from the 2024 page; check 2025/2026 board minutes
+- [ ] **Reconcile Bear Creek $7 vs $8 page conflict** between bearcreekwater.org/services and /billing-and-payment
 
 #### Methodology improvements identified
 - [ ] **parse_sweep priority dict:** add `serper` and `locality_discovery` to bucket 3-4 (currently fall into bucket 7 default)
