@@ -1615,6 +1615,33 @@ All bulk sources have now been through the Sprint 28 audit pattern:
 - **`tx_tml_2023` is the only genuine source-level URL loss** (171 rows). All other sources are 95-100% covered.
 - **Cross-state contamination is real but bounded** — `kcmn.us` (Minnesota) was found weakly matching non-MN PWSIDs via generic round-number values. R0 conservative tier exclusion avoided baking these in.
 
+### Sprint 28 — MI Gap Closure (PAUSED at Checkpoint A.5, 2026-04-07)
+
+**Gap:** 35 PWSIDs / 506,756 pop (was 39/559k at prompt-write, organic closures closed 4)
+**Full summary:** `docs/session_summaries/2026-04-07_sprint28_mi_gap_closure_checkpoint_a5.md`
+
+#### Completed
+- [x] **Full MI gap audit** — 35 PWSIDs categorized by failure mode
+- [x] **Gap delta verified** — 4 PWSID drop from organic closures during Mar 30–Apr 2 bulk parse wave, NOT tail sweep
+- [x] **Parse result vocabulary mapped** — DB stores `NULL`/`failed`/`skipped` only; Sprint 27 taxonomy is conceptual
+- [x] **DOMAIN_BLACKLIST expanded** — 7 MI county aggregator domains added (Oakland, Wayne, St Clair, michigan.gov), total 13 entries
+- [x] **rescrape_diagnose.py bug fix** — `c.population_served` → `cb.population_served` (line 56)
+- [x] **rescrape_diagnose dry-run** — 143 candidate URLs / 93 PWSIDs (39 P1 gap, 104 P3 upgrade)
+
+#### BLOCKED — awaiting PWSID matchup bug fix
+- [ ] **Task 3: rescrape_recover.py --state MI** — ready to run, 143 URLs, ~1-3 min
+- [ ] **Task 4: MI parse batch** — dry-run first, wait for approval
+- [ ] **Task 5: Locality discovery** — critical for Ann Arbor (118k), county-contaminated systems
+- [ ] **Task 6: Scrape locality URLs + mi_locality_r1 batch**
+- [ ] **Task 7: Manual top-5 investigation** — Ann Arbor, Ypsilanti, Holland BPW, Monroe SC, Coldwater
+- [ ] **Task 8: Final report + commit**
+
+#### Key context for resumption
+- **Tail sweep is dead** (killed during source_url audit). No collision risk.
+- **PWSID matchup bug** — discovery→PWSID filing may contaminate correct rates to wrong utilities. Same class as Bear Creek/North Lincoln/Palisade (Sprint 30). Separate chat investigating. DO NOT run locality discovery until resolved.
+- **Ann Arbor (118k) = 23% of MI gap.** All existing URLs are washtenaw county fee schedule contamination.
+- **Holland BPW (50k) and Coldwater (14k)** have the right pages with substantial content (15k and 45k chars), parser just said `failed`. Cheapest wins via reparse.
+
 ### Later
 - [ ] Automate EPA CCR APEX form scraping
 - [ ] Stripe/payment integration for API tiers

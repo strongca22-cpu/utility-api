@@ -102,6 +102,14 @@ DOMAIN_BLACKLIST = {
     "psc.wi.gov",                           # 93/93 failures (100%) — regulatory filings
     "www.louisianawater.com",               # 82/82 failures (100%) — utility portal
     "dam.assets.ohio.gov",                  # 171/176 failures (97.2%) — document archive
+    # Sprint 28 (MI) — county aggregators contaminating city utility lookups
+    "oaklandcountymi.gov",                  # 33/33 failures (100%) — county aggregator
+    "oaklandcounty.org",                    # 33/33 failures (100%) — county aggregator
+    "oaklandcounty.com",                    # 33/33 failures (100%) — county aggregator
+    "waynecounty.org",                      # 30/30 failures (100%) — county aggregator
+    "waynecounty.com",                      # 30/30 failures (100%) — county aggregator
+    "stclaircounty.org",                    # 23/25 failures (92.0%) — county aggregator
+    "www.michigan.gov",                     # 51/53 failures (96.2%) — state portal + EGLE Playwright download bug
 }
 
 

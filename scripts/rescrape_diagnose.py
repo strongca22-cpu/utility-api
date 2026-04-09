@@ -54,7 +54,7 @@ def find_candidates(state: str | None = None, min_pop: int = 0) -> list[dict]:
         state_filter = "AND sr.pwsid LIKE :state_prefix"
         params["state_prefix"] = f"{state}%"
     if min_pop > 0:
-        pop_filter = "AND c.population_served >= :min_pop"
+        pop_filter = "AND cb.population_served >= :min_pop"
         params["min_pop"] = min_pop
 
     with engine.connect() as conn:
